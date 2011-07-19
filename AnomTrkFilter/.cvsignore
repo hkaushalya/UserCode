@@ -3,3 +3,8 @@
 *.pdf
 *.swp
 *.root
+*.png
+*.gif
+*.txt
+*.log
+*.job
