@@ -13,7 +13,7 @@
 //
 // Original Author:  samantha hewamanage
 //         Created:  Tue Jul  5 17:28:00 CDT 2011
-// $Id: AnomTrkMETFilter.cc,v 1.2 2011/07/12 03:49:00 samantha Exp $
+// $Id: AnomTrkMETFilter.cc,v 1.3 2011/07/16 02:34:14 samantha Exp $
 //
 //
 
@@ -104,36 +104,18 @@ class AnomTrkMETFilter : public edm::EDFilter {
 		int inMinNdofVtx; //minimum number of dof for the vtx
 		double dMaxPrimVtxZ; //maximum seperation between a track and the primary vertex.
 
-		//	 std::vector<edm::RunNumber_t> startrun;
-		//	 std::vector<edm::EventNumber_t> endrun;
-
 		struct Hist_t{
 			TProfile *hAtanVsMet;
-			//TH1F *hNtrks;
-			//TH1F *hTrksPerVtx;
-			//TH1F *hNvtx;
-			//TH1F *hNpets;
 			TH1F *hPfMet;
 			TH1F *hPfMetSig;
-			//High Purity Tracks atan>0.7
-			//TH1F *hNtrks_highPureTrks_atanGt7;
-			//TH1F *hTrksPerVtx_highPureTrks_atanGt7;
-			//TH1F *hNvtx_highPureTrks_atanGt7;
 			TH1F *hPfMet_highPureTrks_atanGt7;
 			TH1F *hPfMetSig_highPureTrks_atanGt7;
-			//High Purity Tracks atan<0.7
-			//TH1F *hNtrks_highPureTrks_atanLt7;
-			//TH1F *hTrksPerVtx_highPureTrks_atanLt7;
-			//TH1F *hNvtx_highPureTrks_atanLt7;
 			TH1F *hPfMet_highPureTrks_atanLt7;
 			TH1F *hPfMetSig_highPureTrks_atanLt7;
 		};
 
 		struct TrackHist_t{
 			TH1F *hQuality;
-			TH1F *hNPixelHits;
-			TH1F *hNStripHits;
-			TH1F *hTrkDelZfromPrimVtx;
 			TH1F *hRatioIt4toIt01;
 			TH1F *hRatioIt5toIt01;
 			TH1F *hRatioPixlesstoIt01;
@@ -142,12 +124,6 @@ class AnomTrkMETFilter : public edm::EDFilter {
 			TH1F *hRatioPixlesstoIt01pure;
 		};
 		TH1F* hPrimVtxz; //z cdt of the primary vertex
-		//TH1F* hTrksPerVtx;
-		//TH2F* hTrksPerVtxGevBins;
-		//TH1F* hTrkVtxSeparation;
-		//TH1F* hTrksPerVtxNtrksRatio;
-		//TH1F* hTrkVtxSeparationGt;
-		//TH1F* hTrkVtxSeparationLt;
 		struct FinalHist_t {
 			TH1F* hPFMet;
 			TH1F* hTCMet;
@@ -164,15 +140,15 @@ class AnomTrkMETFilter : public edm::EDFilter {
 		TrackHist_t hTrkIter0, hTrkIter1, hTrkIter2, hTrkIter3, hTrkIter4, hTrkIter5;
 		Hist_t histsIter4, histsIter5, histsPixless;
 
-		struct RunLumEvt_t
+		struct RunLumiEvt_t
 		{
 			unsigned run;
 			unsigned lumi;
 			unsigned evt;
 		};
 
-		std::vector<RunLumEvt_t> it4Rej, it5Rej, pxlessRej;
-		std::vector<RunLumEvt_t>::iterator rejIt;
+		std::vector<RunLumiEvt_t> it4Rej, it5Rej, pxlessRej;
+		std::vector<RunLumiEvt_t>::iterator rejIt;
 
 		//jet collections
 		edm::InputTag caloJetInputTag_;
@@ -191,7 +167,8 @@ class AnomTrkMETFilter : public edm::EDFilter {
 		};
 		std::vector<TrkRatio_t> vTrkRatio;
 		std::vector<std::pair<edm::RunNumber_t, edm::EventNumber_t> > vBadEvents;
-		bool AnomEvent(const std::pair<edm::RunNumber_t, edm::EventNumber_t> runevt);
+		bool AnomEvent(const RunLumiEvt_t runlumevt);
+		bool processBadOnly;
 		struct EvtInfo_t
 		{
 			double run;
@@ -220,10 +197,19 @@ class AnomTrkMETFilter : public edm::EDFilter {
 		std::string GetEPSname(const std::string name) 
 		{
 			std::stringstream s;
-			s << name << ".eps";
+			s << name << ".png";
 			return s.str();
 		}
 		void PrintHist(TH1 *hist);
+		struct TrkInfo_t
+		{
+			TH1F *algo;
+			TH1F *validPixHits;
+			TH1F *purity;
+			TH1F *pt;
+		};
+
+		TrkInfo_t hTrksAssoWithVtx, hTrksNotAssoWithVtx;
 };
 
 //
@@ -252,6 +238,7 @@ AnomTrkMETFilter::AnomTrkMETFilter(const edm::ParameterSet& iConfig):
 	pfJetInputTag_ = iConfig.getParameter<edm::InputTag>("pfJetInputTag_");
 	iVerbose = iConfig.getUntrackedParameter<int>("verbose",0);
 	print_hists = iConfig.getUntrackedParameter<bool>("print_hists", false);
+	processBadOnly = iConfig.getUntrackedParameter<bool>("processBadOnly", false);
 	iProcessed = 0;
 	iPassed = 0;
 
@@ -261,59 +248,35 @@ AnomTrkMETFilter::AnomTrkMETFilter(const edm::ParameterSet& iConfig):
 	const double met_max = 4000, met_bins = 400;
 
 	histsIter4.hAtanVsMet = fs->make<TProfile> ("Atan2VsMet_iter4" ,"atan2(iter4/iter0+1) Vs PF#slash{E}_{T}", met_bins,0,met_max);
-//	histsIter4.hNvtx  = fs->make<TH1F> ("NVtx_iter4" ," N Vertices", 50,0,50);
 	histsIter4.hPfMet  = fs->make<TH1F> ("PfMet_iter4" ," Raw #slash{E}_{T} (PFMETCollection::pfMet)", met_bins,0,met_max);
 	histsIter4.hPfMetSig  = fs->make<TH1F> ("PfMetSig_iter4" ," #slash{E}_{T}-Sig (PFMETCollection::metSig)", 200,0,20);
-//	histsIter4.hTrksPerVtx = fs->make<TH1F> ("NtrksPerVtx_iter4" ," N Tracks per Vertex", 250,0,500);
 
 	//high purity tracks
-//	histsIter4.hNtrks_highPureTrks_atanGt7 = fs->make<TH1F> ("Ntrks_highPureTrks_atanGt7_iter4" ,"High Purity Tracks atan2(iter4/iter0+1)>0.7: N Tracks", 250,0,500);
-//	histsIter4.hNvtx_highPureTrks_atanGt7  = fs->make<TH1F> ("NVtx_highPureTrks_atanGt7_iter4" ,"High Purity Tracks atan2(iter4/iter0+1)>0.7:  N Vertices", 50,0,50);
 	histsIter4.hPfMet_highPureTrks_atanGt7  = fs->make<TH1F> ("PfMet_highPureTrks_atanGt7_iter4" ,"High Purity Tracks atan2(iter4/iter0+1)>0.7:  PF#slash{E}_{T} (PFMETCollection::pfMet)", met_bins,0,met_max);
 	histsIter4.hPfMetSig_highPureTrks_atanGt7  = fs->make<TH1F> ("PfMetSig_highPureTrks_atanGt7_iter4" ,"High Purity Tracks atan2(iter4/iter0+1)>0.7: PF#slash{E}_{T}-Sig (PFMETCollection::metSig)", 200,0,20);
-//	histsIter4.hTrksPerVtx_highPureTrks_atanGt7 = fs->make<TH1F> ("NtrksPerVtx_highPureTrks_atanGt7_iter4" ,"High Purity Tracks atan2(iter4/iter0+1)>0.7:  N Tracks per Vertex", 250,0,500);
-
-//	histsIter4.hNtrks_highPureTrks_atanLt7 = fs->make<TH1F> ("Ntrks_highPureTrks_atanLt7_iter4" ,"High Purity Tracks atan2(iter4/iter0+1)<0.7: N Tracks", 250,0,500);
-//	histsIter4.hNvtx_highPureTrks_atanLt7  = fs->make<TH1F> ("NVtx_highPureTrks_atanLt7_iter4" ,"High Purity Tracks atan2(iter4/iter0+1)<0.7:  N Vertices", 50,0,50);
 	histsIter4.hPfMet_highPureTrks_atanLt7  = fs->make<TH1F> ("PfMet_highPureTrks_atanLt7_iter4" ,"High Purity Tracks atan2(iter4/iter0+1)<0.7:  PF#slash{E}_{T} (PFMETCollection::pfMet)", met_bins,0,met_max);
 	histsIter4.hPfMetSig_highPureTrks_atanLt7  = fs->make<TH1F> ("PfMetSig_highPureTrks_atanLt7_iter4" ,"High Purity Tracks atan2(iter4/iter0+1)<0.7: PF#slash{E}_{T}-Sig (PFMETCollection::metSig)", 200,0,20);
-//	histsIter4.hTrksPerVtx_highPureTrks_atanLt7 = fs->make<TH1F> ("NtrksPerVtx_highPureTrks_atanLt7_iter4" ,"High Purity Tracks atan2(iter4/iter0+1)<0.7:  N Tracks per Vertex", 250,0,500);
-
 
 	histsIter5.hAtanVsMet = fs->make<TProfile> ("Atan2VsMet_iter5" ,"atan2(iter5/iter0+1) Vs PF#slash{E}_{T}", 200,0,1000);
 
 	//high purity tracks
-//	histsIter5.hNtrks_highPureTrks_atanGt7 = fs->make<TH1F> ("Ntrks_highPureTrks_atanGt7_iter5" ,"High Purity Tracks atan>(iter5/iter0+1)0.7: N Tracks", 250,0,500);
-//	histsIter5.hNvtx_highPureTrks_atanGt7  = fs->make<TH1F> ("NVtx_highPureTrks_atanGt7_iter5" ,"High Purity Tracks atan>(iter5/iter0+1)0.7:  N Vertices", 50,0,50);
 	histsIter5.hPfMet_highPureTrks_atanGt7  = fs->make<TH1F> ("PfMet_highPureTrks_atanGt7_iter5" ,"High Purity Tracks atan>(iter5/iter0+1)0.7:  PF#slash{E}_{T} (PFMETCollection::pfMet)", met_bins,0,met_max);
 	histsIter5.hPfMetSig_highPureTrks_atanGt7  = fs->make<TH1F> ("PfMetSig_highPureTrks_atanGt7_iter5" ,"High Purity Tracks atan2(iter5/iter0+1)>0.7: PF#slash{E}_{T}-Sig (PFMETCollection::metSig)", 200,0,20);
-//	histsIter5.hTrksPerVtx_highPureTrks_atanGt7 = fs->make<TH1F> ("NtrksPerVtx_highPureTrks_atanGt7_iter5" ,"High Purity Tracks atan>(iter5/iter0+1)0.7:  N Tracks per Vertex", 250,0,500);
 
-//	histsIter5.hNtrks_highPureTrks_atanLt7 = fs->make<TH1F> ("Ntrks_highPureTrks_atanLt7_iter5" ,"High Purity Tracks atan<(iter5/iter0+1)0.7: N Tracks", 250,0,500);
-//	histsIter5.hNvtx_highPureTrks_atanLt7  = fs->make<TH1F> ("NVtx_highPureTrks_atanLt7_iter5" ,"High Purity Tracks atan<(iter5/iter0+1)0.7:  N Vertices", 50,0,50);
 	histsIter5.hPfMet_highPureTrks_atanLt7  = fs->make<TH1F> ("PfMet_highPureTrks_atanLt7_iter5" ,"High Purity Tracks atan<(iter5/iter0+1)0.7:  PF#slash{E}_{T} (PFMETCollection::pfMet)", met_bins,0,met_max);
 	histsIter5.hPfMetSig_highPureTrks_atanLt7  = fs->make<TH1F> ("PfMetSig_highPureTrks_atanLt7_iter5" ,"High Purity Tracks atan2(iter5/iter0+1)<0.7: PF#slash{E}_{T}-Sig (PFMETCollection::metSig)", 200,0,20);
-//	histsIter5.hTrksPerVtx_highPureTrks_atanLt7 = fs->make<TH1F> ("NtrksPerVtx_highPureTrks_atanLt7_iter5" ,"High Purity Tracks atan<(iter5/iter0+1)0.7:  N Tracks per Vertex", 250,0,500);
 
 
 	//pixelless stuff from pure tracks
 	histsPixless.hAtanVsMet = fs->make<TProfile> ("Atan2VsMet_Pixless" ,"atan2(Pixelless/iter0+1) Vs PF#slash{E}_{T}", met_bins,0,met_max);
 
-//	histsPixless.hNtrks_highPureTrks_atanGt7 = fs->make<TH1F> ("Ntrks_highPureTrks_atanGt7_Pixless" ,"High Purity Tracks atan>(Pixless/iter0+1)0.7: N Tracks", 250,0,500);
-//	histsPixless.hNvtx_highPureTrks_atanGt7  = fs->make<TH1F> ("NVtx_highPureTrks_atanGt7_Pixless" ,"High Purity Tracks atan>(Pixless/iter0+1)0.7:  N Vertices", 50,0,50);
 	histsPixless.hPfMet_highPureTrks_atanGt7  = fs->make<TH1F> ("PfMet_highPureTrks_atanGt7_Pixless" ,"High Purity Tracks atan>(Pixless/iter0+1)0.7:  PF#slash{E}_{T} (PFMETCollection::pfMet)", met_bins,0,met_max);
 	histsPixless.hPfMetSig_highPureTrks_atanGt7  = fs->make<TH1F> ("PfMetSig_highPureTrks_atanGt7_Pixless" ,"High Purity Tracks atan2(Pixless/iter0+1)>0.7: PF#slash{E}_{T}-Sig (PFMETCollection::metSig)", 200,0,20);
-//	histsPixless.hTrksPerVtx_highPureTrks_atanGt7 = fs->make<TH1F> ("NtrksPerVtx_highPureTrks_atanGt7_Pixless" ,"High Purity Tracks atan>(Pixless/iter0+1)0.7:  N Tracks per Vertex", 250,0,500);
 
-//	histsPixless.hNtrks_highPureTrks_atanLt7 = fs->make<TH1F> ("Ntrks_highPureTrks_atanLt7_Pixless" ,"High Purity Tracks atan2(Pixless/iter0+1)<0.7: N Tracks", 250,0,500);
-//	histsPixless.hNvtx_highPureTrks_atanLt7  = fs->make<TH1F> ("NVtx_highPureTrks_atanLt7_Pixless" ,"High Purity Tracks atan2(Pixless/iter0+1)<0.7:  N Vertices", 50,0,50);
 	histsPixless.hPfMet_highPureTrks_atanLt7  = fs->make<TH1F> ("PfMet_highPureTrks_atanLt7_Pixless" ,"High Purity Tracks atan2(Pixless/iter0+1)<0.7:  PF#slash{E}_{T} (PFMETCollection::pfMet)", met_bins,0,met_max);
 	histsPixless.hPfMetSig_highPureTrks_atanLt7  = fs->make<TH1F> ("PfMetSig_highPureTrks_atanLt7_Pixless" ,"High Purity Tracks atan2(Pixless/iter0+1)<0.7: PF#slash{E}_{T}-Sig (PFMETCollection::metSig)", 200,0,20);
 
 	hTrkIter0.hQuality = fs->make<TH1F> ("TrkQuality","Trk Quality Flag",10,0,10);
-	//hTrkIter0.hNPixelHits = fs->make<TH1F> ("NPixelHits","Trk N Pixel Hits",100,0,100);
-	//hTrkIter0.hNStripHits = fs->make<TH1F> ("NStripHits","Trk N Strip Hits",100,0,100);
-	//hTrkIter0.hTrkDelZfromPrimVtx = fs->make<TH1F> ("TrkDelZfromPrimVtx","#Delta z = abs(z^{trk} - z^{prim. vtx})",200,0,200);
 	hTrkIter0.hRatioIt4toIt01 = fs->make<TH1F> ("hRatioIt4toIt01","General Tracks: atan2(iter4/Iter0+1);atan2(ratio);Events;",200,0,2);
 	hTrkIter0.hRatioIt5toIt01 = fs->make<TH1F> ("hRatioIt5toIt01","General Tracks: atan2(iter5/Iter0+1);atan2(ratio);Events;",200,0,2);
 	hTrkIter0.hRatioPixlesstoIt01 = fs->make<TH1F> ("hRatioPixlesstoIt01","General Tracks: atan2(Pixless/Iter0+1);atan2(ratio);Events;",200,0,2);
@@ -322,12 +285,6 @@ AnomTrkMETFilter::AnomTrkMETFilter(const edm::ParameterSet& iConfig):
 	hTrkIter0.hRatioPixlesstoIt01pure = fs->make<TH1F> ("hRatioPixlesstoIt01pure","High Purity Tracks: atan2(Pixless/Iter0+1);atan2(ratio);Events;",200,0,2);
 
 	hPrimVtxz = fs->make<TH1F> ("PrimVtxZ","Primvary Vertex z-position;z [cm];Events;",300,0,300);
-	//hTrksPerVtx = fs->make<TH1F> ("trksPerVtx","Tracks per vtx;Tracks per vtx;Events;",300,0,300);
-	//hTrksPerVtxGevBins = fs->make<TH2F> ("trksPerVtxGeVBins","Tracks per vtx in GeVBin;Tracks per vtx in 5GeV bins;Events;",20,0,100,50,0,50);
-	//hTrkVtxSeparation = fs->make<TH1F> ("trkVtxSeparation","Track-vtx z separation;#Delta z;Events",100,0,100);
-	//hTrksPerVtxNtrksRatio	 = fs->make<TH1F> ("trksPetrVtxNtrksRation","Traks per vertex/ntracks;ratio;Events",100,0,1);
-	//hTrkVtxSeparationGt = fs->make<TH1F> ("trkVtxSeparationGt","Track-vtx z separation for trk ratio > ;#Delta z;Events",100,0,100);
-	//hTrkVtxSeparationLt = fs->make<TH1F> ("trkVtxSeparationLt","Track-vtx z separation for trk ratio < ;#Delta z;Events",100,0,100);
 
 	const double ratio_bins = 300, ratio_min = -2., ratio_max = 1.;
 	const double ratio2_bins = 1000, ratio2_min = -10., ratio2_max = 10.;
@@ -373,6 +330,18 @@ AnomTrkMETFilter::AnomTrkMETFilter(const edm::ParameterSet& iConfig):
 	hCutHist.AfterNtrkRatioCut_ratio3 = fs->make<TH1F> ("AfterNtrkRatioCut_ratio3" ,"AfterNtrkRatioCut_ratio3;Ratio;Events;", ratio3_bins, ratio3_min, ratio3_max);
 	hCutHist.AfterNtrkRatioRatio2Cut_ratio3 = fs->make<TH1F> ("AfterNtrkRatioRatio2Cut_ratio3" ,"AfterNtrkRatioRatio2Cut_ratio3;Ratio;Events;", ratio3_bins, ratio3_min, ratio3_max);
 
+
+	//track quality check
+	hTrksAssoWithVtx.algo = fs->make<TH1F> ("nTrksAssoWithVtx_algo" ,"nTrksAssoWithVtx algo;Algo;;", 11, -.05, 10.5);
+	hTrksAssoWithVtx.validPixHits = fs->make<TH1F> ("nTrksAssoWithVtx_pixHits" ,"nTrksAssoWithVtx validPixHist;PixHist;;", 20, 0, 20);
+	hTrksAssoWithVtx.purity = fs->make<TH1F> ("nTrksAssoWithVtx_purity" ,"nTrksAssoWithVtx purity;Algo;Events;", 11, -.05, 10.5);
+	hTrksAssoWithVtx.pt = fs->make<TH1F> ("nTrksAssoWithVtx_pt" ,"nTrksAssoWithVtx pt;pt;;", 100, 0, 500);
+
+	hTrksNotAssoWithVtx.algo = fs->make<TH1F> ("nTrksNotAssoWithVtx_algo" ,"nTrksNotAssoWithVtx algo;Algo;;", 11, -.05, 10.5);
+	hTrksNotAssoWithVtx.validPixHits = fs->make<TH1F> ("nTrksNotAssoWithVtx_pixHits" ,"nTrksNotAssoWithVtx validPixHist;PixHist;;", 20, 0, 20);
+	hTrksNotAssoWithVtx.purity = fs->make<TH1F> ("nTrksNotAssoWithVtx_purity" ,"nTrksNotAssoWithVtx purity;Algo;Events;", 11, -.05, 10.5);
+	hTrksNotAssoWithVtx.pt = fs->make<TH1F> ("nTrksNotAssoWithVtx_pt" ,"nTrksNotAssoWithVtx pt;pt;;", 100, 0, 500);
+
 }
 
 
@@ -394,11 +363,6 @@ bool
 AnomTrkMETFilter::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
    using namespace edm;
-/*#ifdef THIS_IS_AN_EVENTSETUP_EXAMPLE
-   ESHandle<SetupData> pSetup;
-   iSetup.get<SetupRecord>().get(pSetup);
-#endif
-*/
 	++iProcessed;
 	const double fMinTrkPt = 0.9;
 	bool bSaveEvent = false;
@@ -406,16 +370,16 @@ AnomTrkMETFilter::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 	RunNumber_t kRun   = iEvent.id().run();
 	EventNumber_t kEvent = iEvent.id().event();
 	LuminosityBlockNumber_t kLumi  = iEvent.id().luminosityBlock(); 
-	RunLumEvt_t kRunLumiEvent;
+	RunLumiEvt_t kRunLumiEvent;
 	kRunLumiEvent.run = kRun;
 	kRunLumiEvent.lumi = kLumi;
 	kRunLumiEvent.evt = kEvent;
+	if (processBadOnly)
+	{
+		std::cout << "Processing only bad events." << std::endl;
+		if (! AnomEvent(kRunLumiEvent)) return 0;
+	}
 
-	//if (! AnomEvent(kRunLumiEvent)) return 0;
-	//std::cout << "====== processing event " << kRun << ", " << kEvent << std::endl;
-	//if (kEvent != 22174344 || kEvent != 91591777) return 0;
-	//if (kEvent != 91591777) return 0;
-	//std::cout << "====== FOUND EVENT event " << kRun << ", " << kEvent << std::endl;
 	if (iVerbose) std::cout << "====== processing event " << kRun << ", " << kEvent << std::endl;
 
 	//========== Trigger Selections
@@ -436,7 +400,6 @@ AnomTrkMETFilter::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 			dPFMet = it->pt();
 			dPFMetSig = it->mEtSig();
 			if (dPFMet<dminMet) return 0;  //minimum met requirement
-
 		}
 	} else
 	{
@@ -507,12 +470,13 @@ AnomTrkMETFilter::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 	for (reco::TrackCollection::const_iterator it = tracks->begin(); it != tracks->end(); ++it)
 	{
 			const double trkpt = it->pt();
-			//if (trkpt< fMinTrkPt) continue;
+			if (trkpt< fMinTrkPt) continue;
 			jj++;
 			//std::cout << "trk [" << jj << "]"<< std::setw(10) << it->pt() << "/"<< std::setw(10) << it->phi() << "/"<< std::setw(10)<< it->eta() << std::endl;
 			ntrks++;
 			if (trkpt>0.9) ++ntrks_above9;
-			if (it->hitPattern().numberOfValidPixelHits() ==0) ++ntrks_nopixhits; 
+			//if (it->hitPattern().numberOfValidPixelHits() ==0) ++ntrks_nopixhits; 
+			if (it->hitPattern().numberOfValidPixelHits() <3) ++ntrks_nopixhits; 
 	}
 
  // ==========================================================
@@ -526,7 +490,7 @@ AnomTrkMETFilter::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
    if (vertexHandle.isValid())
 	{
      reco::VertexCollection vertexCollection = *(vertexHandle.product());
-     //std::cout << "VtxSize = "<<  vertexCollection.size() << std::endl;
+     if (iVerbose) std::cout << __LINE__<< "::" << __FUNCTION__ << "::VtxSize = "<<  vertexCollection.size() << std::endl;
      reco::VertexCollection::const_iterator v = vertexCollection.begin();
 	  if (v->isValid())
 	  {
@@ -544,7 +508,7 @@ AnomTrkMETFilter::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 			  hPrimVtxz->Fill(dPrimVtx_z);
 				//std::cout << "vertex["<< i << "] ndof/chi2/z = " <<v->ndof() << "/ " << v->chi2() << v->z() 
 			  	//		<< "  ][ntrks associated = " << v->tracksSize() << std::endl; 
-				//AnalyseTracks(tracks, v);
+				AnalyseTracks(tracks, v);
 				//loop over tracks associated with the vertex
 				reco::Vertex::trackRef_iterator trackIter = v->tracks_begin();
 				double nTrk = 0;
@@ -620,8 +584,8 @@ AnomTrkMETFilter::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 		//
 //	 	std::cout << "ntrks/ratio/ratio2/ratio3 = "<< ntrks_above9 << "/" <<
 //					tr.ratio << "/"<< tr.ratio2 <<"/"<< tr.ratio3 << std::endl;
-	  if  (ntrks>10 &&  tr.ratio<0.55 && tr.ratio2>0.35 && tr.ratio3>0.4) 
-	  //if  (ntrks>10 &&  tr.ratio<0.55 && tr.ratio2>0.29 && tr.ratio3>0.3) 
+	  //if  (ntrks>10 &&  tr.ratio<0.55 && tr.ratio2>0.35 && tr.ratio3>0.4) 
+	  if  (ntrks>10 &&  tr.ratio<0.55 && tr.ratio2>0.29 && tr.ratio3>0.3) 
 	  {
 		  if (dPFMet>dminMet || dTcMet>dminMet) bSaveEvent = true;
 		  vBadEvents_fromMyCuts.push_back(eventInfo);
@@ -884,13 +848,13 @@ AnomTrkMETFilter::beginJob()
 
 }
 
-bool AnomTrkMETFilter::AnomEvent(const std::pair<edm::RunNumber_t, edm::EventNumber_t> runevt)
+bool AnomTrkMETFilter::AnomEvent(const RunLumiEvt_t runevt)
 {
 //	std::cout << "****** bad evt check! " << vBadEvents.size() << std::endl;
 	for (std::vector<std::pair<edm::RunNumber_t, edm::EventNumber_t> >::const_iterator it = vBadEvents.begin(); it != vBadEvents.end(); ++it)
 	{
 //			std::cout << "****** bad evt = " << runevt.first << " [" << runevt.second << "]" << it->first << ", " << it->second << std::endl;
-			if (it->first == runevt.first && it->second == runevt.second)
+			if (it->first == runevt.run && it->second == runevt.evt)
 			{
 				std::cout << "########################### MATCH FOUND " << std::endl;
 				return true;
@@ -1016,8 +980,14 @@ void AnomTrkMETFilter::PrintHist(TH1 *hist)
 }
 void AnomTrkMETFilter::AnalyseTracks(const edm::Handle<reco::TrackCollection> tracks, const reco::VertexCollection::const_iterator vtx)
 {
+/* Dump addition info about the traks associated with a vertex.
+ *
+ *
+ */
 	int j = 0;
 	int matched = 0;
+	std::vector<int> vMatchedTracks;
+	if (iVerbose) std::cout << std::setw(10) << "Match?" << std::setw(12) << "highPure?" << std::setw(5) << "algo" << std::setw(12) << "pt" <<  std::setw(15) << "numberOfValidPixelHits" <<  std::endl;   
 	for (reco::TrackCollection::const_iterator it = tracks->begin(); it != tracks->end(); ++it)
 	{
 		++j;
@@ -1033,10 +1003,18 @@ void AnomTrkMETFilter::AnalyseTracks(const edm::Handle<reco::TrackCollection> tr
 			{
 				matchFound = true;
 				++matched;
+				vMatchedTracks.push_back(j);
 				//std::cout << "Matching [vtx trk=trklbk][dz] =" << i << " = " << j << "][" << fabs(vtx->z() - it->innerPosition().Z())  << std::endl;
 				//hTrkVtxSeparationGt->Fill(fabs(vtx->z() - it->innerPosition().Z()));
-				//std::cout << std::setw(12) << "highPure?" << std::setw(5) << "algo" << std::setw(12) << "pt" <<  std::setw(15) << "numberOfValidPixelHits" <<  std::endl;   
-				//std::cout << std::setw(12) << it->quality(reco::TrackBase::highPurity) << std::setw(5) << it->algo() << std::setw(12) << it->pt() <<  std::setw(15) << it->hitPattern().numberOfValidPixelHits() <<  std::endl;   
+				if (iVerbose) std::cout << std::setw(10) << "YES ["<<j << "," << i << "]" 
+						<< std::setw(12) << it->quality(reco::TrackBase::highPurity) 
+						<< std::setw(5) << it->algo() << std::setw(12) << it->pt() 
+						<<  std::setw(15) << it->hitPattern().numberOfValidPixelHits() <<  std::endl;   
+
+				hTrksAssoWithVtx.algo->Fill(it->algo());
+				hTrksAssoWithVtx.validPixHits->Fill(it->hitPattern().numberOfValidPixelHits());
+				hTrksAssoWithVtx.purity->Fill(it->quality(reco::TrackBase::highPurity));
+				hTrksAssoWithVtx.pt->Fill(it->pt());
 			}
 
 		}
@@ -1045,9 +1023,35 @@ void AnomTrkMETFilter::AnalyseTracks(const edm::Handle<reco::TrackCollection> tr
 			//std::cout << " NOT Matching trk : innerPosition= " << it->innerPosition().Z()  << std::endl;
 			//std::cout << std::setw(12) << "highPure?" << std::setw(5) << "algo" << std::setw(12) << "pt" <<  std::setw(15) << "numberOfValidPixelHits" <<  std::endl;   
 			//std::cout << std::setw(12) << it->quality(reco::TrackBase::highPurity) << std::setw(5) << it->algo() << std::setw(12) << it->pt() <<  std::setw(15) << it->hitPattern().numberOfValidPixelHits() <<  std::endl;   
+			if (iVerbose) std::cout << std::setw(10) << "NO ["<< j << "," << i<< "]" 
+				<< std::setw(12) << it->quality(reco::TrackBase::highPurity) 
+				<< std::setw(5) << it->algo() << std::setw(12) << it->pt() 
+				<<  std::setw(15) << it->hitPattern().numberOfValidPixelHits() <<  std::endl;   
 		}
 	}
-	std::cout << "Found " << matched << " matches from " << j << " tracks." << std::endl;
+	if (iVerbose) std::cout << "Found " << matched << " matches from " << j << " tracks." << std::endl;
+	
+	int k =0;
+	for (reco::TrackCollection::const_iterator it = tracks->begin(); it != tracks->end(); ++it)
+	{
+		++k;
+		bool match = false;
+		for (std::vector<int>::const_iterator it2 = vMatchedTracks.begin(); it2 != vMatchedTracks.end(); ++it2)
+		{
+			if (k == (*it2))
+			{
+				match = true;
+				break;
+			}
+		}
+		if (! match)
+		{
+			hTrksNotAssoWithVtx.algo->Fill(it->algo());
+			hTrksNotAssoWithVtx.validPixHits->Fill(it->hitPattern().numberOfValidPixelHits());
+			hTrksNotAssoWithVtx.purity->Fill(it->quality(reco::TrackBase::highPurity));
+			hTrksNotAssoWithVtx.pt->Fill(it->pt());
+		}
+	}
 
 }
 
