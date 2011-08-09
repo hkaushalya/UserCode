@@ -20,8 +20,9 @@ class HistMaker
 	public:
 		HistMaker();
 		~HistMaker();
-		void AddHist(const string completeName, const string title="", const bool logScale=false,
-						const double yMaxMultiplier=1);
+		void AddHist(const string completeName, const string title="",
+					const int rebin=1, const bool logScale=false,
+					const double yMaxMultiplier=1);
 		void AddFile(const string fileName, const string legendText,
 				const int marker = 0, const int lineWidth=2, const int lineColor=2); 
 		void LegendOptions(const float x1=0.6, const float x2=0.9, const float y1=0.7, const float y2=0.9, const float font=42);
@@ -42,6 +43,7 @@ class HistMaker
 		{
 			string name;
 			string title;
+			int rebin;
 			bool logScale;
 			double yMaxMultiplier;
 		};
@@ -93,11 +95,12 @@ void HistMaker::PrintFormat(const string format)
 }
 
 
-void HistMaker::AddHist(const string histName, const string title, const bool logScale, const double yMaxMultiplier)
+void HistMaker::AddHist(const string histName, const string title, const int rebin, const bool logScale, const double yMaxMultiplier)
 { 
 	histNames_t hName;
 	hName.name = histName;
 	hName.title = title;
+	hName.rebin = rebin;
 	hName.logScale = logScale;
 	hName.yMaxMultiplier = yMaxMultiplier;
 	vHistNames.push_back(hName);
@@ -179,6 +182,8 @@ void HistMaker::Draw(const int iHist)
 			{
 				vHistPropeties.at(i).hist->SetTitle(vHistNames.at(iHist).title.c_str());
 			}
+
+			vHistPropeties.at(i).hist->Rebin(vHistNames.at(iHist).rebin);
 
 			leg->AddEntry(vHistPropeties.at(i).hist, vHistPropeties.at(i).legendText.c_str());
 		}
