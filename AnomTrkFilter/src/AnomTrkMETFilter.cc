@@ -55,6 +55,8 @@
 #include "DataFormats/JetReco/interface/CaloJetCollection.h"
 #include "DataFormats/JetReco/interface/PFJetCollection.h"
 
+#include "DataFormats/BeamSpot/interface/BeamSpot.h"
+
 //ROOT
 #include "TH1F.h"
 #include "TH2F.h"
@@ -168,6 +170,15 @@ class AnomTrkMETFilter : public edm::EDFilter {
 			TH1F* exptOuterHits;
 			TProfile *ptVsptErr;
 			TH1F* validHitFraction;
+			TH1F *chi2;
+			TH1F *vx;
+			TH1F *vy;
+			TH1F *vz;
+			TH1F *delz;
+			TH1F *delr3d;
+			TH1F *delr3d_bs;
+			TH1F *normalizedChi2;
+			TH1F *ndof;
 		};
 		struct PFHists_t {
 			TH1F* chargeHadFraction;
@@ -180,7 +191,8 @@ class AnomTrkMETFilter : public edm::EDFilter {
 					const std::vector<unsigned> vMatchedTracks);
 		bool storeHLT(const edm::Event& e, const edm::EventSetup& iSetup);
 		void PFlowAnalyse(edm::Event&, const edm::EventSetup&);
-		void FillTrackInfoHists(TrkInfo_t trkHist, reco::TrackCollection::const_iterator it);
+		void FillTrackInfoHists(TrkInfo_t trkHist, reco::TrackCollection::const_iterator it
+					, const math::XYZPoint vtxPoint);
 		edm::InputTag m_trackCollection;
 		edm::InputTag m_vtxCollection;
 		//const double m_vtxzcut;
@@ -214,6 +226,7 @@ class AnomTrkMETFilter : public edm::EDFilter {
 		bool AnomEvent(const RunLumiEvt_t runlumevt);
 		bool processBadOnly;
 
+		edm::InputTag beamSpotInputTag_;
 		std::vector<EvtInfo_t> vBadEvents_fromMyCuts, vBadEvents_fromAndreasCuts;
 		int iVerbose; // control print levels
 
@@ -259,6 +272,7 @@ class AnomTrkMETFilter : public edm::EDFilter {
 		TH1F* nTrksVtxWgtmoreThan5_pt;
 
 		TrkInfo_t hTrksAssoWithVtx, hTrksNotAssoWithVtx;
+		math::XYZPoint beamSpot;
 };
 
 //
@@ -285,6 +299,7 @@ AnomTrkMETFilter::AnomTrkMETFilter(const edm::ParameterSet& iConfig):
 	dMaxPrimVtxZ = iConfig.getUntrackedParameter<double>("maxDelzTrkVtx",200.0);
 	caloJetInputTag_ = iConfig.getParameter<edm::InputTag>("caloJetInputTag_");
 	pfJetInputTag_ = iConfig.getParameter<edm::InputTag>("pfJetInputTag_");
+	beamSpotInputTag_ = iConfig.getParameter<edm::InputTag>("beamSpotSrc");
 	iVerbose = iConfig.getUntrackedParameter<int>("verbose",0);
 	print_hists = iConfig.getUntrackedParameter<bool>("printHists", false);
 	processBadOnly = iConfig.getUntrackedParameter<bool>("processBadOnly", false);
@@ -395,6 +410,15 @@ AnomTrkMETFilter::AnomTrkMETFilter(const edm::ParameterSet& iConfig):
 	hTrksAssoWithVtx.exptOuterHits = fs->make<TH1F> ("nTrksAssoWithVtx_exptOuterHits" ,"nTrksAssoWithVtx exptOuterHits;#Delta exptOuterHits;;", 20, 0, 20);
 	hTrksAssoWithVtx.ptVsptErr = fs->make<TProfile> ("nTrksAssoWithVtx_ptVsptErr" ,"nTrksAssoWithVtx ptVsptErr;pt;#Delta pt/pt;", 100, 0, 500);
 	hTrksAssoWithVtx.validHitFraction = fs->make<TH1F> ("nTrksAssoWithVtx_validHitFraction" ,"nTrksAssoWithVtx validHitFractio;Valid Hit Fraction;;", 100, 0, 1);
+	hTrksAssoWithVtx.chi2 = fs->make<TH1F> ("nTrksAssoWithVtx_chi2" ,"nTrksAssoWithVtx #Chi^{2};#Chi^{2};;", 800,0 ,80);
+	hTrksAssoWithVtx.vz = fs->make<TH1F> ("nTrksAssoWithVtx_vz" ,"nTrksAssoWithVtx vz;vz;;",200, 0, 200);
+	hTrksAssoWithVtx.vx = fs->make<TH1F> ("nTrksAssoWithVtx_vx" ,"nTrksAssoWithVtx vx;vx;;",200, 0, 200);
+	hTrksAssoWithVtx.vy = fs->make<TH1F> ("nTrksAssoWithVtx_vy" ,"nTrksAssoWithVtx vy;vy;;",200, 0, 200);
+	hTrksAssoWithVtx.delz = fs->make<TH1F> ("nTrksAssoWithVtx_delz" ,"nTrksAssoWithVtx #delta z;#delta z;;",200 ,0 ,200);
+	hTrksAssoWithVtx.delr3d = fs->make<TH1F> ("nTrksAssoWithVtx_delr3d" ,"nTrksAssoWithVtx #delta r (3D);#delta r;;",1000,0,10);
+	hTrksAssoWithVtx.delr3d_bs = fs->make<TH1F> ("nTrksAssoWithVtx_delr3d_bs" ,"nTrksAssoWithVtx #delta r (3D) w.r.t to offline beamspot;#delta r (wrt BS);;",2500,0,25);
+	hTrksAssoWithVtx.normalizedChi2 = fs->make<TH1F> ("nTrksAssoWithVtx_normChi2" ,"nTrksAssoWithVtx;Normalized #Chi^{2};;", 100,0 ,10);
+	hTrksAssoWithVtx.ndof = fs->make<TH1F> ("nTrksAssoWithVtx_ndof" ,"nTrksAssoWithVtx ;ndof;;", 80,0 ,80);
 
 	hTrksNotAssoWithVtx.ntrks = fs->make<TH1F> ("nTrksNotAssoWithVtx_ntrks" ,"nTrksNotAssoWithVtx;N tracks;Events;", 700,0 ,700);
 	hTrksNotAssoWithVtx.algo = fs->make<TH1F> ("nTrksNotAssoWithVtx_algo" ,"nTrksNotAssoWithVtx algo;Algo;;", 11, -.05, 10.5);
@@ -408,6 +432,15 @@ AnomTrkMETFilter::AnomTrkMETFilter(const edm::ParameterSet& iConfig):
 	hTrksNotAssoWithVtx.exptOuterHits = fs->make<TH1F> ("nTrksNotAssoWithVtx_exptOuterHits" ,"nTrksNotAssoWithVtx exptOuterHits;#Delta exptOuterHits;;", 20, 0, 20);
 	hTrksNotAssoWithVtx.ptVsptErr = fs->make<TProfile> ("nTrksNotAssoWithVtx_ptVsptErr" ,"nTrksNotAssoWithVtx ptVsptErr;pt;#Delta pt/pt;", 100, 0, 500);
 	hTrksNotAssoWithVtx.validHitFraction = fs->make<TH1F> ("nTrksNotAssoWithVtx_validHitFraction" ,"nTrksNotAssoWithVtx validHitFractio;Valid Hit Fraction;;", 100, 0, 1);
+	hTrksNotAssoWithVtx.chi2 = fs->make<TH1F> ("nTrksNotAssoWithVtx_chi2" ,"nTrksNotAssoWithVtx #Chi^{2};#Chi^{2};;", 800,0 ,80);
+	hTrksNotAssoWithVtx.vz = fs->make<TH1F> ("nTrksNotAssoWithVtx_vz" ,"nTrksNotAssoWithVtx vz;vz;;",200, 0, 200);
+	hTrksNotAssoWithVtx.vx = fs->make<TH1F> ("nTrksNotAssoWithVtx_vx" ,"nTrksNotAssoWithVtx vx;vx;;",200, 0, 200);
+	hTrksNotAssoWithVtx.vy = fs->make<TH1F> ("nTrksNotAssoWithVtx_vy" ,"nTrksNotAssoWithVtx vy;vy;;",200, 0, 200);
+	hTrksNotAssoWithVtx.delz = fs->make<TH1F> ("nTrksNotAssoWithVtx_delz" ,"nTrksNotAssoWithVtx #delta z;#delta z;;",200 ,0 ,200);
+	hTrksNotAssoWithVtx.delr3d = fs->make<TH1F> ("nTrksNotAssoWithVtx_delr3d" ,"nTrksNotAssoWithVtx #delta r (3D);#delta r;;",1000,0,10);
+	hTrksNotAssoWithVtx.delr3d_bs = fs->make<TH1F> ("nTrksNotAssoWithVtx_delr3d_bs" ,"nTrksNotAssoWithVtx #delta r (3D) w.r.t to offline beamspot;#delta r (wrt BS);;",2500,0,25);
+	hTrksNotAssoWithVtx.normalizedChi2 = fs->make<TH1F> ("nTrksNotAssoWithVtx_normChi2" ,"nTrksNotAssoWithVtx;Normalized #Chi^{2};;", 100,0 ,10);
+	hTrksNotAssoWithVtx.ndof = fs->make<TH1F> ("nTrksNotAssoWithVtx_ndof" ,"nTrksNotAssoWithVtx ;ndof;;", 80,0 ,80);
 
 
 	trkPurityFraction  = fs->make<TH1F> ("trkPurityFraction" ,"trkPurityFraction (high purity tracks/all tracks);ratio;;", 100, 0, 1);
@@ -485,6 +518,22 @@ AnomTrkMETFilter::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 	if (req_trigger)
 	{
 		if (! storeHLT(iEvent, iSetup)) return 0;
+	}
+
+	// =========================================================
+	// BEAM SPOT INFORMATION
+	
+	edm::Handle<reco::BeamSpot> recoBeamSpotHandle;
+	iEvent.getByLabel(beamSpotInputTag_,recoBeamSpotHandle);
+	reco::BeamSpot bs = *recoBeamSpotHandle;     
+
+	if (recoBeamSpotHandle.isValid()) 
+	{
+	   beamSpot.SetXYZ(recoBeamSpotHandle->x0(), recoBeamSpotHandle->y0(), recoBeamSpotHandle->z0());
+	} else 
+	{
+		
+		beamSpot.SetXYZ(0, 0, 0);
 	}
 
 	//************** PF Collections analyser
@@ -1219,6 +1268,7 @@ void AnomTrkMETFilter::AnalyseTracks(const edm::Handle<reco::TrackCollection> tr
 		for (reco::Vertex::trackRef_iterator vtxTrkIter = vtx->tracks_begin();vtxTrkIter != vtx->tracks_end(); vtxTrkIter++)
 		{
 			++i;
+			 math::XYZPoint vtxPoint = vtx->position();
 
 			if ( (*vtxTrkIter)->pt() == it->pt()
 					&& (*vtxTrkIter)->eta() == it->eta()
@@ -1227,7 +1277,8 @@ void AnomTrkMETFilter::AnalyseTracks(const edm::Handle<reco::TrackCollection> tr
 				matchFound = true;
 				++matched;
 				vMatchedTracks.push_back(j);
-				//std::cout << "Matching [vtx trk=trklbk][dz] =" << i << " = " << j << "][" << fabs(vtx->z() - it->innerPosition().Z())  << std::endl;
+				//std::cout << "Matching [vtx/ trk=trklbk][dz] =" << i << " = " << j << "][" << fabs(vtx->z() - it->innerPosition().Z())  << std::endl;
+				//std::cout << "Matching [vtx/ trk=trklbk] =" << i << "/ " << j << "][pt=" << it->pt() << "]"  << std::endl;
 				//hTrkVtxSeparationGt->Fill(fabs(vtx->z() - it->innerPosition().Z()));
 				if (iVerbose) std::cout << std::setw(10) << "YES ["<<j << "," << i << "]" 
 						<< std::setw(12) << it->quality(reco::TrackBase::highPurity) 
@@ -1235,7 +1286,7 @@ void AnomTrkMETFilter::AnalyseTracks(const edm::Handle<reco::TrackCollection> tr
 						<<  std::setw(15) << it->hitPattern().numberOfValidPixelHits() <<  std::endl;   
 
 				hTrksAssoWithVtx.wgt->Fill(vtx->trackWeight((*vtxTrkIter)));
-				FillTrackInfoHists(hTrksAssoWithVtx,it);
+				FillTrackInfoHists(hTrksAssoWithVtx,it, vtxPoint);
 			}
 
 		}
@@ -1265,6 +1316,11 @@ void AnomTrkMETFilter::FillUnmatchTrackHists(edm::Handle<reco::TrackCollection> 
 
 	unsigned k =0;
    double nPureTrks = 0;
+				std::cout << std::setw(15) << "Asso. w. Vtx?" <<  std::setw(6) << "Trk#"
+						<< std::setw(10) << "pt"
+						<< std::setw(12) << "highPurity?"
+						<< std::setw(5) << "algo" 
+						<<  std::setw(15) << "ValidPixHits" <<  std::endl;   
 	for (reco::TrackCollection::const_iterator it = tracks->begin(); it != tracks->end(); ++it)
 	{
 		++k;
@@ -1275,12 +1331,24 @@ void AnomTrkMETFilter::FillUnmatchTrackHists(edm::Handle<reco::TrackCollection> 
 			if (k == (*it2))
 			{
 				match = true;
+				std::cout << std::setw(15) << "YES" <<  std::setw(6) << k
+						<< std::setw(10) << it->pt()
+						<< std::setw(12) << it->quality(reco::TrackBase::highPurity) 
+						<< std::setw(5) << it->algo() 
+						<<  std::setw(15) << it->hitPattern().numberOfValidPixelHits() <<  std::endl;   
 				break;
 			}
 		}
 		if (! match)
 		{
-			FillTrackInfoHists(hTrksNotAssoWithVtx,it);
+			//std::cout << "NOT Matching [" << k << "][pt=" << it->pt() << "]"  << std::endl;
+				std::cout << std::setw(15) << "NO" <<  std::setw(6) << k
+						<< std::setw(10) << it->pt()
+						<< std::setw(12) << it->quality(reco::TrackBase::highPurity) 
+						<< std::setw(5) << it->algo() 
+						<<  std::setw(15) << it->hitPattern().numberOfValidPixelHits() <<  std::endl;   
+			math::XYZPoint vtxPoint(0,0,0);
+			FillTrackInfoHists(hTrksNotAssoWithVtx,it, vtxPoint);
 		}
 	}
 
@@ -1404,7 +1472,9 @@ void AnomTrkMETFilter::PFlowAnalyse(edm::Event& iEvent, const edm::EventSetup& i
 */
 }
 
-void AnomTrkMETFilter::FillTrackInfoHists(TrkInfo_t trkHist, reco::TrackCollection::const_iterator it)
+void AnomTrkMETFilter::FillTrackInfoHists(TrkInfo_t trkHist, 
+				reco::TrackCollection::const_iterator it
+				, const math::XYZPoint vtxPoint)
 {
 	trkHist.algo->Fill(it->algo());
 	trkHist.validPixHits->Fill(it->hitPattern().numberOfValidPixelHits());
@@ -1417,6 +1487,24 @@ void AnomTrkMETFilter::FillTrackInfoHists(TrkInfo_t trkHist, reco::TrackCollecti
 	trkHist.exptOuterHits->Fill(it->trackerExpectedHitsOuter().numberOfLostTrackerHits());
 	trkHist.ptVsptErr->Fill(it->pt(),it->ptError()/it->pt());
 	trkHist.validHitFraction->Fill(it->validFraction());
+
+
+	trkHist.chi2->Fill(it->chi2());
+	trkHist.vx->Fill(fabs(it->vx()));
+	trkHist.vy->Fill(fabs(it->vy()));
+	trkHist.vz->Fill(fabs(it->vz()));
+	trkHist.delz->Fill(fabs(vtxPoint.Z() - it->vz()));
+	const float delr = sqrt(pow(vtxPoint.X() - it->vx(),2)
+					+ pow(vtxPoint.Y() - it->vy(),2)
+					+ pow(vtxPoint.Z() - it->vz(),2) );
+	//del r wrt to the offline beamspot
+	const float delr_bs = sqrt(pow(beamSpot.X() - it->vx(),2)
+					+ pow(beamSpot.Y() - it->vy(),2)
+					+ pow(beamSpot.Z() - it->vz(),2) );
+	trkHist.delr3d->Fill(delr);
+	trkHist.delr3d_bs->Fill(delr_bs);
+	trkHist.normalizedChi2->Fill(it->normalizedChi2());
+	trkHist.ndof->Fill(it->ndof());
 }
 
 //define this as a plug-in
