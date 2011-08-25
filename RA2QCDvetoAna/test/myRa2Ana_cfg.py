@@ -18,7 +18,7 @@ process.options = cms.untracked.PSet(
 )
 
 
-evts2Process = 100000
+evts2Process = 500000
 #runningOnMC = True 
 runningOnMC = False
 
@@ -41,21 +41,15 @@ process.MessageLogger.cerr.FwkReport.reportEvery = 1000
 #-- Input Source --------------------------------------------------------------
 process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(evts2Process))
 
-#process.load('SusyAnalysis.MyAnalysis.HTRun2011AMay10ReReco_160404to163869_cfi')
-#process.source = cms.Source("PoolSource", fileNames = cms.untracked.vstring(
-# "dcap://pnfs/cms/WAX/resilient/seema/SusyRA2Analysis/12June2011_HTRun2011A_May10ReReco_160404to163869_AOD_lpcA/susypat_1000_1_jHl.root"
-#,"dcap://pnfs/cms/WAX/resilient/seema/SusyRA2Analysis/12June2011_HTRun2011A_May10ReReco_160404to163869_AOD_lpcA/susypat_1001_1_jZd.root"
-#,"dcap://pnfs/cms/WAX/resilient/seema/SusyRA2Analysis/12June2011_HTRun2011A_May10ReReco_160404to163869_AOD_lpcA/susypat_1002_1_yUP.root"
-#,"dcap://pnfs/cms/WAX/resilient/seema/SusyRA2Analysis/12June2011_HTRun2011A_May10ReReco_160404to163869_AOD_lpcA/susypat_1003_1_GQj.root"
-#,"dcap://pnfs/cms/WAX/resilient/seema/SusyRA2Analysis/12June2011_HTRun2011A_May10ReReco_160404to163869_AOD_lpcA/susypat_1004_1_94m.root"
-#,"dcap://pnfs/cms/WAX/resilient/seema/SusyRA2Analysis/12June2011_HTRun2011A_May10ReReco_160404to163869_AOD_lpcA/susypat_1005_1_QpZ.root"
-#    )
-#)
-if evts2Process != -1 : 
-	print "Using short list of files for testing."
-	process.load("UserCode.RA2QCDvetoAna.HTRun2011APromptRecoV4_160404to167151_shortlist_cfi")
+#process.load("UserCode.JERStudy.JER_2011Aug_QCD_Pt_15to3000_TuneZ2_Flat_7TeV_pythia6_shortlist_cfi")
+process.load("UserCode.JERStudy.JER_2011Aug_QCD_Pt_15to3000_TuneZ2_Flat_7TeV_pythia6_MERGED_cfi")
+
+#if evts2Process != -1 : 
+#	print "Using short list of files for testing."
+#	process.load("UserCode.RA2QCDvetoAna.HTRun2011APromptRecoV4_160404to167151_shortlist_cfi")
 	#process.load("UserCode.RA2QCDvetoAna.2011RA2_Jun09_forrestp_QCD_Pt_15to3000_TuneZ2_Flat_7TeV_pythia6_cfi")
-else : process.load("UserCode.RA2QCDvetoAna.HTRun2011APromptRecoV4_160404to167151_cfi")
+#else : process.load("UserCode.RA2QCDvetoAna.HTRun2011APromptRecoV4_160404to167151_cfi")
+
 #-- check RA2 recipe here ------------------------------------------------------------
 process.prefilterCounter        = cms.EDProducer("EventCountProducer")
 process.postStdCleaningCounter  = cms.EDProducer("EventCountProducer")
@@ -63,6 +57,7 @@ process.postStdCleaningCounter  = cms.EDProducer("EventCountProducer")
 #-- Output module configuration -----------------------------------------------
 process.load('SandBox.Skims.RA2Objects_cff')
 process.load('SandBox.Skims.RA2Selection_cff')
+process.mhtPFFilter.MinMHT = 0
 
 #process.load('SandBox.Skims.puWeightProducer_cfi')
 
@@ -90,8 +85,10 @@ process.QCDvetoAna = cms.EDFilter('RA2QCDvetoAna',
 							htInputTag = cms.InputTag("htPF"),
 							nMinVtx = cms.untracked.int32(1),	
 							ndofVtx = cms.untracked.int32(4),	
-							maxDelzTrkVtx = cms.untracked.double(24.0),	
+							maxDelzVtx = cms.untracked.double(24.0),	
+							maxDelRho = cms.untracked.double(2.0),	
 							minMet = cms.untracked.double(0.0),	
+							dMinHT = cms.untracked.double(350.0),	
 							verbose = cms.untracked.int32(0)
 )
 

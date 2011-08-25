@@ -53,8 +53,13 @@ process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(evts2Process)
 #)
 if evts2Process != -1 : 
 	print "Using short list of files for testing."
-	process.load("UserCode.RA2QCDvetoAna.HTRun2011APromptRecoV4_160404to167151_shortlist_cfi")
+	#process.load("UserCode.RA2QCDvetoAna.HTRun2011APromptRecoV4_160404to167151_shortlist_cfi")
 	#process.load("UserCode.RA2QCDvetoAna.2011RA2_Jun09_forrestp_QCD_Pt_15to3000_TuneZ2_Flat_7TeV_pythia6_cfi")
+	process.source = cms.Source("PoolSource", fileNames = cms.untracked.vstring(
+		'file:/uscms_data/d3/samantha/SUSYRA2work/CMSSW_4_2_5/src/SandBox/Skims/test/MET_PATSkimsIncludeTaiEvents_1.root'
+		)
+	)
+
 else : process.load("UserCode.RA2QCDvetoAna.HTRun2011APromptRecoV4_160404to167151_cfi")
 #-- check RA2 recipe here ------------------------------------------------------------
 process.prefilterCounter        = cms.EDProducer("EventCountProducer")
@@ -78,30 +83,36 @@ process.load('SandBox.Skims.RA2Selection_cff')
 #                                         Debug       = cms.bool(False)
 #)
 
+
+process.load('SandBox.Skims.trackingFailureFilter_cfi')
+
 process.QCDvetoAna = cms.EDFilter('RA2QCDvetoAna',
 							#caloJetInputTag_ = cms.InputTag("ak5CaloJets"),
 							#pfJetInputTag_   = cms.InputTag("ak5PFJets"),
 							#HltTriggerResults = cms.InputTag("TriggerResults::HLT"),
 							#req_trigger = cms.untracked.bool(False),
 							#TriggerPathsToStore = cms.vstring("HLT_MET65_v3"),
-							patJetsInputTag = cms.InputTag("patJetsAK5PFPt30"),
+							patJetsPFPt30InputTag = cms.InputTag("patJetsAK5PFPt30"),
+							patJetsPFPt50Eta25InputTag = cms.InputTag("patJetsAK5PFPt50Eta25"),
 							mhtInputTag = cms.InputTag("mhtPF"),
 							htInputTag = cms.InputTag("htPF"),
 							nMinVtx = cms.untracked.int32(1),	
 							ndofVtx = cms.untracked.int32(4),	
 							maxDelzTrkVtx = cms.untracked.double(24.0),	
+							maxDelRho = cms.untracked.double(2.0),	
 							minMet = cms.untracked.double(0.0),	
 							verbose = cms.untracked.int32(0)
 )
 
 
 process.fullseq = cms.Sequence(
-                      process.ra2StdCleaning *
-                      process.ra2PostCleaning *
-                      process.ra2EcalTPFilter *
-                      process.vetoBEFilterHTRun2011AMay10ReRecov1 *
-                      process.ra2FullPFSelection *
-                      process.QCDvetoAna
+                      #process.ra2StdCleaning *
+                      #process.ra2PostCleaning *
+                      #process.ra2EcalTPFilter *
+                      #process.vetoBEFilterHTRun2011AMay10ReRecov1 *
+                      #process.ra2FullPFSelection *
+    						 process.trackingFailureFilter
+                      *process.QCDvetoAna
 )
 
 process.fullseq.remove(process.jetMHTPFDPhiFilter)
