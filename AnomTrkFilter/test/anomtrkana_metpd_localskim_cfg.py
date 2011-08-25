@@ -47,7 +47,7 @@ if badEvents:
 	process.source = cms.Source("PoolSource",
    	fileNames = cms.untracked.vstring(
 					#'file:./output/TrkFiltOutEventsFromMETPD.root',
-					#'file:/uscms_data/d3/samantha/TrkFiltOutEventsFromJETPD.root'
+#					'file:/uscms_data/d3/samantha/SUSYRA2work/CMSSW_4_2_5/src/SandBox/Skims/test/MET_PATSkimsIncludeTaiEvents.root'
 #this has one of Tai's bad events: 167151:20:22174344
 			'/store/data/Run2011A/MET/RECO/PromptReco-v4/000/167/151/94223088-409B-E011-8FB5-003048F11C58.root',
 #163270:409:252238770 from METB-tag sample
@@ -99,7 +99,8 @@ process.anomtrk = cms.EDFilter('AnomTrkMETFilter',
 							caloJetInputTag_ = cms.InputTag("ak5CaloJets"),
 							pfJetInputTag_   = cms.InputTag("ak5PFJets"),
 							HltTriggerResults = cms.InputTag("TriggerResults::HLT"),
-							print_hists = cms.untracked.bool(True),
+							beamSpotSrc = cms.InputTag("offlineBeamSpot"),
+							print_hists = cms.untracked.bool(False),
 							req_trigger = cms.untracked.bool(False),
 							TriggerPathsToStore = cms.vstring("HLT_MET65_v3"),
 							nMinVtx = cms.untracked.int32(1),	
@@ -129,16 +130,19 @@ process.ecalDeadCellTPfilter.etValToBeFlagged = cms.double(63.75)
 process.ecalDeadCellTPfilter.ebReducedRecHitCollection = cms.InputTag("reducedEcalRecHitsEB")
 process.ecalDeadCellTPfilter.eeReducedRecHitCollection = cms.InputTag("reducedEcalRecHitsEE")
 
+process.load('SandBox.Skims.trackingFailureFilter_cfi')
+
 
 process.myfilter_path = cms.Path(process.noScraping 
 										* process.goodVertices
 										* process.HBHENoiseFilter 
 										* process.beamHaloFilter
 										* process.ecalDeadCellTPfilter
+    									#* process.trackingFailureFilter
 										* process.anomtrk
 )
 
-process.out.SelectEvents = cms.untracked.PSet( SelectEvents = cms.vstring('myfilter_path') )
+#process.out.SelectEvents = cms.untracked.PSet( SelectEvents = cms.vstring('myfilter_path') )
 
-process.outpath = cms.EndPath(process.out)
+#process.outpath = cms.EndPath(process.out)
 
