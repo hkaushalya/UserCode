@@ -106,9 +106,9 @@ class RA2bQCDvetoAna : public edm::EDFilter {
 
 		
 		int inMinVtx;
-		double dminMet;
-		unsigned int iProcessed; // number of processed events
-		unsigned int iPassed; //number of events passed the filter
+		double dMinMet;
+		unsigned int uProcessed; // number of processed events
+		unsigned int uPassed; //number of events passed the filter
 		int inMinNdofVtx; //minimum number of dof for the vtx
 		RunLumiEvt_t kRunLumiEvent;
 		int iVerbose; // control print levels
@@ -123,6 +123,7 @@ class RA2bQCDvetoAna : public edm::EDFilter {
 			TH1F* ht;
 			TH1F* njet;
 			TH1F* metphi;
+			TH1F* met;
 		};
 
 		struct JetHist_t{
@@ -130,6 +131,10 @@ class RA2bQCDvetoAna : public edm::EDFilter {
 			TH1F* eta;
 			TH1F* phi;
 			TH1F* delphi;  //delphi(jet,MHT)
+			//TH1F* delT;
+			TH1F* delTDevidedByJetPt; //delT/Jet Pt
+			TProfile* delTvsJetPt;
+			TProfile* delTDevidedByJetPtvsJetPt; //delT/Jet Pt
 		};
 
 		struct Hist_t {  //hists for each inclusive jet category
@@ -143,14 +148,15 @@ class RA2bQCDvetoAna : public edm::EDFilter {
 
 		TH1F* hDelPhiMin;
 		TH1F* hDelPhiMinNorm;
-		TH2F* hDelPhiMinVsMET;
-		TH2F* hDelPhiMinNormVshDelPhiMin;
-		TH2F* hDelPhiMinNormVsMET;
-		TH1F* hPassFail;
+		TProfile* hDelPhiMinVsMET;
+	//	TH2F* hDelPhiMinNormVshDelPhiMin;
+		TProfile* hDelPhiMinNormVsMET;
+		TH1F* hPass;
 		TH1F* hFail;
-		TH1F* hPassFail_Norm;
+		TH1F* hPassFail;
 		TH1F* hPass_Norm;
 		TH1F* hFail_Norm;
+		TH1F* hPassFail_Norm;
 
 		//TH1F* hist_delphiMin_jetmet[5];
 		//TH2F* hist_delphiMin_jetmetVsMHT[5]; //0=all jets, 1=only 3 jets, 2=upto 4 jets 
@@ -178,10 +184,15 @@ class RA2bQCDvetoAna : public edm::EDFilter {
 				, const unsigned njets
 				, edm::Handle<std::vector<pat::Jet> > jetHandle
 				, edm::Handle<edm::View<reco::MET> > mhtHandle); 
-			void DoDelMinStudy(edm::Handle<edm::View<reco::MET> > mhtHandle 
-				, edm::Handle<std::vector<pat::Jet> > pt30jetHandle);
+			//void DoDelMinStudy(edm::Handle<edm::View<reco::MET> > mhtHandle 
+			//	, edm::Handle<std::vector<pat::Jet> > pt30jetHandle);
+			void DoDelMinStudy(edm::Handle<std::vector<reco::PFMET> >pfMetHandle
+				, edm::Handle<std::vector<pat::Jet> > pt30jetHandle
+				, const std::vector<unsigned> vLead3JetIndices);
 		void PrintHeader();
 		TLorentzVector vMetVec;
+		edm::Handle<std::vector<reco::PFMET> >pfMetHandle;
+		unsigned uFailNvtxCut, uFailNjet50Eta24Cut, uFailMinHTCut, uFailMinPFMetCut;
 };
 
 
@@ -214,7 +225,7 @@ RA2bQCDvetoAna::RA2bQCDvetoAna(const edm::ParameterSet& iConfig)
 	mhtInputTag_ = iConfig.getParameter<edm::InputTag>("mhtInputTag");
 	htInputTag_ = iConfig.getParameter<edm::InputTag>("htInputTag");
 	inMinVtx = iConfig.getUntrackedParameter<int>("nMinVtx",1);
-	dminMet = iConfig.getUntrackedParameter<double>("minMet",0.0);
+	dMinMet = iConfig.getUntrackedParameter<double>("minMet",0.0);
 	dMinHT = iConfig.getUntrackedParameter<double>("dMinHT",350.0);
 	inMinNdofVtx = iConfig.getUntrackedParameter<int>("ndofVtx",0);
 	dMaxPrimVtxZ = iConfig.getUntrackedParameter<double>("maxDelzVtx",24.0);
@@ -222,9 +233,13 @@ RA2bQCDvetoAna::RA2bQCDvetoAna(const edm::ParameterSet& iConfig)
 	//caloJetInputTag_ = iConfig.getParameter<edm::InputTag>("caloJetInputTag_");
 	//pfJetInputTag_ = iConfig.getParameter<edm::InputTag>("pfJetInputTag_");
 	iVerbose = iConfig.getUntrackedParameter<int>("verbose",0);
-	iProcessed = 0;
-	iPassed = 0;
-	vMetVec.SetPxPyPzE(0,0,0,0);
+	uProcessed = 0;
+	uPassed = 0;
+	uFailNvtxCut = 0;
+	uFailNjet50Eta24Cut = 0;
+	uFailMinHTCut = 0;
+	uFailMinPFMetCut = 0;
+
 
 	//generate hists
 	edm::Service<TFileService> fs;
@@ -245,32 +260,79 @@ RA2bQCDvetoAna::RA2bQCDvetoAna(const edm::ParameterSet& iConfig)
 	MHT_by_phislice[5] = fs->make<TH1F> ("mht_phislice_gt0.8" ,"MHT (#Delta#Phi_{min}>0.8);MHT [GeV];Events;", met_bins, 0, met_max);
 
 	//these are general event hist to check the PAT tuples cuts
-	const double evt_met_max = 4000, evt_met_bins = 400;
-	evtHist.nvtx = fs->make<TH1F> ("pat_nvtx" ,"PAT-tuple quantities for debugging;Nvtx;Events;", 15, 0, 15);
-	evtHist.vtxz = fs->make<TH1F> ("pat_vtxz","PAT-tuple quantities for debugging;Primary Vertex z [cm];Arbitrary;",30,0,30);
-	evtHist.mht = fs->make<TH1F> ("pat_mht" ,"PAT-tuple quantities for debugging;MHT [GeV];Events;", evt_met_bins, 0, evt_met_max);
-	evtHist.ht = fs->make<TH1F> ("pat_ht" ,"PAT-tuple quantities for debugging;HT [GeV];Events;", evt_met_bins, 0, evt_met_max);
-	evtHist.njet = fs->make<TH1F> ("pat_njet" ,"PAT-tuple quantities for debugging;NJET [GeV];Events;", 10, 0, 10);
-	evtHist.metphi = fs->make<TH1F> ("pat_metphi" ,"PAT-tuple quantities for debugging;met phi;Events;", 160, -8, 8);
+	const double evt_met_max = 800, evt_met_bins = 400;
+	const double evt_ht_max = 4000, evt_ht_bins = 80;
+	/*
+	 * All plots with ra2b_* prefix should remain as it is. They are all made with MET
+	 * and using std. RA2b selection.
+	 */
+	evtHist.nvtx = fs->make<TH1F> ("ra2b_nvtx" ,"RA2b: Nvtx;Nvtx;Events;", 15, 0, 15);
+	evtHist.vtxz = fs->make<TH1F> ("ra2b_vtxz","RA2b:;Primary Vertex z [cm];Arbitrary;",30,0,30);
+	evtHist.met = fs->make<TH1F> ("ra2b_met" ,"RA2b: (MET from PFmetHandle);MET [GeV];Events;", evt_met_bins, 0, evt_met_max);
+	evtHist.ht = fs->make<TH1F> ("ra2b_ht" ,"RA2b: HT from Jets ET>50 && |#Eta|<2.4;HT [GeV];Events;", evt_ht_bins, 0, evt_ht_max);
+	evtHist.njet = fs->make<TH1F> ("ra2b_njet_et50eta24" ,"RA2b: Njets (Et>50 && |#Eta|<2.4;NJETS;Events;", 10, 0, 10);
+	evtHist.metphi = fs->make<TH1F> ("metphi" ,"PAT-tuple quantities for debugging;met phi;Events;", 160, -8, 8);
 
 
 	const double pt_bins = 200, pt_max = 2000;
-	pf30_jet1Hist.pt = fs->make<TH1F> ("pat_pf30_jet1_pt" ,"PAT-tuple quantities for debugging: PF30-Jet1 pt;pt [GeV];Events;", pt_bins, 0, pt_max);
-	pf30_jet1Hist.eta = fs->make<TH1F> ("pat_pf30_jet1_eta" ,"PAT-tuple quantities for debugging: PF30-Jet1 eta;eta;Events;", 100, -5, 5);
-	pf30_jet1Hist.phi = fs->make<TH1F> ("pat_pf30_jet1_phi" ,"PAT-tuple quantities for debugging: PF30-Jet1 phi;phi;Events;", 160, -8, 8);
-	pf30_jet1Hist.delphi = fs->make<TH1F> ("pat_pf30_jet1_delphi" ,"PAT-tuple quantities for debugging: PF30-Jet1: delphi;delphi;Events;", 160, -8, 8);
+	pf30_jet1Hist.pt = fs->make<TH1F> ("ra2b_pf30_jet1_pt" ,"RA2b: PF30-Jet1 pt;pt [GeV];Events;", pt_bins, 0, pt_max);
+	pf30_jet1Hist.eta = fs->make<TH1F> ("ra2b_pf30_jet1_eta" ,"RA2b: PF30-Jet1 eta;eta;Events;", 100, -5, 5);
+	pf30_jet1Hist.phi = fs->make<TH1F> ("ra2b_pf30_jet1_phi" ,"RA2b: PF30-Jet1 phi;phi;Events;", 160, -8, 8);
+	pf30_jet1Hist.delphi = fs->make<TH1F> ("pf30_jet1_delphi" ,"RA2b: PF30-Jet1: delphi;delphi;Events;", 160, -8, 8);
 
-	pf30_jet2Hist.pt = fs->make<TH1F> ("pat_pf30_jet2_pt" ,"PAT-tuple quantities for debugging: PF30-Jet2 pt;pt [GeV];Events;", pt_bins, 0, pt_max);
-	pf30_jet2Hist.eta = fs->make<TH1F> ("pat_pf30_jet2_eta" ,"PAT-tuple quantities for debugging: PF30-Jet2 eta;eta;Events;", 100, -5, 5);
-	pf30_jet2Hist.phi = fs->make<TH1F> ("pat_pf30_jet2_phi" ,"PAT-tuple quantities for debugging: PF30-Jet2 phi;phi;Events;", 160, -8, 8);
-	pf30_jet2Hist.delphi = fs->make<TH1F> ("pat_pf30_jet2_delphi" ,"PAT-tuple quantities for debugging: PF30-Jet2: delphi;delphi;Events;", 160, -8, 8);
+	pf30_jet2Hist.pt = fs->make<TH1F> ("ra2b_pf30_jet2_pt" ,"RA2b: PF30-Jet2 pt;pt [GeV];Events;", pt_bins, 0, pt_max);
+	pf30_jet2Hist.eta = fs->make<TH1F> ("ra2b_pf30_jet2_eta" ,"RA2b: PF30-Jet2 eta;eta;Events;", 100, -5, 5);
+	pf30_jet2Hist.phi = fs->make<TH1F> ("ra2b_pf30_jet2_phi" ,"RA2b: PF30-Jet2 phi;phi;Events;", 160, -8, 8);
+	pf30_jet2Hist.delphi = fs->make<TH1F> ("ra2b_pf30_jet2_delphi" ,"RA2b: PF30-Jet2: delphi;delphi;Events;", 160, -8, 8);
 
-	pf30_jet3Hist.pt = fs->make<TH1F> ("pat_pf30_jet3_pt" ,"PAT-tuple quantities for debugging: PF30-Jet3 pt;pt [GeV];Events;", pt_bins, 0, pt_max);
-	pf30_jet3Hist.eta = fs->make<TH1F> ("pat_pf30_jet3_eta" ,"PAT-tuple quantities for debugging: PF30-Jet3 eta;eta;Events;", 100, -5, 5);
-	pf30_jet3Hist.phi = fs->make<TH1F> ("pat_pf30_jet3_phi" ,"PAT-tuple quantities for debugging: PF30-Jet3 phi;phi;Events;", 160, -8, 8);
-	pf30_jet3Hist.delphi = fs->make<TH1F> ("pat_pf30_jet3_delphi" ,"PAT-tuple quantities for debugging: PF30-Jet3: delphi;delphi;Events;", 160, -8, 8);
+	pf30_jet3Hist.pt = fs->make<TH1F> ("ra2b_pf30_jet3_pt" ,"RA2b: PF30-Jet3 pt;pt [GeV];Events;", pt_bins, 0, pt_max);
+	pf30_jet3Hist.eta = fs->make<TH1F> ("ra2b_pf30_jet3_eta" ,"RA2b: PF30-Jet3 eta;eta;Events;", 100, -5, 5);
+	pf30_jet3Hist.phi = fs->make<TH1F> ("ra2b_pf30_jet3_phi" ,"RA2b: PF30-Jet3 phi;phi;Events;", 160, -8, 8);
+	pf30_jet3Hist.delphi = fs->make<TH1F> ("ra2b_pf30_jet3_delphi" ,"RA2b: PF30-Jet3: delphi;delphi;Events;", 160, -8, 8);
 
 
+	//pf30_jet1Hist.delT = fs->make<TH1F> ("ra2b_pf30_jet1_delT" ,"RA2b: PF30-Jet1: #Delta T; #Delta T;Events;", 200, 0, 1000); 
+	pf30_jet1Hist.delTDevidedByJetPt = fs->make<TH1F> ("ra2b_pf30_jet1_delTJetPt" ,"RA2b: PF30-Jet1; #Delta T/P_{T}^{Jet1}; Events;", 200, 0, 200); 
+	//pf30_jet2Hist.delT = fs->make<TH1F> ("ra2b_pf30_jet2_delT" ,"RA2b: PF30-Jet2: #Delta T; #Delta T;Events;", 200, 0, 1000); 
+	pf30_jet2Hist.delTDevidedByJetPt = fs->make<TH1F> ("ra2b_pf30_jet2_delTJetPt" ,"RA2b: PF30-Jet2; #Delta T/P_{T}^{Jet2}; Events;", 200, 0, 200); 
+	//pf30_jet3Hist.delT = fs->make<TH1F> ("ra2b_pf30_jet3_delT" ,"RA2b: PF30-Jet3: #Delta T; #Delta T;Events;", 200, 0, 1000); 
+	pf30_jet3Hist.delTDevidedByJetPt = fs->make<TH1F> ("ra2b_pf30_jet3_delTJetPt" ,"RA2b: PF30-Jet3; #Delta T/P_{T}^{Jet3}; Events;", 200, 0, 200); 
+
+	pf30_jet1Hist.delTvsJetPt = fs->make<TProfile> ("ra2b_pf30_jet1_delTvsJetPt" ,"RA2b: PF30-Jet1: #Delta T vs Jet1 Pt; Jet1 Pt;#Delta T;", 50, 0, 2000); 
+	pf30_jet1Hist.delTDevidedByJetPtvsJetPt = fs->make<TProfile> ("ra2b_pf30_jet1_delTDevidedByJetPtvsJetPt" ,"RA2b: PF30-Jet1; Jet1 Pt;#Delta T/P_{T}^{Jet1};", 50, 0, 2000); 
+	pf30_jet2Hist.delTvsJetPt = fs->make<TProfile> ("ra2b_pf30_jet2_delTvsJetPt" ,"RA2b: PF30-Jet1: #Delta T vs Jet2 Pt; Jet2 Pt;#Delta T;", 50, 0, 2000); 
+	pf30_jet2Hist.delTDevidedByJetPtvsJetPt = fs->make<TProfile> ("ra2b_pf30_jet2_delTDevidedByJetPtvsJetPt" ,"RA2b: PF30-Jet2; Jet2 Pt;#Delta T/P_{T}^{Jet2};", 50, 0, 2000); 
+	pf30_jet3Hist.delTvsJetPt = fs->make<TProfile> ("ra2b_pf30_jet3_delTvsJetPt" ,"RA2b: PF30-Jet1: #Delta T vs Jet3 Pt; Jet3 Pt;#Delta T;", 50, 0, 2000); 
+	pf30_jet3Hist.delTDevidedByJetPtvsJetPt = fs->make<TProfile> ("ra2b_pf30_jet3_delTDevidedByJetPtvsJetPt" ,"RA2b: PF30-Jet3; Jet3 Pt;#Delta T/P_{T}^{Jet3};", 50, 0, 2000); 
+
+	hDelPhiMin = fs->make<TH1F> ("ra2b_delPhiMin","RA2b: #Delta#Phi_{min} distribution", 40, 0, 4);
+	hDelPhiMinNorm = fs->make<TH1F> ("ra2b_delPhiMinNorm","RA2b: #Delta#Phi_{min}^{norm} distribution", 100, 0, 20);
+	//hDelPhiMinNormVshDelPhiMin = fs->make<TH2F> ("delPhiMinNormVsdelPhiMin","delPhiMinNormalized VS delPhiMin", 500,0,5, 2000, 0, 20);
+	hDelPhiMinVsMET = fs->make<TProfile> ("ra2b_delPhiMinVsMET","RA2b: #Delta#Phi_{min} vs #slash{E}_{T}", 30,0,600, 0, 4);
+	hDelPhiMinNormVsMET = fs->make<TProfile> ("ra2b_delPhiMinNormVsMET","RA2b: #Delta#Phi_{min}^{norm} vs #slash{E}_{T}",30,0,600, 0, 20);
+
+	//const float npassFailHistBins = 16;
+	//const float passFailHistBins[] = {0,20,40,60,80,100,120,140,160,180,200,250,300,350,400,500,600};
+	const float npassFailHistBins = 15;
+	const float passFailHistBins[] = {0,10,20,30,40,50,60,70,80,100,120,150,200,250,350,500};
+
+	hPass = fs->make<TH1F> ("ra2b_Pass","RA2b: PASS from #Delta#Phi_{min} cut", npassFailHistBins, passFailHistBins);
+	hFail = fs->make<TH1F> ("ra2b_Fail","RA2b: FAIL from #Delta#Phi_{min} cut", npassFailHistBins, passFailHistBins);
+	hPassFail = fs->make<TH1F> ("ra2b_PassFail","RA2b: PASS/FAIL ratio from #Delta#Phi_{min} cut",npassFailHistBins, passFailHistBins);
+
+	hPass_Norm = fs->make<TH1F> ("ra2b_Pass_Norm","RA2b: PASS from #Delta#Phi_{min}^{norm} cut;#slash{E}_{T};PASS;", npassFailHistBins, passFailHistBins);
+	hFail_Norm = fs->make<TH1F> ("ra2b_Fail_Norm","RA2b: FAIL from #Delta#Phi_{min}^{norm} cut;#slash{E}_{T};FAIL;", npassFailHistBins, passFailHistBins);
+	hPassFail_Norm = fs->make<TH1F> ("ra2b_PassFail_Norm","RA2b: PASS/FAIL ratio from #Delta#Phi_{min}^{norm} cut;#slash{E}_{T};PASS/FAIL;", npassFailHistBins, passFailHistBins);
+
+	hPass->Sumw2();
+	hFail->Sumw2();
+	hPassFail->Sumw2();
+	hPass_Norm->Sumw2();
+	hFail_Norm->Sumw2();
+	hPassFail_Norm->Sumw2();
+
+
+	//RA2 plots
 	pf50eta25_jet1Hist.pt = fs->make<TH1F> ("pat_pf50eta25_jet1_pt" ,"PAT-tuple quantities for debugging: pf50eta25-Jet1 pt;pt [GeV];Events;", pt_bins, 0, pt_max);
 	pf50eta25_jet1Hist.eta = fs->make<TH1F> ("pat_pf50eta25_jet1_eta" ,"PAT-tuple quantities for debugging: pf50eta25-Jet1 eta;eta;Events;", 100, -5, 5);
 	pf50eta25_jet1Hist.phi = fs->make<TH1F> ("pat_pf50eta25_jet1_phi" ,"PAT-tuple quantities for debugging: pf50eta25-Jet1 phi;phi;Events;", 160, -8, 8);
@@ -290,21 +352,7 @@ RA2bQCDvetoAna::RA2bQCDvetoAna(const edm::ParameterSet& iConfig)
 //	hist_delphiMin_jetmet[0] = fs->make<TH1F> ("delphiMin_jetmet" ,"delphi Min.;delphi min;Events;", 160, -8, 8);
 //	hist_delphiMin_jetmetVsMHT[0] = fs->make<TH2F> ("delphiMin_jetmetVsMHT" ,"delphi min Vs MHT;MHT;delphi min;", 1000, 0, 1000,400,0,4);
 
-	hDelPhiMin = fs->make<TH1F> ("delPhiMin","delPhiMin", 400, 0, 4);
-	hDelPhiMinNorm = fs->make<TH1F> ("delPhiMinNorm","delPhiMinNorm", 2000, 0, 20);
-	hDelPhiMinNormVshDelPhiMin = fs->make<TH2F> ("delPhiMinNormVsdelPhiMin","delPhiMinNormalized VS delPhiMin", 500,0,5, 2000, 0, 20);
-	hDelPhiMinVsMET = fs->make<TH2F> ("delPhiMinVsMET","delPhiMin VS MET", 150,0,1500, 400, 0, 10);
-	hDelPhiMinNormVsMET = fs->make<TH2F> ("delPhiMinNormVsMET","delPhiMinNorm VS MET",150,0,1500, 400, 0, 20);
-	hPassFail = fs->make<TH1F> ("hPassFail","PASS/FAIL",20, 0, 400);
-	hPassFail->Sumw2();
-	hFail = fs->make<TH1F> ("hFail","FAIL",20, 0, 400);
-	hFail->Sumw2();
-	hPass_Norm = fs->make<TH1F> ("hPass_Norm","Normalized: PASS",20, 0, 400);
-	hPass_Norm->Sumw2();
-	hPassFail_Norm = fs->make<TH1F> ("hPassFail_Norm","Normalized: PASS/FAIL;MHT;Events;",20, 0, 400);
-	hPassFail_Norm->Sumw2();
-	hFail_Norm = fs->make<TH1F> ("hFail_Norm","Normalized: FAIL;MHT;Events;",20, 0, 400);
-	hFail_Norm->Sumw2();
+
 
 }
 
@@ -327,7 +375,7 @@ bool
 RA2bQCDvetoAna::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
    using namespace edm;
-	++iProcessed;
+	++uProcessed;
 	bool bSaveEvent = false;
 	kRunLumiEvent.run  = iEvent.id().run();
 	kRunLumiEvent.lumi = iEvent.id().luminosityBlock(); 
@@ -352,6 +400,9 @@ RA2bQCDvetoAna::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 		 	<<  kRunLumiEvent.run << ":" << kRunLumiEvent.lumi 
 			<< ":" << kRunLumiEvent.evt << std::endl;
 
+	/* NO need. I am pplying STD RA2 Selection
+	 *
+	 */
 	Handle<reco::VertexCollection> vertexHandle;
 	iEvent.getByLabel("goodVerticesRA2", vertexHandle);
 	double dNvtx = 0;
@@ -375,9 +426,13 @@ RA2bQCDvetoAna::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 		  }
 	  }
 	}
+	
 
 	evtHist.nvtx->Fill(dNvtx);
 	
+	/*  Get all the handles needed and check their
+	 *  validity.
+	 */
 	iEvent.getByLabel(htInputTag_, htHandle);
 	if (! htHandle.isValid()) 
 	{
@@ -387,61 +442,13 @@ RA2bQCDvetoAna::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 	{
 		if (iVerbose) std::cout << __FUNCTION__ << ":" << __LINE__ << ":" << htInputTag_<< " found!" << std::endl;  
 	}
-	//i SHOULD BE USING PFpt30Eta25 if looking at MHT. not PFpt30 JETS????
-	iEvent.getByLabel(patJetsPFPt30InputTag_, jetHandle);
-	if (! jetHandle.isValid()) 
+
+	iEvent.getByLabel("pfMet",pfMetHandle);
+	if (! pfMetHandle.isValid())
 	{
-		std::cout << __FUNCTION__ << ":" << __LINE__ << ":JET handle not found!" << std::endl;
+		std::cout << "Valid PFMET Collection Not Found!" << std::endl;
 		assert(false);
-	} else
-	{
-		if (iVerbose) std::cout << __FUNCTION__ << ":" << __LINE__ << ":" << patJetsPFPt30InputTag_ << " found!" << std::endl;  
 	}
-
-	if ((*htHandle) < dMinHT) return 0;
-	unsigned njet30eta25 = 0;
-	TLorentzVector vSumJetVec(0,0,0,0);
-	for (unsigned i = 0 ; i < jetHandle->size() ; ++i)
-	{
-		const TLorentzVector iJetVec((*jetHandle)[i].px(),(*jetHandle)[i].py(),(*jetHandle)[i].pz(),(*jetHandle)[i].energy());
-		vSumJetVec += iJetVec;
-		if (iJetVec.Pt()<50. || fabs(iJetVec.Eta())>2.4) continue;
-		//loose jet id stuff
-		if ((*jetHandle)[i].neutralHadronEnergyFraction() >=0.99) continue;
-		if ((*jetHandle)[i].neutralEmEnergyFraction() >=0.99) continue;
-		if (((*jetHandle)[i].getPFConstituents()).size() <=1) continue;
-		if ((*jetHandle)[i].chargedHadronEnergyFraction() <=0) continue;
-		if ((*jetHandle)[i].chargedMultiplicity() <=0) continue;
-		if ((*jetHandle)[i].chargedEmEnergyFraction() >=0.99) continue;
-		
-		++njet30eta25;
-	}
-	if (njet30eta25<3) return 0; 
-	vMetVec = vSumJetVec;
-
- 	// ==========================================================
-	// MET Information 
-	iEvent.getByLabel(mhtInputTag_, mhtHandle);
-	if (! mhtHandle.isValid()) 
-	{
-		std::cout << __FUNCTION__ << ":" << __LINE__ << ":MHT handle not found!" << std::endl;
-		assert(false);
-	} else
-	{
-		if (iVerbose) std::cout << __FUNCTION__ << ":" << __LINE__ << ":" << mhtInputTag_ << " found!" << std::endl;  
-	}
-	const float mht = (*mhtHandle)[0].pt();
-
-
-/*
-	if (mht>60 && mht<=80) FillHistograms(Hist[0], mhtHandle, jetHandle); 
-	else if (mht>80 && mht<=100) FillHistograms(Hist[1], mhtHandle, jetHandle); 
-	else if (mht>100&& mht<=120) FillHistograms(Hist[2], mhtHandle, jetHandle); 
-	else if (mht>120&& mht<=140) FillHistograms(Hist[3], mhtHandle, jetHandle); 
-	else if (mht>140&& mht<=170) FillHistograms(Hist[4], mhtHandle, jetHandle); 
-	else if (mht>170&& mht<=200) FillHistograms(Hist[5], mhtHandle, jetHandle); 
-	else if (mht>200) FillHistograms(Hist[6], mhtHandle, jetHandle); 
-*/	
 
 	iEvent.getByLabel(patJetsPFPt50Eta25InputTag_, pfpt50eta25JetHandle);
 	if (! pfpt50eta25JetHandle.isValid()) 
@@ -459,7 +466,99 @@ RA2bQCDvetoAna::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 		assert(false);
 	}
 
-	unsigned numpt30Jets = pfpt30JetHandle->size();
+	iEvent.getByLabel(mhtInputTag_, mhtHandle);
+	if (! mhtHandle.isValid()) 
+	{
+		std::cout << __FUNCTION__ << ":" << __LINE__ << ":MHT handle not found!" << std::endl;
+		assert(false);
+	} else
+	{
+		if (iVerbose) std::cout << __FUNCTION__ << ":" << __LINE__ << ":" 
+			<< mhtInputTag_ << " found!" << std::endl;  
+	}
+
+	/*replicate RA2b HT which uses only jet with et>50and eta<2.4
+	 */
+	std::cout << "====================================" << std::endl;
+	unsigned njet50eta24 = 0;
+	TLorentzVector vSumJetVec(0,0,0,0), vSumJetEt50Eta24(0,0,0,0);
+	double dHt_et50eta24 = 0;
+	std::vector<unsigned> vLead3JetIndices;
+	for (unsigned i = 0 ; i < pfpt30JetHandle->size() ; ++i)
+	{
+		const TLorentzVector iJetVec((*pfpt30JetHandle)[i].px(),
+										(*pfpt30JetHandle)[i].py(),
+										(*pfpt30JetHandle)[i].pz(),
+										(*pfpt30JetHandle)[i].energy());
+		std::cout << "--- i, et =" << i << ", " << iJetVec.Pt() << std::endl;
+		vSumJetVec += iJetVec;
+		if (iJetVec.Pt()<50. || fabs(iJetVec.Eta())>2.4) continue;
+		//loose jet id stuff
+		if ((*pfpt30JetHandle)[i].neutralHadronEnergyFraction() >=0.99) continue;
+		if ((*pfpt30JetHandle)[i].neutralEmEnergyFraction() >=0.99) continue;
+		if (((*pfpt30JetHandle)[i].getPFConstituents()).size() <=1) continue;
+		if ((*pfpt30JetHandle)[i].chargedHadronEnergyFraction() <=0) continue;
+		if ((*pfpt30JetHandle)[i].chargedMultiplicity() <=0) continue;
+		if ((*pfpt30JetHandle)[i].chargedEmEnergyFraction() >=0.99) continue;
+		
+		if (vLead3JetIndices.size()<3) vLead3JetIndices.push_back(i);
+		vSumJetEt50Eta24 += iJetVec;
+		dHt_et50eta24 += iJetVec.Pt();
+		++njet50eta24;
+	}
+
+
+	//APPLY RA2b cuts
+	if (dNvtx<1) { ++uFailNvtxCut; return 0;}
+	if (njet50eta24<3) { ++uFailNjet50Eta24Cut; return 0;}
+	if (dHt_et50eta24<dMinHT) { ++uFailMinHTCut; return 0; }
+	if ((*pfMetHandle)[0].pt() < dMinMet) { ++uFailMinPFMetCut; return 0;}
+
+	//NOTE: htHandle give the same value as the sumPt of all jets with Et>30 in pfpt30JetHandle
+	//std::cout << "jet ht/ht handle = " << vSumJetEt50Eta24.Pt() << "/ " << (*htHandle)  
+	//				<< " ( " << dHt_et50eta24 << std::endl;
+
+
+	/*
+	 * Fill hists after RA2b base selection
+	 */
+
+	evtHist.nvtx->Fill(dNvtx);
+	evtHist.njet->Fill(njet50eta24);
+	evtHist.metphi->Fill((*pfMetHandle)[0].phi());
+	evtHist.met->Fill( (*pfMetHandle)[0].pt());
+	evtHist.ht->Fill(dHt_et50eta24);
+
+	pf30_jet1Hist.pt->Fill((*pfpt30JetHandle)[vLead3JetIndices.at(0)].pt());
+	pf30_jet2Hist.pt->Fill((*pfpt30JetHandle)[vLead3JetIndices.at(1)].pt());
+	pf30_jet3Hist.pt->Fill((*pfpt30JetHandle)[vLead3JetIndices.at(2)].pt());
+	pf30_jet1Hist.eta->Fill((*pfpt30JetHandle)[vLead3JetIndices.at(0)].eta());
+	pf30_jet2Hist.eta->Fill((*pfpt30JetHandle)[vLead3JetIndices.at(1)].eta());
+	pf30_jet3Hist.eta->Fill((*pfpt30JetHandle)[vLead3JetIndices.at(2)].eta());
+
+
+	DoDelMinStudy(pfMetHandle, pfpt30JetHandle, vLead3JetIndices);
+
+
+//	RA2 Stuff from here
+
+	//met calcualted from all jets with et>30
+
+//	const float mht = (*mhtHandle)[0].pt();
+
+
+/*
+	if (mht>60 && mht<=80) FillHistograms(Hist[0], mhtHandle, jetHandle); 
+	else if (mht>80 && mht<=100) FillHistograms(Hist[1], mhtHandle, jetHandle); 
+	else if (mht>100&& mht<=120) FillHistograms(Hist[2], mhtHandle, jetHandle); 
+	else if (mht>120&& mht<=140) FillHistograms(Hist[3], mhtHandle, jetHandle); 
+	else if (mht>140&& mht<=170) FillHistograms(Hist[4], mhtHandle, jetHandle); 
+	else if (mht>170&& mht<=200) FillHistograms(Hist[5], mhtHandle, jetHandle); 
+	else if (mht>200) FillHistograms(Hist[6], mhtHandle, jetHandle); 
+*/	
+
+
+/*	unsigned numpt30Jets = pfpt30JetHandle->size();
 	//std::cout << "pfpt30JetHandle numjets = " << numpt30Jets << std::endl;
 	TLorentzVector oJetsVec(0,0,0,0);
 	for (unsigned i = 0 ; i < numpt30Jets ; ++i)
@@ -470,30 +569,6 @@ RA2bQCDvetoAna::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 			oJetsVec += iJetVec;
 	}
 
-	evtHist.metphi->Fill((*mhtHandle)[0].phi());
-	evtHist.mht->Fill( (*mhtHandle)[0].pt());
-	evtHist.ht->Fill( (*htHandle) );
-
-	unsigned numpt50eta25Jets = pfpt50eta25JetHandle->size();
-	if (iVerbose) std::cout << "pfpt50eta25JetHandle numjets = " << numpt50eta25Jets << std::endl;
-	float myHt = 0;
-	for (unsigned i = 0 ; i < numpt50eta25Jets ; ++i)
-	{
-			myHt += (*pfpt50eta25JetHandle)[i].pt();  
-			if (i==0) 
-			{
-				pf30_jet1Hist.pt->Fill((*pfpt50eta25JetHandle)[i].pt());
-				pf30_jet1Hist.eta->Fill((*pfpt50eta25JetHandle)[i].eta());
-			} else if (i==1) 
-			{
-				pf30_jet2Hist.pt->Fill((*pfpt50eta25JetHandle)[i].pt());
-				pf30_jet2Hist.eta->Fill((*pfpt50eta25JetHandle)[i].eta());
-			} else if (i==2) 
-			{
-				pf30_jet3Hist.pt->Fill((*pfpt50eta25JetHandle)[i].pt());
-				pf30_jet3Hist.eta->Fill((*pfpt50eta25JetHandle)[i].eta());
-			}
-	}
 
 	if (iVerbose)
 	{
@@ -501,10 +576,9 @@ RA2bQCDvetoAna::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 		std::cout << "ht/my ht = " << (*htHandle) << "/" << myHt << std::endl;
 	}
 
+*/
 
-	DoDelMinStudy(mhtHandle, pfpt30JetHandle);
-
-	++iPassed;
+	++uPassed;
    return true;
 }
 
@@ -522,8 +596,8 @@ RA2bQCDvetoAna::endJob() {
 
 	std::cout << __FILE__ << "::" << __FUNCTION__  << "\n" << std::endl;
 	std::cout << "[ATM:00] Job settings " << std::endl;
-	std::cout << "[ATM:01] Events Processed --- = " << iProcessed << std::endl;
-	std::cout << "[ATM:02] Events Passed ------ = " << iPassed << std::endl;
+	std::cout << "[ATM:01] Events Processed --- = " << uProcessed << std::endl;
+	std::cout << "[ATM:02] Events Passed ------ = " << uPassed << std::endl;
 	std::cout << "[ATM:10] Primary Vtx Min ---- = " << inMinVtx << std::endl; 
 	std::cout << "[ATM:11] Primary Vtx Min ndof = " << inMinNdofVtx << std::endl; 
 /*	std::cout << "[ATM:20] Triggers Used ------ = ";
@@ -539,8 +613,16 @@ RA2bQCDvetoAna::endJob() {
 		std::cout << "NONE" << std::endl; 
 	}
 	*/
-	std::cout << "[ATM:30] Minimum MET -------- = " << dminMet << std::endl;
+	std::cout << "[ATM:30] Minimum MET -------- = " << dMinMet << std::endl;
 	std::cout << "[ATM:31] Minimum HT --------- = " << dMinHT << std::endl;
+	std::cout << "[ATM:40] PASS Summary --------- " << std::endl;
+	std::cout << "[ATM:41] Pass nvtx ---------- = " << (uProcessed - uFailNvtxCut) << " (" << uFailNvtxCut << ")" << std::endl;
+	std::cout << "[ATM:42] Pass njet ---------- = " << (uProcessed - uFailNvtxCut - uFailNjet50Eta24Cut) 
+																	<< " (" << uFailNjet50Eta24Cut << ")" << std::endl;
+	std::cout << "[ATM:43] Pass ht ------------ = " << (uProcessed - uFailNvtxCut - uFailNjet50Eta24Cut - uFailMinHTCut) 
+																	<< " (" << uFailMinHTCut << ")" << std::endl;
+	std::cout << "[ATM:44] Pass met ----------- = " << (uProcessed - uFailNvtxCut - uFailNjet50Eta24Cut - uFailMinHTCut - uFailMinPFMetCut) 
+																	<< " (" << uFailMinPFMetCut << ")" << std::endl;
 
 }
 
@@ -835,50 +917,63 @@ unsigned RA2bQCDvetoAna::minDelPhi(std::vector<float>& vDelPhi_jetjet
 }
 
 
-void RA2bQCDvetoAna::DoDelMinStudy(edm::Handle<edm::View<reco::MET> > mhtHandle 
-				, edm::Handle<std::vector<pat::Jet> > pt30jetHandle)
+void RA2bQCDvetoAna::DoDelMinStudy(edm::Handle<std::vector<reco::PFMET> >pfMetHandle
+				, edm::Handle<std::vector<pat::Jet> > pt30jetHandle, 
+				const std::vector<unsigned> vLead3JetIndices)
 {
 
 	//PrintHeader();
 	std::vector<float> vDelPhi_jetmet, vDelPhiNorm_jetmet;
 
-	//const float mht = (*mhtHandle)[0].pt();
-	const float met = vMetVec.Pt();
+	const float met = (*pfMetHandle)[0].pt();
 	unsigned njet = 0; //consider cross product only from lead 3 jets
 
-	for (unsigned i = 0 ; i < jetHandle->size() ; ++i)
+	for (unsigned i = 0 ; i < vLead3JetIndices.size() ; ++i)
 	{
-		const TLorentzVector iJetVec((*jetHandle)[i].px(),(*jetHandle)[i].py(),(*jetHandle)[i].pz(),(*jetHandle)[i].energy());
-		if (iJetVec.Pt()<50. || fabs(iJetVec.Eta())>2.5) continue;
-		//loose jet id stuff
-		if ((*jetHandle)[i].neutralHadronEnergyFraction() >=0.99) continue;
-		if ((*jetHandle)[i].neutralEmEnergyFraction() >=0.99) continue;
-		if (((*jetHandle)[i].getPFConstituents()).size() <=1) continue;
-		if ((*jetHandle)[i].chargedHadronEnergyFraction() <=0) continue;
-		if ((*jetHandle)[i].chargedMultiplicity() <=0) continue;
-		if ((*jetHandle)[i].chargedEmEnergyFraction() >=0.99) continue;
-		if (njet <3)
-		{
-			//const float delphi_jetmet = fabs(TVector2::Phi_mpi_pi((*jetHandle)[i].phi() - (*mhtHandle)[0].phi()));
-			const float delphi_jetmet = fabs(TVector2::Phi_mpi_pi((*jetHandle)[i].phi() - vMetVec.Phi()));
-			vDelPhi_jetmet.push_back(delphi_jetmet);
-			//loop over rest of the jets to calcualte deltaT for i th jet
-			float sumCP2 = 0;  //sqaure of sum of cross products
-			for (unsigned j = 0 ; j < jetHandle->size() ; ++j)
-			{
-				if ( i == j ) continue;
-				if (iJetVec.Pt()<30. || fabs(iJetVec.Eta())>2.5) continue;
-				const TLorentzVector jJetVec((*jetHandle)[j].px(),(*jetHandle)[j].py(),(*jetHandle)[j].pz(),(*jetHandle)[j].energy());
-				sumCP2 += pow(iJetVec.Px() * jJetVec.Py() + iJetVec.Py() * jJetVec.Px() ,2);
-			}
-			const float delT_i = (0.1*sqrt(sumCP2))/iJetVec.Pt();
-			const float delPhi_i = delphi_jetmet/atan2(delT_i,met);
-			vDelPhiNorm_jetmet.push_back(delPhi_i);
-			//std::cout << "jet/dphi/dphi_norm = " << i << " | " << delphi_jetmet
-			//			<< " | " << delPhi_i << std::endl;
-			++njet;
-		}
+		const TLorentzVector iJetVec((*pt30jetHandle)[vLead3JetIndices.at(i)].px(),
+												(*pt30jetHandle)[vLead3JetIndices.at(i)].py(),
+												(*pt30jetHandle)[vLead3JetIndices.at(i)].pz(),
+												(*pt30jetHandle)[vLead3JetIndices.at(i)].energy());
+		const float delphi_jetmet = fabs(TVector2::Phi_mpi_pi((*pt30jetHandle)[i].phi() - (*pfMetHandle)[0].phi()));
+		vDelPhi_jetmet.push_back(delphi_jetmet);
 
+		/*
+		 * loop over rest of the jets to calcualte deltaT for i th jet
+		 */
+		float sumCP2 = 0;  //sqaure of sum of cross products
+		for (unsigned j = 0 ; j < pt30jetHandle->size() ; ++j)
+		{
+			if ( vLead3JetIndices.at(i) == j ) continue;
+			const TLorentzVector jJetVec((*pt30jetHandle)[j].px(),(*pt30jetHandle)[j].py(),
+										(*pt30jetHandle)[j].pz(),(*pt30jetHandle)[j].energy());
+			sumCP2 += pow(iJetVec.Px() * jJetVec.Py() + iJetVec.Py() * jJetVec.Px() ,2);
+		}
+		const float delT_i = (0.1*sqrt(sumCP2))/iJetVec.Pt();
+		const float delPhi_i = delphi_jetmet/atan2(delT_i,met);
+		vDelPhiNorm_jetmet.push_back(delPhi_i);
+
+		if (i==0) //first jet
+		{
+			//pf30_jet1Hist.delT->Fill(sqrt(sumCP2));
+			pf30_jet1Hist.delTDevidedByJetPt->Fill(delT_i);
+			pf30_jet1Hist.delTvsJetPt->Fill(iJetVec.Pt(),sqrt(sumCP2));
+			pf30_jet1Hist.delTDevidedByJetPtvsJetPt->Fill(iJetVec.Pt(), delT_i);
+		} else if (i==1) //2nd jet
+		{
+			//pf30_jet2Hist.delT->Fill(sqrt(sumCP2));
+			pf30_jet2Hist.delTDevidedByJetPt->Fill(delT_i);
+			pf30_jet2Hist.delTvsJetPt->Fill(iJetVec.Pt(),sqrt(sumCP2));
+			pf30_jet2Hist.delTDevidedByJetPtvsJetPt->Fill(iJetVec.Pt(), delT_i);
+		} else if (i==2) //3rd jet
+		{
+			//pf30_jet3Hist.delT->Fill(sqrt(sumCP2));
+			pf30_jet3Hist.delTDevidedByJetPt->Fill(delT_i);
+			pf30_jet3Hist.delTvsJetPt->Fill(iJetVec.Pt(),sqrt(sumCP2));
+			pf30_jet3Hist.delTDevidedByJetPtvsJetPt->Fill(iJetVec.Pt(), delT_i);
+		}
+		
+		//std::cout << "jet/dphi/dphi_norm = " << i << " | " << delphi_jetmet
+		//			<< " | " << delPhi_i << std::endl;
 	}
 
 	std::sort(vDelPhi_jetmet.begin(), vDelPhi_jetmet.end(), sort_using_less_than);	
@@ -888,7 +983,7 @@ void RA2bQCDvetoAna::DoDelMinStudy(edm::Handle<edm::View<reco::MET> > mhtHandle
 	{
 		hDelPhiMin->Fill(vDelPhi_jetmet.at(0));
 		hDelPhiMinNorm->Fill(vDelPhiNorm_jetmet.at(0));
-		hDelPhiMinNormVshDelPhiMin->Fill(vDelPhi_jetmet.at(0),vDelPhiNorm_jetmet.at(0));
+		//hDelPhiMinNormVshDelPhiMin->Fill(vDelPhi_jetmet.at(0),vDelPhiNorm_jetmet.at(0));
 		hDelPhiMinVsMET->Fill(met, vDelPhi_jetmet.at(0));
 		hDelPhiMinNormVsMET->Fill(met, vDelPhiNorm_jetmet.at(0));
 		if (vDelPhiNorm_jetmet.at(0)>4) 
@@ -903,6 +998,7 @@ void RA2bQCDvetoAna::DoDelMinStudy(edm::Handle<edm::View<reco::MET> > mhtHandle
 		if (vDelPhi_jetmet.at(0)>0.3) 
 		{
 			hPassFail->Fill(met);
+			hPass->Fill(met);
 		} else 
 		{
 			hFail->Fill(met);
