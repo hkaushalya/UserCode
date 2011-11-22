@@ -133,80 +133,80 @@ void makeSplitQCDhist_MadGraphBinned(const string histname, const string title, 
 
 }
 
-void makeSplitQCDhist()
+void makeSplitQCDhist_MadGraphBinned()
 {
 	//RA2b plots
 
-	makeSplitQCDhist("factorization_ht350/pf30_jet1_pt","RA2b;Jet1-P_{T};Events;",1);
+	makeSplitQCDhist_MadGraphBinned("factorization_ht350/pf30_jet1_pt","RA2b;Jet1-P_{T};Events;",1);
 	return;
-	makeSplitQCDhist("QCDvetoAna/ra2b_pf30_jet2_pt","RA2b;Jet2-P_{T};Events;",1);
-	makeSplitQCDhist("QCDvetoAna/ra2b_pf30_jet3_pt","RA2b;Jet3-P_{T};Events;",1);
-	makeSplitQCDhist("QCDvetoAna/ra2b_pf30_jet1_eta","RA2b;Jet1-#{Eta};Events;",0);
-	makeSplitQCDhist("QCDvetoAna/ra2b_pf30_jet2_eta","RA2b;Jet2-#{Eta};Events;",0);
-	makeSplitQCDhist("QCDvetoAna/ra2b_pf30_jet3_eta","RA2b;Jet3-#{Eta};Events;",0);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_pf30_jet2_pt","RA2b;Jet2-P_{T};Events;",1);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_pf30_jet3_pt","RA2b;Jet3-P_{T};Events;",1);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_pf30_jet1_eta","RA2b;Jet1-#{Eta};Events;",0);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_pf30_jet2_eta","RA2b;Jet2-#{Eta};Events;",0);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_pf30_jet3_eta","RA2b;Jet3-#{Eta};Events;",0);
 
-/*	makeSplitQCDhist("QCDvetoAna/ra2b_pf30_jet1_delTJetPt","RA2b;#Delta T;Events;",1);
-	makeSplitQCDhist("QCDvetoAna/ra2b_pf30_jet2_delTJetPt","RA2b;#Delta T;Events;",1);
-	makeSplitQCDhist("QCDvetoAna/ra2b_pf30_jet3_delTJetPt","RA2b;#Delta T;Events;",1);
+/*	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_pf30_jet1_delTJetPt","RA2b;#Delta T;Events;",1);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_pf30_jet2_delTJetPt","RA2b;#Delta T;Events;",1);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_pf30_jet3_delTJetPt","RA2b;#Delta T;Events;",1);
 */
-//	makeSplitQCDhist("QCDvetoAna/ra2b_pf30_jet1_delTvsJetPt","RA2b;P_{T}^{Jet1};#Delta T;",1);
-//	makeSplitQCDhist("QCDvetoAna/ra2b_pf30_jet2_delTvsJetPt","RA2b;P_{T}^{Jet2};#Delta T;",1);
-//	makeSplitQCDhist("QCDvetoAna/ra2b_pf30_jet3_delTvsJetPt","RA2b;P_{T}^{Jet3};#Delta T;",1);
+//	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_pf30_jet1_delTvsJetPt","RA2b;P_{T}^{Jet1};#Delta T;",1);
+//	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_pf30_jet2_delTvsJetPt","RA2b;P_{T}^{Jet2};#Delta T;",1);
+//	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_pf30_jet3_delTvsJetPt","RA2b;P_{T}^{Jet3};#Delta T;",1);
 
 
-/*	makeSplitQCDhist("QCDvetoAna/ra2b_pf30_jet1_delTDevidedByJetPtvsJetPt","RA2b;P_{T}^{Jet1};#Delta T;",1);
-	makeSplitQCDhist("QCDvetoAna/ra2b_pf30_jet2_delTDevidedByJetPtvsJetPt","RA2b;P_{T}^{Jet2};#Delta T;",1);
-	makeSplitQCDhist("QCDvetoAna/ra2b_pf30_jet3_delTDevidedByJetPtvsJetPt","RA2b;P_{T}^{Jet3};#Delta T;",1);
+/*	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_pf30_jet1_delTDevidedByJetPtvsJetPt","RA2b;P_{T}^{Jet1};#Delta T;",1);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_pf30_jet2_delTDevidedByJetPtvsJetPt","RA2b;P_{T}^{Jet2};#Delta T;",1);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_pf30_jet3_delTDevidedByJetPtvsJetPt","RA2b;P_{T}^{Jet3};#Delta T;",1);
 */
-//	makeSplitQCDhist("QCDvetoAna/ra2b_delPhiMin","RA2b;#Delta#Phi_{min};Events;",0);
-//	makeSplitQCDhist("QCDvetoAna/ra2b_delPhiMinNorm","RA2b;#Delta#Phi_{min}^{norm};Events;",0);
-//	makeSplitQCDhist("QCDvetoAna/ra2b_delPhiMinVsMET","RA2b;MET; Avg. #Delta#Phi_{min};",1);
-//	makeSplitQCDhist("QCDvetoAna/ra2b_delPhiMinNormVsMET","RA2b;MET; Avg. #Delta#Phi_{min}^{norm};",1);
+//	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_delPhiMin","RA2b;#Delta#Phi_{min};Events;",0);
+//	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_delPhiMinNorm","RA2b;#Delta#Phi_{min}^{norm};Events;",0);
+//	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_delPhiMinVsMET","RA2b;MET; Avg. #Delta#Phi_{min};",1);
+//	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_delPhiMinNormVsMET","RA2b;MET; Avg. #Delta#Phi_{min}^{norm};",1);
 
-/*	makeSplitQCDhist("QCDvetoAna/ra2b_delPhiMinVsMET","RA2b;#slash{E}_{T};#Delta#Phi_{min};",0);
-	makeSplitQCDhist("QCDvetoAna/ra2b_delPhiMinNormVsMET","RA2b;#slash{E}_{T};#Delta#Phi_{min}^{norm};",0);
+/*	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_delPhiMinVsMET","RA2b;#slash{E}_{T};#Delta#Phi_{min};",0);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_delPhiMinNormVsMET","RA2b;#slash{E}_{T};#Delta#Phi_{min}^{norm};",0);
 
-	makeSplitQCDhist("QCDvetoAna/ra2b_PassFail","RA2b: Using #Delta#Phi_{min} ;#slash{E}_{T};PASS/FAIL Ratio;",0);
-	makeSplitQCDhist("QCDvetoAna/ra2b_PassFail_Norm","RA2b: Using #Delta#Phi_{min}^{norm} ;#slash{E}_{T};PASS/FAIL Ratio;",0);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_PassFail","RA2b: Using #Delta#Phi_{min} ;#slash{E}_{T};PASS/FAIL Ratio;",0);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/ra2b_PassFail_Norm","RA2b: Using #Delta#Phi_{min}^{norm} ;#slash{E}_{T};PASS/FAIL Ratio;",0);
 */
 	//ra2 plots
 
-/*	makeSplitQCDhist("QCDvetoAna/pat_mht",";MHT;Events;",1);
-	makeSplitQCDhist("QCDvetoAna/pat_ht",";HT;Events",1);
-	makeSplitQCDhist("QCDvetoAna/pat_meff",";MEff;Events;",1);
+/*	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/pat_mht",";MHT;Events;",1);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/pat_ht",";HT;Events",1);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/pat_meff",";MEff;Events;",1);
 */
-//	makeSplitQCDhist("QCDvetoAna/metsig_delphi_fail","#slash{E}_{T}-Significance of Events Failing #Delta#Phi_{min} cut;#slash{E}_{T}-Sig;Events;",0);
-//	makeSplitQCDhist("QCDvetoAna/metsig_delphi_pass","#slash{E}_{T}-Significance of Events Passing #Delta#Phi_{min} cut;#slash{E}_{T}-Sig;Events;",0);
+//	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/metsig_delphi_fail","#slash{E}_{T}-Significance of Events Failing #Delta#Phi_{min} cut;#slash{E}_{T}-Sig;Events;",0);
+//	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/metsig_delphi_pass","#slash{E}_{T}-Significance of Events Passing #Delta#Phi_{min} cut;#slash{E}_{T}-Sig;Events;",0);
 
-//   makeSplitQCDhist("QCDvetoAna/metsig_delphinorm_fail","#slash{E}_{T}-Significance of Events Failing #Delta#Phi_{min}^{norm} cut;#slash{E}_{T}-Sig;Events;",0);
-//	makeSplitQCDhist("QCDvetoAna/metsig_delphinorm_pass","#slash{E}_{T}-Significance of Events Passing #Delta#Phi_{min}^{norm} cut;#slash{E}_{T}-Sig;Events;",0);
-	//makeSplitQCDhist("QCDvetoAna/pat_njet_et50eta25",";Njet (Et50Eta2.5);Events;",0);
+//   makeSplitQCDhist_MadGraphBinned("QCDvetoAna/metsig_delphinorm_fail","#slash{E}_{T}-Significance of Events Failing #Delta#Phi_{min}^{norm} cut;#slash{E}_{T}-Sig;Events;",0);
+//	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/metsig_delphinorm_pass","#slash{E}_{T}-Significance of Events Passing #Delta#Phi_{min}^{norm} cut;#slash{E}_{T}-Sig;Events;",0);
+	//makeSplitQCDhist_MadGraphBinned("QCDvetoAna/pat_njet_et50eta25",";Njet (Et50Eta2.5);Events;",0);
 
-/*	makeSplitQCDhist("QCDvetoAna/delPhiMin_mht",";#Delta#Phi_{min};Events;",0);
-	makeSplitQCDhist("QCDvetoAna/delPhiMinNorm_mht",";#Delta#Phi_{min}^{norm};Events;",0);
+/*	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/delPhiMin_mht",";#Delta#Phi_{min};Events;",0);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/delPhiMinNorm_mht",";#Delta#Phi_{min}^{norm};Events;",0);
 */
-//	makeSplitQCDhist("QCDvetoAna/hPassFail_mht","Using #Delta#Phi_{min} ;MHT;PASS/FAIL Ratio;",0);
-//	makeSplitQCDhist("QCDvetoAna/hPassFail_Norm_mht","Using #Delta#Phi_{min}^{norm};MHT;PASS/FAIL Ratio;",0);
+//	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/hPassFail_mht","Using #Delta#Phi_{min} ;MHT;PASS/FAIL Ratio;",0);
+//	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/hPassFail_Norm_mht","Using #Delta#Phi_{min}^{norm};MHT;PASS/FAIL Ratio;",0);
 
 
-//	makeSplitQCDhist("QCDvetoAna/delPhiMin_met",";#Delta#Phi_{min};Events;",1);
-//	makeSplitQCDhist("QCDvetoAna/delPhiMinNorm_met",";#Delta#Phi_{min}^{norm};Events;",1);
+//	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/delPhiMin_met",";#Delta#Phi_{min};Events;",1);
+//	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/delPhiMinNorm_met",";#Delta#Phi_{min}^{norm};Events;",1);
 
-//	makeSplitQCDhist("QCDvetoAna/hPassFail_met","Using #Delta#Phi_{min} ;MET;PASS/FAIL Ratio;",0);
-//	makeSplitQCDhist("QCDvetoAna/hPassFail_Norm_met","Using #Delta#Phi_{min}^{norm};MET;PASS/FAIL Ratio;",0);
+//	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/hPassFail_met","Using #Delta#Phi_{min} ;MET;PASS/FAIL Ratio;",0);
+//	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/hPassFail_Norm_met","Using #Delta#Phi_{min}^{norm};MET;PASS/FAIL Ratio;",0);
 
 
 /*
-	makeSplitQCDhist("QCDvetoAna/pat_pf50eta25_jet1_pt","Jet-1 (PF50Eta2.5);E_{T};Events;",1);
-	makeSplitQCDhist("QCDvetoAna/pat_pf50eta25_jet2_pt","Jet-2 (PF50Eta2.5);E_{T};Events;",1);
-	makeSplitQCDhist("QCDvetoAna/pat_pf50eta25_jet3_pt","Jet-3 (PF50Eta2.5);E_{T};Events;",1);
-	makeSplitQCDhist("QCDvetoAna/pat_pf50eta25_jet1_eta","Jet-1 (PF50Eta2.5);#Eta;Events;",0);
-	makeSplitQCDhist("QCDvetoAna/pat_pf50eta25_jet2_eta","Jet-2 (PF50Eta2.5);#Eta;Events;",0);
-	makeSplitQCDhist("QCDvetoAna/pat_pf50eta25_jet3_eta","Jet-3 (PF50Eta2.5);#Eta;Events;",0);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/pat_pf50eta25_jet1_pt","Jet-1 (PF50Eta2.5);E_{T};Events;",1);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/pat_pf50eta25_jet2_pt","Jet-2 (PF50Eta2.5);E_{T};Events;",1);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/pat_pf50eta25_jet3_pt","Jet-3 (PF50Eta2.5);E_{T};Events;",1);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/pat_pf50eta25_jet1_eta","Jet-1 (PF50Eta2.5);#Eta;Events;",0);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/pat_pf50eta25_jet2_eta","Jet-2 (PF50Eta2.5);#Eta;Events;",0);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/pat_pf50eta25_jet3_eta","Jet-3 (PF50Eta2.5);#Eta;Events;",0);
 
-	makeSplitQCDhist("QCDvetoAna/pat_pf50eta25_jet1_delphi", "Jet-1 (PF50Eta2.5);#Delta#Phi(jet-1, MHT);Events;",0);
-	makeSplitQCDhist("QCDvetoAna/pat_pf50eta25_jet2_delphi", "Jet-2 (PF50Eta2.5);#Delta#Phi(jet-2, MHT);Events;",0);
-	makeSplitQCDhist("QCDvetoAna/pat_pf50eta25_jet3_delphi", "Jet-3 (PF50Eta2.5);#Delta#Phi(jet-3, MHT);Events;",0);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/pat_pf50eta25_jet1_delphi", "Jet-1 (PF50Eta2.5);#Delta#Phi(jet-1, MHT);Events;",0);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/pat_pf50eta25_jet2_delphi", "Jet-2 (PF50Eta2.5);#Delta#Phi(jet-2, MHT);Events;",0);
+	makeSplitQCDhist_MadGraphBinned("QCDvetoAna/pat_pf50eta25_jet3_delphi", "Jet-3 (PF50Eta2.5);#Delta#Phi(jet-3, MHT);Events;",0);
 */
 
 }
