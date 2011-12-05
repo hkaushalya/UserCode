@@ -15,65 +15,127 @@
 
 using namespace std;
 
-double expFitFunc(double *x, double *par)
+const static float fDATA_LUMI = 4650; //pb-1
+const static float passFailRatio_fitrange_xmin = 50.0;
+const static float passFailRatio_fitrange_xmax = 150.0;
+std::vector<float> incMHTBins;
+const static int nMHTbins = 5;
+const static float arrMHTbins[nMHTbins] = {200,350,500,600,7000};
+float CONST_C = 0.0217;
+
+struct Predictions_t
 {
-	double fitval=0.0;
-	//if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + 0.03;
-	if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + 0.02;
-	else fitval=-1.0E6;
-	return fitval;
+		float incl_mean[nMHTbins];
+		float incl_statErr[nMHTbins];
+		float incl_fitErr[nMHTbins];
+		float excl_mean[nMHTbins-1];
+		float excl_statErr[nMHTbins-1];
+		float excl_fitErr[nMHTbins-1];
+		float incl_signal_mean[nMHTbins];
+		float incl_signal_statErr[nMHTbins];
+		float excl_signal_mean[nMHTbins-1];
+		float excl_signal_statErr[nMHTbins-1];
+		
+};
+
+
+
+void PrintExclResults(const Predictions_t& res, const float HTmin=0, const float HTmax=0)
+{
+	cout << setprecision(3) 
+					<< setw(10) << " HT "
+					<< setw(15) << "MHT"
+					<< setw(15) << " mean " 
+					<< setw(20) << "statFitErr"
+					<< setw(30) << "Signal+/-stat"
+					<< endl;
+	for (int i=0; i< nMHTbins -1 ; ++i)
+	{
+			const float mean          = res.excl_mean[i]; 
+			const float statAndFitErr = sqrt(pow(res.excl_statErr[i],2)+pow(res.excl_fitErr[i],2));
+			const float signal        = res.excl_signal_mean[i];
+			const float signalErr     = res.excl_signal_statErr[i];
+
+		cout << setprecision(4) 
+					<< setw(5) << HTmin << "-" << HTmax << " & "
+					<< setw(10) << incMHTBins.at(i) << "-" << incMHTBins.at(i+1) << " & "
+					<< setw(15) << mean   << "& $\\pm$ " << statAndFitErr << " & "
+					<< setw(15) << signal << "& $\\pm$ " << signalErr
+					<< endl;
+	}
+}
+void PrintInclResults(const Predictions_t& res, const float HTmin=0)
+{
+	cout << setprecision(3) 
+					<< setw(10) << " HT "
+					<< setw(15) << "MHT"
+					<< setw(15) << " mean " 
+					<< setw(20) << "statFitErr"
+					<< setw(30) << "Signal+/-stat"
+					<< endl;
+	for (int i=0; i< nMHTbins ; ++i)
+	{
+			const float mean          = res.incl_mean[i]; 
+			const float statAndFitErr = sqrt(pow(res.incl_statErr[i],2)+pow(res.incl_fitErr[i],2));
+			const float signal        = res.incl_signal_mean[i];
+			const float signalErr     = res.incl_signal_statErr[i];
+
+		cout << setprecision(4) 
+					<< setw(10) << HTmin << " & "
+					<< setw(10) << incMHTBins.at(i) << " & "
+					<< setw(15) << mean   << " & $\\pm$ " << statAndFitErr << " & "
+					<< setw(15) << signal << " & $\\pm$ " << signalErr
+					<< endl;
+	}
+	cout << "out of " << __FUNCTION__ << endl;
 }
 
-double gausFitFunc(double *x, double *par)
-{
-	double arg = par[0] * exp(par[1] * x[0]);
-	//double fitval = 1.0 / TMath::Erf (arg) - par[2];
-	//double fitval = 1.0 / TMath::Erf (arg) - 1 + 0.03;
-	double fitval = 1.0 / TMath::Erf (arg) - 1 + 0.02;
-	return fitval;
+
+//cross section for each sample in pt order
+const float xSec[] = {
+	115100,
+	24260,
+	1168,
+	70.22,
+	15.55,
+	1.844,
+	0.3321,
+	0.01087,
+	0.0003575 
+};
+
+const float nEvents[] = {
+	6127528, //120 //ok
+	6220160,	//170 //ok
+	6432669,//300  //ok
+	3990085,	//470 //ok
+	4245695,	//600 //ok
+	4053888,//800  //ok
+	2093222,//1000 //ok
+	2196200, //1400 //ok
+	293139 //1800  //ok
+};
+
+double GetFitFunctionError(TF1* f1, double x) {
+
+	double err = 0.;
+	Double_t val[1] = { x };
+
+	for(Int_t j=0; j<f1->GetNpar(); ++j) 
+	{
+		err += f1->GradientPar(j,val) * f1->GetParError(j);
+	}
+
+	return err;
+
 }
 
 
-
-void makePassFail_QCDMC(const float fitrange_xmin = 50, const float fitrange_xmax = 150) 
+TH1* GetHist(const std::string histname, const float scaleTo=1.0)
 {
-
-	const bool logScale = true;
-	const string title = " : HT>500 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
-	const float scaleTo = 4650; // pb
-
-	//cross section for each sample in pt order
-	const float cs[] = {	115100,
-								24260,
-								1168,
-								70.22,
-								15.55,
-								1.844,
-								0.3321,
-								0.01087,
-								0.0003575 
-								};
-
-	const float nevts[] = {6127528, //120 //ok
-									6220160,	//170 //ok
-									6432669,//300  //ok
-									3990085,	//470 //ok
-									4245695,	//600 //ok
-									4053888,//800  //ok
-									2093222,//1000 //ok
-									2196200, //1400 //ok
-									293139 //1800  //ok
-	};
-	
-	
-	
-
 	const Int_t nBins = 9;
 	TFile *files[nBins];
-	TH1 *hists_pass[nBins] = {0,0,0,0,0,0,0,0,0};
-	TH1 *hists_fail[nBins] = {0,0,0,0,0,0,0,0,0};
-	TH1 *hists_signal_mht200[nBins] = {0,0,0,0,0,0,0,0,0};
-	TH1 *hists_control[nBins] = {0,0,0,0,0,0,0,0,0};
+	TH1 *hists[nBins] = {0,0,0,0,0,0,0,0,0};
 
 	files[0] = new TFile ("qcd1/Merged.root");
 	files[1] = new TFile ("qcd2/Merged.root");
@@ -85,18 +147,7 @@ void makePassFail_QCDMC(const float fitrange_xmin = 50, const float fitrange_xma
 	files[7] = new TFile ("qcd8/Merged.root");
 	files[8] = new TFile ("qcd9/Merged.root");
 
-	TH1 *Hist_pass = 0;
-	TH1 *Hist_fail = 0;
-	TH1 *Hist_signal_mht200 = 0;
-	TH1 *Hist_control = 0;
-	const std::string histname1("factorization_ht500/Pass_RA2dphi_HT500");
-	const std::string histname2("factorization_ht500/Fail_1");
-	//const std::string histname1("factorization_ht350/Pass_RA2dphi");
-	//const std::string histname2("factorization_ht350/Fail_1");
-	//const std::string signal1_mht200("factorization_ht500/Signal_0");
-	//const std::string control1("factorization_ht500/Fail_lt_point2_HT500");
-	const std::string signal1_mht200("factorization_ht500/Signal_2");
-	const std::string control1("factorization_ht500/Fail_lt_point2_HT800");
+	TH1 *res_hist = 0;
 
 	for (int i=0; i<nBins; ++i)
 	{
@@ -106,71 +157,234 @@ void makePassFail_QCDMC(const float fitrange_xmin = 50, const float fitrange_xma
 			assert (false);
 		} else
 		{
-			//cout << files[i]->GetName() << " opened." <<  endl;
 
-			hists_pass[i] = dynamic_cast<TH1*> (files[i]->Get(histname1.c_str()));
-			hists_fail[i] = dynamic_cast<TH1*> (files[i]->Get(histname2.c_str()));
-			hists_signal_mht200[i] = dynamic_cast<TH1*> (files[i]->Get(signal1_mht200.c_str()));
-			hists_control[i] = dynamic_cast<TH1*> (files[i]->Get(control1.c_str()));
-			if (hists_pass[i] != 0 && hists_fail[i] != 0 && hists_signal_mht200[i] != 0 && hists_control[i])
+			hists[i] = dynamic_cast<TH1*> (files[i]->Get(histname.c_str()));
+			if (hists[i] == 0 )
 			{
-				//std::cout << "Entries pass/ fail " << hists_pass[i]->GetEntries() << " / " << hists_fail[i]->GetEntries() << std::endl;
-				//hists_pass[i]->Print();
-				//new TCanvas();
-				//hists_pass[i]->Draw();
-				//gPad->SetEditable(0);
-				hists_pass[i]->Sumw2();
-				hists_fail[i]->Sumw2();
-				hists_signal_mht200[i]->Sumw2();
-				hists_control[i]->Sumw2();
-						
-        		//print last bin events
-				const int lastbin = hists_pass[i]->GetNbinsX();
-				std::cout << "pass: last bin events [" << hists_pass[i]->GetBinLowEdge(lastbin) << "] " <<
-					hists_pass[i]->GetBinContent(lastbin)
-					<< " ][overflow = " << hists_pass[i]->GetBinContent(lastbin+1)
-					<< std::endl;
-				std::cout << "fail: last bin events [" << hists_fail[i]->GetBinLowEdge(lastbin) << "] " <<
-					hists_fail[i]->GetBinContent(lastbin)
-					<< " ][overflow = " << hists_fail[i]->GetBinContent(lastbin+1)
-					<< std::endl;
-
-
-
-				const float scale = scaleTo/ ( nevts[i] / cs[i] );
-				hists_pass[i]->Scale(scale);
-				hists_pass[i]->SetLineWidth(2);
-				hists_pass[i]->SetLineColor(i);
-				hists_fail[i]->Scale(scale);
-				hists_fail[i]->SetLineWidth(2);
-				hists_fail[i]->SetLineColor(i+11);
-				
-				hists_signal_mht200[i]->Scale(scale);
-				hists_control[i]->Scale(scale);
-
-				//if (i != 0) hists_pass[0]->Add(hists_pass[i]);
-				if (i == 0) 
-				{
-					Hist_pass = dynamic_cast<TH1*> (hists_pass[i]->Clone("histpass_copy"));
-					Hist_fail = dynamic_cast<TH1*> (hists_fail[i]->Clone("histfail_copy"));
-					Hist_signal_mht200 = dynamic_cast<TH1*> (hists_signal_mht200[i]->Clone("histsignal_mth200_copy"));
-					Hist_control = dynamic_cast<TH1*> (hists_control[i]->Clone("histscontrol_copy"));
-				} else
-				{
-					Hist_pass->Add(hists_pass[i]);
-					Hist_fail->Add(hists_fail[i]);
-					Hist_signal_mht200->Add(hists_signal_mht200[i]);
-					Hist_control->Add(hists_control[i]);
-				}
-
-			} else {
-				cout << "Hist_pass " << histname1 << " not found in " << files[i]->GetName() << "!" << endl;
+				cout << "hist_pass " << histname << " not found in " << files[i]->GetName() << "!" << endl;
 				assert (false);
+			} else 
+			{
+				hists[i]->Sumw2();
+						
+				const float scale = scaleTo/ ( nEvents[i] / xSec[i] );
+				hists[i]->Scale(scale);
+
+				if (i == 0) { res_hist = dynamic_cast<TH1*> (hists[i]->Clone("histcopy")); } 
+				else { res_hist->Add(hists[i]); }
 			}
 		}
 	}
+	
+	return res_hist;
 
-/*	new TCanvas();
+}
+
+
+
+double expFitFunc(double *x, double *par)
+{
+	double fitval=0.0;
+	//if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + 0.03;
+	//if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + 0.0217;
+	if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + CONST_C;
+	else fitval=-1.0E6;
+	return fitval;
+}
+
+double gausFitFunc(double *x, double *par)
+{
+	double arg = par[0] * exp(par[1] * x[0]);
+	//double fitval = 1.0 / TMath::Erf (arg) - par[2];
+	//double fitval = 1.0 / TMath::Erf (arg) - 1 + 0.03;
+	//double fitval = 1.0 / TMath::Erf (arg) - 1 + 0.02;
+	//double fitval = 1.0 / TMath::Erf (arg) - 1 + 0.0217;
+	double fitval = 1.0 / TMath::Erf (arg) - 1 + CONST_C;
+	return fitval;
+}
+
+Predictions_t GetPredictions(const TH1* hist, TF1* f1, const TH1* signalHist)
+{
+	assert(hist != NULL && "GetPredictions:: hist not found!");
+	assert(f1 != NULL && "GetPredictions:: func not found!");
+	assert(signalHist != NULL && "GetPredictions:: signalHist not found!");
+	//new TCanvas(); gPad->SetLogy(); hist->SetStats(1); hist->DrawCopy(); //gPad->Print("control.eps");
+	
+
+	std::cout << "INITIAL INFO FOR HIST:"; hist->Print();
+	int bin1 = 0;
+	for (int bin =0; bin<hist->GetNbinsX(); ++bin) 
+	{ 
+		if (hist->GetBinLowEdge(bin)<incMHTBins.at(0)) continue;
+		else { bin1 = bin; break; }
+	}
+	int bin2 = hist->GetNbinsX()+1;
+	double err =0;
+	double integral = hist->IntegralAndError(bin1, bin2, err);
+	std::cout << "Intergral for MHT> "<< incMHTBins.at(0) << ":" << integral << "+/-" << err << std::endl;
+/*	double sig_sum = 0;
+	double sig_err2 =0;
+	for (int bin =0; bin<signalHist->GetNbinsX()+1; ++bin) 
+	{
+		if (signalHist->GetBinContent(bin)>0)
+		{
+			sig_sum += signalHist->GetBinContent(bin);
+			sig_err2 += pow(signalHist->GetBinError(bin),2);
+		}
+	}
+	std::cout << "Signal hist  := " << sig_sum << " +/- " << sqrt(sig_err2) << std::endl;
+*/
+	double sumGaus[incMHTBins.size()];
+	double Gaus_StatErr[incMHTBins.size()];
+	double Gaus_FitErr[incMHTBins.size()];
+	double sumGaus_excl[incMHTBins.size()-1];
+	double Gaus_StatErr_excl[incMHTBins.size()-1];
+	double Gaus_FitErr_excl[incMHTBins.size()-1];
+	double signal_mean_excl[incMHTBins.size()-1];
+	double signal_statErr_excl[incMHTBins.size()-1];
+	double signal_mean_incl[incMHTBins.size()];
+	double signal_statErr_incl[incMHTBins.size()];
+
+	Predictions_t results;
+
+	for (unsigned mhtBin = 0; mhtBin < incMHTBins.size(); ++mhtBin)
+	{
+		sumGaus[mhtBin]      = 0;
+		Gaus_StatErr[mhtBin] = 0;
+		Gaus_FitErr[mhtBin]  = 0;
+		signal_mean_incl[mhtBin]  = 0;
+		signal_statErr_incl[mhtBin] = 0;
+		if (mhtBin+1<incMHTBins.size()) 
+		{
+			sumGaus_excl[mhtBin]      = 0;
+			Gaus_StatErr_excl[mhtBin] = 0;
+			Gaus_FitErr_excl[mhtBin]  = 0;
+			signal_mean_excl[mhtBin]  = 0;
+			signal_statErr_excl[mhtBin] = 0;
+		}
+
+		for (int bin = 0; bin <= hist->GetNbinsX()+1; ++bin)
+		{
+			if (hist->GetBinContent(bin)>0)
+			{
+				/*			 cout << std::setprecision(4) << std::setw(5) << bin << std::setw(3) << "[" 
+							 << std::setw(10) << hist->GetBinLowEdge(bin) << ", "  << std::setw(10) 
+							 << hist->GetXaxis()->GetBinUpEdge(bin)<< "]" 
+							 << std::setw(10) << hist->GetBinContent(bin) 
+							 << std::setw(10) << hist->GetBinContent(bin) * gausFit2->Eval(hist->GetBinCenter(bin))
+							 << endl;
+							 */				//inclusive bin stuff
+
+				const float binCenter = hist->GetBinCenter(bin);
+				const float binVal    = hist->GetBinContent(bin);
+				const float binErr    = hist->GetBinError(bin);
+				const float funcVal   = f1->Eval(binCenter);
+				const float res       = (binVal * funcVal);
+				const float statErr2  = pow(binErr * funcVal, 2);
+			 	const float fitErr    = binVal * GetFitFunctionError(f1, binCenter);
+				const float binSig    = signalHist->GetBinContent(bin); 
+				const float binSigStatErr2 = pow(signalHist->GetBinError(bin),2); 
+
+			//cout << setprecision(3) << setw(15) << "MHT > " << incMHTBins.at(mhtBin) 
+			//<< setw(20) << binSig  << "&$\\pm$" << binSigStatErr2 << std::endl;
+
+				if (hist->GetBinCenter(bin) > incMHTBins.at(mhtBin))
+				{
+					sumGaus[mhtBin]      += res;
+					Gaus_StatErr[mhtBin] += statErr2;
+					Gaus_FitErr[mhtBin]  += fitErr;
+					signal_mean_incl[mhtBin]  += binSig;
+					signal_statErr_incl[mhtBin]  += binSigStatErr2;
+				}
+
+				//exclsuive bin stuff
+				if (mhtBin+1<incMHTBins.size())
+				{
+					if (hist->GetBinCenter(bin) > incMHTBins.at(mhtBin) 
+							&& hist->GetBinCenter(bin) < incMHTBins.at(mhtBin+1))
+					{
+						sumGaus_excl[mhtBin]      += res;
+						Gaus_StatErr_excl[mhtBin] += statErr2;
+						Gaus_FitErr_excl[mhtBin]  += fitErr;
+						signal_mean_excl[mhtBin]  += binSig;
+						signal_statErr_excl[mhtBin]  += binSigStatErr2;
+					}
+				}
+			}
+		}
+
+		Gaus_StatErr[mhtBin] = sqrt(Gaus_StatErr[mhtBin]);
+		Gaus_StatErr_excl[mhtBin] = sqrt(Gaus_StatErr_excl[mhtBin]);
+		signal_statErr_incl[mhtBin] = sqrt(signal_statErr_incl[mhtBin]);
+		signal_statErr_excl[mhtBin] = sqrt(signal_statErr_excl[mhtBin]);
+
+		results.incl_mean[mhtBin] = sumGaus[mhtBin];
+		results.incl_statErr[mhtBin] = Gaus_StatErr[mhtBin];
+		results.incl_fitErr[mhtBin] = Gaus_FitErr[mhtBin];
+		results.incl_signal_mean[mhtBin] = signal_mean_incl[mhtBin];
+		results.incl_signal_statErr[mhtBin] = signal_statErr_incl[mhtBin];
+
+		
+		if (mhtBin+1<incMHTBins.size())
+		{
+			std::stringstream excl_pred;
+			excl_pred << setprecision(3) << setw(10) << incMHTBins.at(mhtBin) << "<MHT<" << incMHTBins.at(mhtBin+1)
+				<< setw(20) << sumGaus_excl[mhtBin]  << "&$\\pm$" << Gaus_StatErr_excl[mhtBin] << " &$\\pm$ " << Gaus_FitErr_excl[mhtBin];
+			results.excl_mean[mhtBin]    = sumGaus_excl[mhtBin];
+			results.excl_statErr[mhtBin] = Gaus_StatErr_excl[mhtBin];
+			results.excl_fitErr[mhtBin]  = Gaus_FitErr_excl[mhtBin];
+			results.excl_signal_mean[mhtBin] = signal_mean_excl[mhtBin];
+			results.excl_signal_statErr[mhtBin] = signal_statErr_excl[mhtBin];
+		}
+	}
+	
+	return results;
+}
+
+void makePassFail_QCDMC(const int HTbin = 1, const float fitrange_xmin = 50, const float fitrange_xmax = 150) 
+{
+
+	incMHTBins.clear();
+	for (int i=0; i<nMHTbins; ++i) incMHTBins.push_back(arrMHTbins[i]);
+	const bool logScale = true;
+	const float scaleTo = 4650; // pb
+
+	string title("");
+	//const std::string histname1("factorization_ht500/Pass_RA2dphi_HT500");
+	std::string numeHistName("");
+	std::string denoHistName("");
+
+	if (HTbin == 1)   //500gev
+	{
+		title +=" : HT>500 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
+		numeHistName += "factorization_ht500/Pass_RA2dphi";
+		denoHistName += "factorization_ht500/Fail_1";
+	} else if (HTbin == 2)  //600gev
+	{
+		title +=" : HT>600 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
+		numeHistName += "factorization_ht600/Pass_RA2dphi";
+		denoHistName += "factorization_ht600/Fail_1";
+	} else if (HTbin == 3)  //800gev
+	{
+		title +=" : HT>800 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
+		numeHistName += "factorization_ht800/Pass_RA2dphi";
+		denoHistName += "factorization_ht800/Fail_1";
+	} else if (HTbin == 4)  //1000gev
+	{
+		title +=" : HT>1000 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
+		numeHistName += "factorization_ht1000/Pass_RA2dphi";
+		denoHistName += "factorization_ht1000/Fail_1";
+	} else if (HTbin == 5)  //1200gev
+	{
+		title +=" : HT>1200 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
+		numeHistName += "factorization_ht1200/Pass_RA2dphi";
+		denoHistName += "factorization_ht1200/Fail_1";
+	}
+
+	TH1 *Hist_pass = GetHist(numeHistName, scaleTo);
+	TH1 *Hist_fail = GetHist(denoHistName, scaleTo);
+/*
+	new TCanvas();
 	gPad->SetLogy();
 	gStyle->SetOptStat(0);
 	Hist_fail->SetLineColor(kBlue);
@@ -187,10 +401,10 @@ void makePassFail_QCDMC(const float fitrange_xmin = 50, const float fitrange_xma
 */
 	//gPad->SetEditable(0);
 	//new TCanvas();
-	new TCanvas(); gPad->SetLogy(); Hist_pass->DrawCopy();
-	new TCanvas(); gPad->SetLogy(); Hist_fail->DrawCopy();
-	new TCanvas(); gPad->SetLogy(); Hist_signal_mht200->DrawCopy();
-
+//	new TCanvas(); gPad->SetLogy(); Hist_pass->DrawCopy();
+//	new TCanvas(); gPad->SetLogy(); Hist_fail->DrawCopy();
+//	new TCanvas(); gPad->SetLogy(); Hist_signal_mht200->DrawCopy();
+//	return;
 
 	Hist_pass->Divide(Hist_fail);
 	const int maxbin = Hist_pass->GetMaximumBin();
@@ -198,11 +412,11 @@ void makePassFail_QCDMC(const float fitrange_xmin = 50, const float fitrange_xma
 	//Hist_pass->GetYaxis()->SetRangeUser(-0.05, max+0.05);
 
 
-
 	//fit range
 	//const float fitrange_xmin = 50, fitrange_xmax = 120;
 	stringstream newtitle;
-	newtitle << "Fit Range " << fitrange_xmin << "--" << fitrange_xmax << title;
+	//newtitle << "Fit Range " << fitrange_xmin << "--" << fitrange_xmax << title;
+	newtitle << ";MHT [GeV];Ratio (r);";
 
 
 	gStyle->SetOptStat(0);
@@ -260,11 +474,12 @@ void makePassFail_QCDMC(const float fitrange_xmin = 50, const float fitrange_xma
 	gausFit2->SetLineColor(kGreen);
 	gausFit2->SetLineWidth(1);
 	gausFit2->Draw("same");
-	expFit2->Draw("same");
+	//expFit2->Draw("same");
 
-	TLegend *leg  = new TLegend(0.7,0.8,0.9,0.9);
-	leg->AddEntry(gausFit2,"Gaus");
-	leg->AddEntry(expFit2,"Exp");
+	//TLegend *leg  = new TLegend(0.7,0.8,0.9,0.9);
+	TLegend *leg  = new TLegend(0.7,0.7,0.9,0.9);
+	leg->AddEntry(gausFit2,"Gaussian Model");
+	//leg->AddEntry(expFit2,"Exp");
 	leg->Draw();
 
 	const float xmin=0.2, xmax=0.45, ymin=0.7, ymax=0.9;
@@ -277,7 +492,7 @@ void makePassFail_QCDMC(const float fitrange_xmin = 50, const float fitrange_xma
 	exp_stats->SetX2NDC(xmax+0.25);
 	exp_stats->SetY1NDC(ymin);
 	exp_stats->SetY2NDC(ymax);
-	exp_stats->Draw("same");
+	//exp_stats->Draw("same");
 
 
 	//fit quality
@@ -295,83 +510,72 @@ void makePassFail_QCDMC(const float fitrange_xmin = 50, const float fitrange_xma
 //	pt1->Draw("same");
 
 	stringstream epsname;
-	epsname << "factorization_fitrange_" << fitrange_xmin << "to" << fitrange_xmax << ".eps";
+	epsname << "factorization_HTbin" << HTbin << "_fitrange_" << fitrange_xmin << "to" << fitrange_xmax << ".eps";
 	gPad->Print(epsname.str().c_str());
+	return;
 
 	 //make a predicion
-	double sumGaus = 0, sumExp = 0;
-	double sumGaus_excl = 0, sumExp_excl = 0;
-	double Gaus_StatErr = 0, Exp_Stat_Err = 0;
-	double Gaus_StatErr_excl = 0, Exp_Stat_Err_excl = 0;
-	std::vector<float> incMHTBins;
-	incMHTBins.push_back(200);
-	incMHTBins.push_back(350);
-	incMHTBins.push_back(500);
-
-	
 	cout << "\n\n >>>>>> HT>500 PREDICTIONS " << endl; 
-	cout << setw(15) << "MHT bin "<< setw(20) << " Val" << setw(20) << " Gaus " << setw(20) << " Exp "  << setw(20) << "  Signal "<< endl;
+	TH1 *sigHist_ht500       = GetHist("factorization_ht500/Signal_HT500MHT200", scaleTo);
+	TH1 *sidebandHist_ht500  = GetHist("factorization_ht500/Fail_lt_point2_HT500", scaleTo);
+	Predictions_t pred_HT500 = GetPredictions(sidebandHist_ht500, gausFit2, sigHist_ht500); 
 
-	for (unsigned mhtBin = 0; mhtBin < incMHTBins.size(); ++mhtBin)
-	{
-		sumGaus = 0, sumExp = 0;
-		sumGaus_excl = 0, sumExp_excl = 0;
-		Gaus_StatErr = 0, Exp_Stat_Err = 0;
-		Gaus_StatErr_excl = 0, Exp_Stat_Err_excl = 0;
-		double signal = 0, signal_excl = 0;
+	cout << "\n\n >>>>>> HT>800 PREDICTIONS " << endl; 
+	TH1 *sigHist_ht800       = GetHist("factorization_ht500/Signal_HT800MHT200", scaleTo);
+	TH1 *sidebandHist_ht800  = GetHist("factorization_ht500/Fail_lt_point2_HT800", scaleTo);
+	Predictions_t pred_HT800 = GetPredictions(sidebandHist_ht800, gausFit2, sigHist_ht800); 
+
+	cout << "\n\n >>>>>> HT>1000 PREDICTIONS " << endl; 
+	TH1 *sigHist_ht1000       = GetHist("factorization_ht500/Signal_HT1000MHT200", scaleTo);
+	TH1 *sidebandHist_ht1000  = GetHist("factorization_ht500/Fail_lt_point2_HT1000", scaleTo);
+	Predictions_t pred_HT1000 = GetPredictions(sidebandHist_ht1000, gausFit2, sigHist_ht1000); 
+
+	cout << "\n\n >>>>>> HT>1200 PREDICTIONS " << endl; 
+	TH1 *sigHist_ht1200       = GetHist("factorization_ht500/Signal_HT1200MHT200", scaleTo);
+	TH1 *sidebandHist_ht1200  = GetHist("factorization_ht500/Fail_lt_point2_HT1200", scaleTo);
+	Predictions_t pred_HT1200 = GetPredictions(sidebandHist_ht1200, gausFit2, sigHist_ht1200); 
 
 
-		for (int bin = 0; bin <= Hist_control->GetNbinsX()+1; ++bin)
-		{
-							 				//inclusive bin stuff
-				if (Hist_control->GetBinCenter(bin) > incMHTBins.at(mhtBin))
-				{
-							/* cout << std::setprecision(4) << std::setw(5) << bin << std::setw(3) << "[" 
-							 << std::setw(10) << Hist_control->GetBinLowEdge(bin) << ", "  << std::setw(10) 
-							 << Hist_control->GetXaxis()->GetBinUpEdge(bin)<< "]" 
-							 << std::setw(15) << Hist_control->GetBinContent(bin) 
-							 << std::setw(15) << Hist_control->GetBinContent(bin) * gausFit2->Eval(Hist_control->GetBinCenter(bin))
-							 << std::setw(15) << Hist_control->GetBinContent(bin) * expFit2->Eval(Hist_control->GetBinCenter(bin))
-							 << std::setw(15) << Hist_signal_mht200->GetBinContent(bin) 
-							 << endl;
-							 */
 
-					sumGaus      += Hist_control->GetBinContent(bin) * gausFit2->Eval(Hist_control->GetBinCenter(bin));
-					sumExp       += Hist_control->GetBinContent(bin) * expFit2->Eval(Hist_control->GetBinCenter(bin));
-					Gaus_StatErr += Hist_control->GetBinError(bin)   * gausFit2->Eval(Hist_control->GetBinCenter(bin));
-					Exp_Stat_Err += Hist_control->GetBinError(bin)   * expFit2->Eval(Hist_control->GetBinCenter(bin));
-					signal       += Hist_signal_mht200->GetBinContent(bin);
-				}
+	cout << "\n\n >>>>>> 500<HT<800 PREDICTIONS " << endl; 
+	TH1 *sigHist_ht500to800       = GetHist("factorization_ht500/Signal_HT500to800MHT200", scaleTo);
+	TH1 *sidebandHist_ht500to800  = GetHist("factorization_ht500/Fail_lt_point2_500HT800", scaleTo);
+	Predictions_t pred_HT500to800 = GetPredictions(sidebandHist_ht500to800, gausFit2, sigHist_ht500to800); 
 
-									//exclsuive bin stuff
-				if (mhtBin+1<incMHTBins.size())
-				{
-					if (Hist_control->GetBinCenter(bin) > incMHTBins.at(mhtBin) 
-							&& Hist_control->GetBinCenter(bin) < incMHTBins.at(mhtBin+1))
-					{
-						sumGaus_excl      += Hist_control->GetBinContent(bin) * gausFit2->Eval(Hist_control->GetBinCenter(bin));
-						sumExp_excl       += Hist_control->GetBinContent(bin) * expFit2->Eval(Hist_control->GetBinCenter(bin));
-						Gaus_StatErr_excl += Hist_control->GetBinError(bin)   * gausFit2->Eval(Hist_control->GetBinCenter(bin));
-						Exp_Stat_Err_excl += Hist_control->GetBinError(bin)   * expFit2->Eval(Hist_control->GetBinCenter(bin));
-						signal_excl       += Hist_signal_mht200->GetBinContent(bin);
-					}
+	cout << "\n\n >>>>>> 800<HT<1000 PREDICTIONS " << endl; 
+	TH1 *sigHist_ht800to1000       = GetHist("factorization_ht500/Signal_HT800to1000MHT200", scaleTo);
+	TH1 *sidebandHist_ht800to1000  = GetHist("factorization_ht500/Fail_lt_point2_800HT1000", scaleTo);
+	Predictions_t pred_HT800to1000 = GetPredictions(sidebandHist_ht800to1000, gausFit2, sigHist_ht800to1000); 
 
-				}
+	cout << "\n\n >>>>>> 1000<HT<1200 PREDICTIONS " << endl; 
+	TH1 *sigHist_ht1000to1200       = GetHist("factorization_ht500/Signal_HT1000to1200MHT200", scaleTo);
+	TH1 *sidebandHist_ht1000to1200  = GetHist("factorization_ht500/Fail_lt_point2_1000HT1200", scaleTo);
+	Predictions_t pred_HT1000to1200 = GetPredictions(sidebandHist_ht1000to1200, gausFit2, sigHist_ht1000to1200); 
 
-		}
+	cout << "\n\n >>>>>> 1200<HT<1400 PREDICTIONS " << endl; 
+	TH1 *sigHist_ht1200to1400       = GetHist("factorization_ht500/Signal_HT1200to1400MHT200", scaleTo);
+	TH1 *sidebandHist_ht1200to1400  = GetHist("factorization_ht500/Fail_lt_point2_1200HT1400", scaleTo);
+	Predictions_t pred_HT1200to1400 = GetPredictions(sidebandHist_ht1200to1400, gausFit2, sigHist_ht1200to1400); 
 
-		cout<< setprecision(3) << setw(15) << "MHT > " << incMHTBins.at(mhtBin) 
-			<< setw(20) << sumGaus  << "+/-" << Gaus_StatErr 
-			<< setw(20) << sumExp  << " +/-" << Exp_Stat_Err  << setw(30) << signal << endl;
+	cout << "\n\n >>>>>> HT>500 PREDICTIONS " << endl; 
+	PrintInclResults(pred_HT500, 500);
+	cout << "\n\n >>>>>> HT>800 PREDICTIONS " << endl; 
+	PrintInclResults(pred_HT800, 800);
+	cout << "\n\n >>>>>> HT>1000 PREDICTIONS " << endl; 
+	PrintInclResults(pred_HT1000, 1000);
+	cout << "\n\n >>>>>> HT>1200 PREDICTIONS " << endl; 
+	PrintInclResults(pred_HT1200, 1200);
 
-		if (mhtBin+1<incMHTBins.size())
-		{
-			cout<< setprecision(3) << setw(10) << incMHTBins.at(mhtBin) << "<MHT<" << incMHTBins.at(mhtBin+1)
-				<< setw(20) << sumGaus_excl  << "+/-" << Gaus_StatErr_excl 
-				<< setw(20) << sumExp_excl  << " +/-" << Exp_Stat_Err_excl  << setw(30) << signal_excl << endl;
-		}
 
-	}
+	cout << "\n\n >>>>>> 500<HT<800 PREDICTIONS " << endl; 
+	PrintExclResults(pred_HT500to800, 500, 800);
+	cout << "\n\n >>>>>> 800<HT<1000 PREDICTIONS " << endl; 
+	PrintExclResults(pred_HT800to1000, 800, 1000);
+	cout << "\n\n >>>>>> 1000<HT<1200 PREDICTIONS " << endl; 
+	PrintExclResults(pred_HT1000to1200, 1000, 1200);
+	cout << "\n\n >>>>>> 1200<HT<1400 PREDICTIONS " << endl; 
+	PrintExclResults(pred_HT1200to1400, 1200, 1400);
+
 
 }
 
