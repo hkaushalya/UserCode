@@ -12,18 +12,28 @@
 #include "TPaveStats.h"
 #include "TPaveText.h"
 #include <iomanip>
+#include <algorithm>
 
 using namespace std;
 
 const static float fDATA_LUMI = 4650; //pb-1
 const static float fEWK_LUMI  = 81352581.0/(float) 31300.0;        // 31300 pb for NLO xsec and total number of events is 81352581 (sample1+sample2)
+const static float fTTBAR_LUMI = 1.0;
+const static float fZNN_LUMI = 1.0;
 const static string sDATA_FILE_NAME = "Data.root";
-const static string sEWK_FILE_NAME  = "EWKmc.root";
+const static string sWJET_FILE_NAME  = "EWKmc.root";
+const static string sTTBAR_FILE_NAME  = "TTbarMC.root";
+const static string sZNN_FILE_NAME  = "ZnnMC.root";
 const static float passFailRatio_fitrange_xmin = 50.0;
 const static float passFailRatio_fitrange_xmax = 150.0;
 std::vector<float> incMHTBins;
 const static int nMHTbins = 5;
 const static float arrMHTbins[nMHTbins] = {200,350,500,600,7000};
+float CONST_C      = 0.0217;
+//float CONST_C      = 0.03;
+float CONST_C_UP   = 0.07;
+float CONST_C_DOWN = 0.012;
+//float CONST_C = 0.03;
 struct Predictions_t
 {
 		float incl_mean[nMHTbins];
@@ -34,11 +44,33 @@ struct Predictions_t
 		float excl_fitErr[nMHTbins-1];
 };
 
+void PrintExclPredictions(const Predictions_t& res)
+{
+
+	cout << setprecision(3) << setw(15) << " MHT "
+					<< setw(10) << " mean " 
+					<< setw(10) << "stat"
+					<< endl;
+	for (int i=0; i< nMHTbins -1 ; ++i)
+	{
+			const float mean    = res.excl_mean[i]; 
+			const float statErr = res.excl_statErr[i];
+
+		cout << setprecision(3) << setw(15) << incMHTBins.at(i) << "<MHT<" << incMHTBins.at(i+1) 
+					<< setw(10) << mean << " $&\\pm$ " 
+					<< setw(10) << statErr
+					<< endl;
+	}
+}
+
 
 
 void PrintResults(const Predictions_t& res, 
 					const Predictions_t& htSystRes,
-					const Predictions_t& qcdSystRes)
+					const Predictions_t& qcdSystRes,
+					const Predictions_t& C_upSyst,
+					const Predictions_t& C_downSyst
+					)
 {
 
 	cout << setprecision(3) << setw(15) << " MHT "
@@ -46,6 +78,7 @@ void PrintResults(const Predictions_t& res,
 					<< setw(10) << ":statAndFitErr"
 					<< setw(10) << " htSyst"
 					<< setw(10) << " qcdSyst1"
+					<< setw(10) << " const C"
 					<< setw(10) << "total"
 					<< endl;
 	for (int i=0; i< nMHTbins -1 ; ++i)
@@ -54,53 +87,177 @@ void PrintResults(const Predictions_t& res,
 			const float statAndFitErr = sqrt(pow(res.excl_statErr[i],2)+pow(res.excl_fitErr[i],2));
 			const float htSys         = fabs(mean - htSystRes.excl_mean[i]);
 			const float qcdSys1       = fabs(mean - qcdSystRes.excl_mean[i]);
+			const float C_Sys         = max(fabs(mean - C_upSyst.excl_mean[i]), fabs(mean - C_downSyst.excl_mean[i]));
+
 			const float total         = sqrt(  pow(statAndFitErr,2)
 			                                 + pow(htSys,2)
-														+ pow(qcdSys1,2) );
+														+ pow(qcdSys1,2) 
+														+ pow(C_Sys,2) 
+														);
 
 		cout << setprecision(3) << setw(15) << incMHTBins.at(i) << "<MHT<" << incMHTBins.at(i+1) 
 					<< setw(10) << mean << " $&\\pm$ " 
 					<< setw(10) << statAndFitErr
 					<< setw(10) << " $&\\pm$ " << htSys
 					<< setw(10) << " $&\\pm$ " << qcdSys1
+					<< setw(10) << " $&\\pm$ " << C_Sys
 					<< setw(10) << " $&\\pm$ " << total
 					<< endl;
 	}
+
 	for (int i=0; i< nMHTbins ; ++i)
 	{
 			const float mean          = res.incl_mean[i]; 
 			const float statAndFitErr = sqrt(pow(res.incl_statErr[i],2)+pow(res.incl_fitErr[i],2));
 			const float htSys         = fabs(mean - htSystRes.incl_mean[i]);
 			const float qcdSys1       = fabs(mean - qcdSystRes.incl_mean[i]);
+			const float C_Sys         = max(fabs(mean - C_upSyst.incl_mean[i]), fabs(mean - C_downSyst.incl_mean[i]));
 			const float total         = sqrt(  pow(statAndFitErr,2)
 			                                 + pow(htSys,2)
-														+ pow(qcdSys1,2) );
+														+ pow(qcdSys1,2) 
+														+ pow(C_Sys,2) 
+														);
 
 		cout << setprecision(3) << setw(15) << "MHT> " << incMHTBins.at(i) 
 					<< setw(10) << mean << " $&\\pm$ " 
 					<< setw(10) << statAndFitErr
 					<< setw(10) << " $&\\pm$ " << htSys
 					<< setw(10) << " $&\\pm$ " << qcdSys1
+					<< setw(10) << " $&\\pm$ " << C_Sys
 					<< setw(10) << " $&\\pm$ " << total
 					<< endl;
 	}
 
 }
-void SubstractEWK(TH1* hist, const string ewkhistname)
+
+
+/*******************
+ * Find events in each exclusive bin for a given hist
+ *******************/
+Predictions_t GetExlcusiveBinContents(const TH1* hist)
 {
-	TFile* ewkFile = new TFile(sEWK_FILE_NAME.c_str());
+	assert(hist != NULL && "GetPredictions:: hist not found!");
+
+	double mean[incMHTBins.size()-1];
+	double statErr[incMHTBins.size()-1];
+
+	Predictions_t results;
+
+	for (unsigned mhtBin = 0; mhtBin < incMHTBins.size(); ++mhtBin)
+	{
+		if (mhtBin+1<incMHTBins.size()) 
+		{
+			mean[mhtBin] = 0;
+			statErr[mhtBin] = 0;
+		}
+
+		for (int bin = 0; bin <= hist->GetNbinsX()+1; ++bin)
+		{
+			if (hist->GetBinContent(bin)>0)
+			{
+
+				const float binCenter = hist->GetBinCenter(bin);
+				const float binVal    = hist->GetBinContent(bin);
+				const float binErr    = hist->GetBinError(bin);
+				const float statErr2  = pow(binErr, 2);
+
+				if (mhtBin+1<incMHTBins.size())
+				{
+					if (binCenter > incMHTBins.at(mhtBin) 
+							&& binCenter < incMHTBins.at(mhtBin+1))
+					{
+
+					/*	if (mhtBin ==1)
+						{
+							cout << std::setprecision(4) << std::setw(5) << bin << std::setw(3) << "[" 
+								<< std::setw(10) << hist->GetBinLowEdge(bin) << ", "  << std::setw(10) 
+								<< hist->GetXaxis()->GetBinUpEdge(bin)<< "]" 
+								<< std::setw(10) << hist->GetBinContent(bin) 
+								<< std::setw(10) << hist->GetBinError(bin) 
+								<< endl;
+						}
+						*/
+						mean[mhtBin]    += binVal;
+						statErr[mhtBin] += statErr2;
+					}
+				}
+			}
+		}
+
+		statErr[mhtBin] = sqrt(statErr[mhtBin]);
+		//if (mhtBin ==1) { std::cout << "final stat error = " << statErr[mhtBin] << std::endl; }
+
+		results.incl_mean[mhtBin]    = -1;   //to show they are not used or valid for this
+		results.incl_statErr[mhtBin] = -1;
+		results.incl_fitErr[mhtBin]  = -1;
+
+		
+		if (mhtBin+1<incMHTBins.size())
+		{
+			std::stringstream excl_pred;
+			excl_pred << setprecision(3) << setw(10) << incMHTBins.at(mhtBin) << "<MHT<" << incMHTBins.at(mhtBin+1)
+				<< mean[mhtBin]<< "&$\\pm$" << statErr[mhtBin];
+			//std::cout << excl_pred.str() << std::endl;
+			results.excl_mean[mhtBin]    = mean[mhtBin];
+			results.excl_statErr[mhtBin] = statErr[mhtBin];
+			results.excl_fitErr[mhtBin]  = -1;
+		}
+	}
+	
+	return results;
+}
+
+
+Predictions_t SubstractTTbar(TH1* hist, const string histname)
+{
+	TFile* ttbarFile = new TFile(sTTBAR_FILE_NAME.c_str());
+	if (ttbarFile->IsZombie()) { cout << "EWK file not found!" << endl; assert (false); }
+
+	TH1* ttbarHist = dynamic_cast<TH1*> (ttbarFile->Get(histname.c_str()));
+	if (ttbarHist == NULL) { cout << "EWK hist " << histname << " not found!" << endl; assert (false); }
+	ttbarHist->Sumw2();
+	//new TCanvas();
+	//ttbarHist->DrawCopy();
+
+	const float int_b4 = ttbarHist->Integral(); 
+
+	const float scale = fDATA_LUMI/fTTBAR_LUMI;
+
+	ttbarHist->Scale(scale);
+	std::cout << __FUNCTION__ << ": scale = " << scale<< ":: EWK Integral b4/a4= "<< int_b4  << "/" << ttbarHist->Integral() << std::endl; 
+
+	Predictions_t ttbarBinCont =  GetExlcusiveBinContents(ttbarHist);
+	//PrintExclPredictions(ewkBinCont);
+
+	hist->Add(ttbarHist, -1);
+
+	return ttbarBinCont;
+}
+
+
+Predictions_t SubstractEWK(TH1* hist, const string ewkhistname)
+{
+	TFile* ewkFile = new TFile(sWJET_FILE_NAME.c_str());
 	if (ewkFile->IsZombie()) { cout << "EWK file not found!" << endl; assert (false); }
 
 	TH1* ewkHist = dynamic_cast<TH1*> (ewkFile->Get(ewkhistname.c_str()));
 	if (ewkHist == NULL) { cout << "EWK hist " << ewkhistname << " not found!" << endl; assert (false); }
-	new TCanvas();
-	ewkHist->DrawCopy();
+	ewkHist->Sumw2();
+	//new TCanvas();
+	//ewkHist->DrawCopy();
 
-	ewkHist->Scale(fDATA_LUMI/fEWK_LUMI);
+	const float int_b4 = ewkHist->Integral(); 
+	const float scale = fDATA_LUMI/fEWK_LUMI;
 
-	std::cout << "EWK Integral = " << ewkHist->Integral() << std::endl; 
+	ewkHist->Scale(scale);
+	std::cout << __FUNCTION__ << ": scale = " << scale<< ":: EWK Integral b4/a4= "<< int_b4  << "/" << ewkHist->Integral() << std::endl; 
+
+	Predictions_t ewkBinCont =  GetExlcusiveBinContents(ewkHist);
+	//PrintExclPredictions(ewkBinCont);
 
 	hist->Add(ewkHist, -1);
+
+	return ewkBinCont;
 }
 
 
@@ -144,7 +301,8 @@ double expFitFunc(double *x, double *par)
 {
 	double fitval=0.0;
 	//if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + 0.03;
-	if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + 0.02;
+	//if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + 0.0217;
+	if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + CONST_C;
 	else fitval=-1.0E6;
 	return fitval;
 }
@@ -153,12 +311,26 @@ double gausFitFunc(double *x, double *par)
 {
 	double arg = par[0] * exp(par[1] * x[0]);
 	//double fitval = 1.0 / TMath::Erf (arg) - par[2];
-	double fitval = 1.0 / TMath::Erf (arg) - 1 + 0.03;
+	//double fitval = 1.0 / TMath::Erf (arg) - 1 + 0.03;
 	//double fitval = 1.0 / TMath::Erf (arg) - 1 + 0.02;
+	double fitval = 1.0 / TMath::Erf (arg) - 1 + CONST_C;
+	return fitval;
+}
+double gausFitFunc_Cup(double *x, double *par)
+{
+	double arg = par[0] * exp(par[1] * x[0]);
+	double fitval = 1.0 / TMath::Erf (arg) - 1 + CONST_C_UP;
+	return fitval;
+}
+double gausFitFunc_Cdown(double *x, double *par)
+{
+	double arg = par[0] * exp(par[1] * x[0]);
+	double fitval = 1.0 / TMath::Erf (arg) - 1 + CONST_C_DOWN;
 	return fitval;
 }
 
-Predictions_t GetPredictions(const TH1* hist, TF1* f1, std::vector<std::string>& predText)
+
+Predictions_t GetPredictions(const TH1* hist, TF1* f1)
 {
 	assert(hist != NULL && "GetPredictions:: hist not found!");
 	assert(f1 != NULL && "GetPredictions:: func not found!");
@@ -176,8 +348,6 @@ Predictions_t GetPredictions(const TH1* hist, TF1* f1, std::vector<std::string>&
 	double err =0;
 	double integral = hist->IntegralAndError(bin1, bin2, err);
 	std::cout << "Intergral for MHT> "<< incMHTBins.at(0) << ":" << integral << "+/-" << err << std::endl;
-
-	predText.clear();
 
 	double sumGaus[incMHTBins.size()];
 	double Gaus_StatErr[incMHTBins.size()];
@@ -249,21 +419,20 @@ Predictions_t GetPredictions(const TH1* hist, TF1* f1, std::vector<std::string>&
 		std::stringstream incl_pred;
 		incl_pred << setprecision(3) << setw(15) << "MHT > " << incMHTBins.at(mhtBin) 
 			<< setw(20) << sumGaus[mhtBin]  << "&$\\pm$" << Gaus_StatErr[mhtBin] << " &$\\pm$ " << Gaus_FitErr[mhtBin];
-		predText.push_back(incl_pred.str());
+		//std::cout << incl_pred.str() << std::endl;
 		
 		if (mhtBin+1<incMHTBins.size())
 		{
 			std::stringstream excl_pred;
 			excl_pred << setprecision(3) << setw(10) << incMHTBins.at(mhtBin) << "<MHT<" << incMHTBins.at(mhtBin+1)
 				<< setw(20) << sumGaus_excl[mhtBin]  << "&$\\pm$" << Gaus_StatErr_excl[mhtBin] << " &$\\pm$ " << Gaus_FitErr_excl[mhtBin];
-		   predText.push_back(excl_pred.str());
+			//std::cout << excl_pred.str() << std::endl;
 			results.excl_mean[mhtBin]    = sumGaus_excl[mhtBin];
 			results.excl_statErr[mhtBin] = Gaus_StatErr_excl[mhtBin];
 			results.excl_fitErr[mhtBin]  = Gaus_FitErr_excl[mhtBin];
 		}
 	}
 	
-//	for (unsigned i=0; i< predText.size(); ++i) std::cout << predText.at(i) << std::endl;
 	return results;
 }
 
@@ -275,12 +444,10 @@ TF1* FitPassFailRatio(TH1* hist,
 
 	const bool logScale = true;
 
-	const int maxbin = hist->GetMaximumBin();
-	const double max = hist->GetBinContent(maxbin);
-
 	//fit range
 	stringstream newtitle;
-	newtitle << "Fit Range " << passFailRatio_fitrange_xmin << "--" << passFailRatio_fitrange_xmax << title;
+	//newtitle << "Fit Range " << passFailRatio_fitrange_xmin << "--" << passFailRatio_fitrange_xmax << " GeV " << title;
+	newtitle << ";MHT;Ratio (r)";
 	cout << __FUNCTION__ << ":: Fitting Range = " << passFailRatio_fitrange_xmin << " - " << passFailRatio_fitrange_xmax << endl;
 
 	gStyle->SetOptStat(0);
@@ -319,7 +486,7 @@ TF1* FitPassFailRatio(TH1* hist,
 	gausFitResult->DrawCopy("same");
 
 	TLegend *leg  = new TLegend(0.7,0.8,0.9,0.9);
-	leg->AddEntry(gausFitResult,"Gaus");
+	leg->AddEntry(gausFitResult,"Gaussian Model");
 	leg->Draw();
 
 	const float xmin=0.2, xmax=0.45, ymin=0.7, ymax=0.9;
@@ -416,6 +583,28 @@ void makePassFail_data(const float fitrange_xmin = 50, const float fitrange_xmax
 	TF1 *gausFit2 =  FitPassFailRatio(HIST_numer, title, "FactorizationHT500");
 	if (gausFit2 == NULL) { cout << __LINE__ << "::functions null! " << endl; assert (false); }
 
+	//These two are for const 'c' systematic derivations only!
+	TF1 *gausFit_Cup = new TF1("gausFit_Cup",gausFitFunc_Cup,passFailRatio_fitrange_xmin, 1500,2);
+	gausFit_Cup->SetParameters( gausFit2->GetParameters()); 
+	TF1 *gausFit_Cdown = new TF1("gausFit_Cup",gausFitFunc_Cdown, passFailRatio_fitrange_xmin, 1500,2);
+	gausFit_Cdown->SetParameters( gausFit2->GetParameters()); 	
+
+	gausFit_Cup->SetLineColor(kRed);
+	gausFit_Cdown->SetLineColor(kRed);
+	
+	new TCanvas();
+	gPad->SetLogy();
+	TLegend *tleg = new TLegend(0.7,0.8,0.9,0.9);
+	tleg->AddEntry(gausFit2,"Gaussian Fit");
+	tleg->AddEntry(gausFit_Cup,"Uncerainty of const 'c'");
+	gausFit2->Draw();
+	gausFit_Cup->Draw("same");
+	gausFit_Cdown->Draw("same");
+	tleg->Draw();
+	gPad->Print("fit_c_error.eps");
+	return;
+
+
 
 	/**********************************************
 	 * Now Get HT dependence syst fit
@@ -443,19 +632,31 @@ void makePassFail_data(const float fitrange_xmin = 50, const float fitrange_xmax
 	 * *******************************************/
 	const std::string QCDsyst1_numerHistName("factorization_ht500/Pass_RA2dphi");
 	const std::string QCDsyst1_denomHistName("factorization_ht500/Syst1_Fail_ht500");
-	TH1* QCDsyst1_numerHist = dynamic_cast<TH1*> (dataRootFile->Get(QCDsyst1_numerHistName.c_str()));
+	TH1* QCDsyst1_numerHist = dynamic_cast<TH1*> ((dataRootFile->Get(QCDsyst1_numerHistName.c_str()))->Clone("1"));
 	TH1* QCDsyst1_denomHist = dynamic_cast<TH1*> (dataRootFile->Get(QCDsyst1_denomHistName.c_str()));
 	assert(QCDsyst1_numerHist != NULL && "QCDsyst1_numerHistName not found!");
 	assert(QCDsyst1_denomHist != NULL && "QCDsyst1_denomHistName not found!");
-//	SubstractEWK(QCDsyst1_numerHist, QCDsyst_numerHistName);
-//	SubstractEWK(QCDsyst1_denomHist, QCDsyst1_denomHistName);
 	QCDsyst1_numerHist->Divide(QCDsyst1_denomHist);
-	new TCanvas();
-	QCDsyst1_numerHist->DrawCopy();
+	//new TCanvas();
+	//QCDsyst1_numerHist->DrawCopy();
 	const string QCDsyst1_title = "QCD SYST1: : HT>500 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(syst1);";
 	TF1 *QCDsyst1_gausFit =  FitPassFailRatio(QCDsyst1_numerHist, QCDsyst1_title, "QCDSyst1_HT500");
 	if (QCDsyst1_gausFit == NULL) { cout << __LINE__ << "::QCD syst1 functions null! " << endl; assert (false); }
 
+
+	const std::string QCDsyst2_numerHistName("factorization_ht500/Pass_RA2dphi");
+	const std::string QCDsyst2_denomHistName("factorization_ht500/Syst2_Fail_ht500");
+	TH1* QCDsyst2_numerHist = dynamic_cast<TH1*> (dataRootFile->Get(QCDsyst2_numerHistName.c_str()));
+	TH1* QCDsyst2_denomHist = dynamic_cast<TH1*> (dataRootFile->Get(QCDsyst2_denomHistName.c_str()));
+	assert(QCDsyst2_numerHist != NULL && "QCDsyst2_numerHistName not found!");
+	assert(QCDsyst2_denomHist != NULL && "QCDsyst2_denomHistName not found!");
+	QCDsyst2_numerHist->Divide(QCDsyst2_denomHist);
+//	new TCanvas();
+//	QCDsyst2_numerHist->DrawCopy();
+//	QCDsyst2_denomHist->DrawCopy("same");
+	const string QCDsyst2_title = "QCD SYST2: : HT>500 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(syst2);";
+	TF1 *QCDsyst2_gausFit =  FitPassFailRatio(QCDsyst2_numerHist, QCDsyst2_title, "QCDSyst2_HT500");
+	if (QCDsyst2_gausFit == NULL) { cout << __LINE__ << "::QCD syst2 functions null! " << endl; assert (false); }
 
 
 //	new baseline:
@@ -473,21 +674,6 @@ void makePassFail_data(const float fitrange_xmin = 50, const float fitrange_xmax
 
 
 	 //make a predicion
-	std::vector<std::string> vHT500Predictions ,vHT800Predictions, vHT1000Predictions ,vHT1200Predictions;
-	std::vector<std::string> vHT1400Predictions;
-	std::vector<std::string> vHT500to800Predictions ,vHT800to1000Predictions;
-	std::vector<std::string> vHT1000to1200Predictions ,vHT1200to1400Predictions;
-	
-	std::vector<std::string> vHT500Predictions_HTsyst ,vHT800Predictions_HTsyst, vHT1000Predictions_HTsyst ,vHT1200Predictions_HTsyst;
-	std::vector<std::string> vHT1400Predictions_HTsyst;
-	std::vector<std::string> vHT500to800Predictions_HTsyst ,vHT800to1000Predictions_HTsyst;
-	std::vector<std::string> vHT1000to1200Predictions_HTsyst ,vHT1200to1400Predictions_HTsyst;
-
-	std::vector<std::string> vHT500Predictions_QCDsyst1 ,vHT800Predictions_QCDsyst1, vHT1000Predictions_QCDsyst1 ,vHT1200Predictions_QCDsyst1;
-	std::vector<std::string> vHT1400Predictions_QCDsyst1;
-	std::vector<std::string> vHT500to800Predictions_QCDsyst1 ,vHT800to1000Predictions_QCDsyst1;
-	std::vector<std::string> vHT1000to1200Predictions_QCDsyst1 ,vHT1200to1400Predictions_QCDsyst1;
-
 /*
 	cout << "\n\n >>>>>> HT>500 PREDICTIONS " << endl; 
 	TH1* ht500_fail = dynamic_cast<TH1*> (dataRootFile->Get("factorization_ht500/Fail_lt_point2_HT500"));
@@ -521,78 +707,98 @@ void makePassFail_data(const float fitrange_xmin = 50, const float fitrange_xmax
 	TH1* ht1400_fail = dynamic_cast<TH1*> (dataRootFile->Get("factorization_ht500/Fail_lt_point2_HT1400"));
 	assert(ht1400_fail != NULL && "Fail_lt_point2_HT1400 not found!");
 	SubstractEWK(ht1400_fail, "factorization_ht500/Fail_lt_point2_HT1400");
-	Predictions_t pred_HT1400 = GetPredictions(ht1400_fail, gausFit2, vHT1400Predictions);
-	Predictions_t pred_HT1400_htSyst = GetPredictions(ht1400_fail, HTsyst_gausFit, vHT1400Predictions_HTsyst);
+	Predictions_t pred_HT1400 = GetPredictions(ht1400_fail, gausFit2);
+	Predictions_t pred_HT1400_htSyst = GetPredictions(ht1400_fail, HTsyst_gausFit);
 
 	TH1* qcdsyst1_ht1400_fail = dynamic_cast<TH1*> (dataRootFile->Get("factorization_ht500/Syst1_Fail_HT1400_fineBin"));
 	assert(qcdsyst1_ht1400_fail != NULL && "Syst1_Fail_HT1400_fineBin not found!");
-	Predictions_t pred_HT1400_qcdSyst1 = GetPredictions(qcdsyst1_ht1400_fail, QCDsyst1_gausFit, vHT1400Predictions_QCDsyst1);
+	Predictions_t pred_HT1400_qcdSyst1 = GetPredictions(qcdsyst1_ht1400_fail, QCDsyst1_gausFit);
 
+	Predictions_t pred_HT1400_Cup_syst = GetPredictions(ht1400_fail, gausFit_Cup);
+	Predictions_t pred_HT1400_Cdown_syst = GetPredictions(ht1400_fail, gausFit_Cdown);
 
 	//exclsuive HT bins
+	/***   500 < HT < 800 ******/
 	cout << "\n\n >>>>>> 500<HT<800 PREDICTIONS " << endl; 
 	TH1* ht500to800_fail = dynamic_cast<TH1*> (dataRootFile->Get("factorization_ht500/Fail_lt_point2_500HT800"));
 	assert(ht500to800_fail != NULL && "Fail_lt_point2_500HT800 not found!");
 	SubstractEWK(ht500to800_fail, "factorization_ht500/Fail_lt_point2_500HT800");
-	Predictions_t pred_HT500to800 = GetPredictions(ht500to800_fail, gausFit2, vHT500to800Predictions);
-	Predictions_t pred_HT500to800_htSyst = GetPredictions(ht500to800_fail, HTsyst_gausFit, vHT500to800Predictions_HTsyst);
+	Predictions_t pred_HT500to800 = GetPredictions(ht500to800_fail, gausFit2);
+	Predictions_t pred_HT500to800_htSyst = GetPredictions(ht500to800_fail, HTsyst_gausFit);
 
 	TH1* qcdsyst1_ht500to800_fail = dynamic_cast<TH1*> (dataRootFile->Get("factorization_ht500/Syst1_Fail_500HT800_fineBin"));
 	assert(qcdsyst1_ht500to800_fail != NULL && "Syst1_Fail_500HT800 not found!");
-	Predictions_t pred_HT500to800_qcdSyst1 = GetPredictions(qcdsyst1_ht500to800_fail, QCDsyst1_gausFit, vHT500to800Predictions_QCDsyst1);
+	Predictions_t pred_HT500to800_qcdSyst1 = GetPredictions(qcdsyst1_ht500to800_fail, QCDsyst1_gausFit);
+	
+	TH1* qcdsyst2_ht500to800_fail = dynamic_cast<TH1*> (dataRootFile->Get("factorization_ht500/Syst2_Fail_500HT800_fineBin"));
+	assert(qcdsyst2_ht500to800_fail != NULL && "Syst2_Fail_500HT800 not found!");
+	Predictions_t pred_HT500to800_qcdSyst2 = GetPredictions(qcdsyst2_ht500to800_fail, QCDsyst2_gausFit);
+
+	cout << "QCD SYST 1 AND SYST2 " << std::endl;
+	PrintExclPredictions(pred_HT500to800_qcdSyst1);
+	PrintExclPredictions(pred_HT500to800_qcdSyst2);
+
+
+	Predictions_t pred_HT500to800_Cup_syst = GetPredictions(ht500to800_fail, gausFit_Cup);
+	Predictions_t pred_HT500to800_Cdown_syst = GetPredictions(ht500to800_fail, gausFit_Cdown);
+
 
 	cout << "\n\n >>>>>> 800<HT<1000 PREDICTIONS " << endl; 
 	TH1* ht800to1000_fail = dynamic_cast<TH1*> (dataRootFile->Get("factorization_ht500/Fail_lt_point2_800HT1000"));
 	assert(ht800to1000_fail != NULL && "Fail_lt_point2_800HT1000 not found!");
 	SubstractEWK(ht800to1000_fail, "factorization_ht500/Fail_lt_point2_800HT1000");
-	Predictions_t pred_HT800to1000        = GetPredictions(ht800to1000_fail, gausFit2, vHT800to1000Predictions);
-	Predictions_t pred_HT800to1000_htSyst = GetPredictions(ht800to1000_fail, HTsyst_gausFit, vHT800to1000Predictions_HTsyst);
+	Predictions_t pred_HT800to1000        = GetPredictions(ht800to1000_fail, gausFit2);
+	Predictions_t pred_HT800to1000_htSyst = GetPredictions(ht800to1000_fail, HTsyst_gausFit);
 
 	TH1* qcdsyst1_ht800to1000_fail = dynamic_cast<TH1*> (dataRootFile->Get("factorization_ht800/Syst1_Fail_800HT1000_fineBin"));
 	assert(qcdsyst1_ht800to1000_fail != NULL && "Syst1_Fail_800HT1000 not found!");
-	Predictions_t pred_HT800to1000_qcdSyst1 = GetPredictions(qcdsyst1_ht800to1000_fail, QCDsyst1_gausFit, vHT800to1000Predictions_QCDsyst1);
+	Predictions_t pred_HT800to1000_qcdSyst1 = GetPredictions(qcdsyst1_ht800to1000_fail, QCDsyst1_gausFit);
+
+	Predictions_t pred_HT800to1000_Cup_syst = GetPredictions(ht800to1000_fail, gausFit_Cup);
+	Predictions_t pred_HT800to1000_Cdown_syst = GetPredictions(ht800to1000_fail, gausFit_Cdown);
+
 
 	cout << "\n\n >>>>>> 1000<HT<1200 PREDICTIONS " << endl; 
 	TH1* ht1000to1200_fail = dynamic_cast<TH1*> (dataRootFile->Get("factorization_ht500/Fail_lt_point2_1000HT1200"));
 	assert(ht1000to1200_fail != NULL && "Fail_lt_point2_1000HT1200 not found!");
 	SubstractEWK(ht1000to1200_fail, "factorization_ht500/Fail_lt_point2_1000HT1200");
-	Predictions_t pred_HT1000to1200        = GetPredictions(ht1000to1200_fail, gausFit2, vHT1000to1200Predictions);
-	Predictions_t pred_HT1000to1200_htSyst = GetPredictions(ht1000to1200_fail, HTsyst_gausFit, vHT1000to1200Predictions_HTsyst);
+	Predictions_t pred_HT1000to1200        = GetPredictions(ht1000to1200_fail, gausFit2);
+	Predictions_t pred_HT1000to1200_htSyst = GetPredictions(ht1000to1200_fail, HTsyst_gausFit);
 
 	TH1* qcdsyst1_ht1000to1200_fail = dynamic_cast<TH1*> (dataRootFile->Get("factorization_ht1000/Syst1_Fail_1000HT1200_fineBin"));
 	assert(qcdsyst1_ht1000to1200_fail != NULL && "Syst1_Fail_1000HT1200 not found!");
-	Predictions_t pred_HT1000to1200_qcdSyst1 = GetPredictions(qcdsyst1_ht1000to1200_fail, QCDsyst1_gausFit, vHT1000to1200Predictions_QCDsyst1);
+	Predictions_t pred_HT1000to1200_qcdSyst1 = GetPredictions(qcdsyst1_ht1000to1200_fail, QCDsyst1_gausFit);
+
+	Predictions_t pred_HT1000to1200_Cup_syst = GetPredictions(ht1000to1200_fail, gausFit_Cup);
+	Predictions_t pred_HT1000to1200_Cdown_syst = GetPredictions(ht1000to1200_fail, gausFit_Cdown);
+
 
 
 	cout << "\n\n >>>>>> 1200<HT<1400 PREDICTIONS " << endl; 
 	TH1* ht1200to1400_fail = dynamic_cast<TH1*> (dataRootFile->Get("factorization_ht500/Fail_lt_point2_1200HT1400"));
 	assert(ht1200to1400_fail != NULL && "Fail_lt_point2_1200HT1400 not found!");
 	SubstractEWK(ht1200to1400_fail, "factorization_ht500/Fail_lt_point2_1200HT1400");
-	Predictions_t pred_HT1200to1400        = GetPredictions(ht1200to1400_fail, gausFit2, vHT1200to1400Predictions);
-	Predictions_t pred_HT1200to1400_htSyst = GetPredictions(ht1200to1400_fail, HTsyst_gausFit, vHT1200to1400Predictions_HTsyst);
+	Predictions_t pred_HT1200to1400        = GetPredictions(ht1200to1400_fail, gausFit2);
+	Predictions_t pred_HT1200to1400_htSyst = GetPredictions(ht1200to1400_fail, HTsyst_gausFit);
 
 	TH1* qcdsyst1_ht1200to1400_fail = dynamic_cast<TH1*> (dataRootFile->Get("factorization_ht1200/Syst1_Fail_1200HT1400_fineBin"));
 	assert(qcdsyst1_ht1200to1400_fail != NULL && "Syst1_Fail_1200HT1400 not found!");
-	Predictions_t pred_HT1200to1400_qcdSyst1 = GetPredictions(qcdsyst1_ht1200to1400_fail, QCDsyst1_gausFit, vHT1200to1400Predictions_QCDsyst1);
+	Predictions_t pred_HT1200to1400_qcdSyst1 = GetPredictions(qcdsyst1_ht1200to1400_fail, QCDsyst1_gausFit);
 
-
-//	for (unsigned i=0; i< vHT500to800Predictions.size(); ++i) 
-//		std::cout << vHT500to800Predictions.at(i) << "|||" << vHT500to800Predictions_HTsyst.at(i) << std::endl;
-
-
-
+	Predictions_t pred_HT1200to1400_Cup_syst = GetPredictions(ht1200to1400_fail, gausFit_Cup);
+	Predictions_t pred_HT1200to1400_Cdown_syst = GetPredictions(ht1200to1400_fail, gausFit_Cdown);
 
 
 	cout << "\n\n >>>>>> 500<HT<800 PREDICTIONS " << endl; 
-	PrintResults(pred_HT500to800, pred_HT500to800_htSyst, pred_HT500to800_qcdSyst1);
+	PrintResults(pred_HT500to800, pred_HT500to800_htSyst, pred_HT500to800_qcdSyst1, pred_HT500to800_Cup_syst, pred_HT500to800_Cdown_syst);
 	cout << "\n >>>>>> 800<HT<1000 PREDICTIONS " << endl; 
-	PrintResults(pred_HT800to1000, pred_HT800to1000_htSyst, pred_HT800to1000_qcdSyst1);
+	PrintResults(pred_HT800to1000, pred_HT800to1000_htSyst, pred_HT800to1000_qcdSyst1, pred_HT800to1000_Cup_syst, pred_HT800to1000_Cdown_syst);
 	cout << "\n >>>>>> 1000<HT<1200 PREDICTIONS " << endl; 
-	PrintResults(pred_HT1000to1200, pred_HT1000to1200_htSyst, pred_HT1000to1200_qcdSyst1);
+	PrintResults(pred_HT1000to1200, pred_HT1000to1200_htSyst, pred_HT1000to1200_qcdSyst1, pred_HT1000to1200_Cup_syst, pred_HT1000to1200_Cdown_syst);
 	cout << "\n >>>>>> 1200<HT<1400 PREDICTIONS " << endl; 
-	PrintResults(pred_HT1200to1400, pred_HT1200to1400_htSyst, pred_HT1200to1400_qcdSyst1);
+	PrintResults(pred_HT1200to1400, pred_HT1200to1400_htSyst, pred_HT1200to1400_qcdSyst1, pred_HT1200to1400_Cup_syst, pred_HT1200to1400_Cdown_syst);
 	cout << "\n >>>>>> HT>1400 PREDICTIONS " << endl; 
-	PrintResults(pred_HT1400, pred_HT1400_htSyst, pred_HT1400_qcdSyst1);
+	PrintResults(pred_HT1400, pred_HT1400_htSyst, pred_HT1400_qcdSyst1, pred_HT1400_Cup_syst, pred_HT1400_Cdown_syst);
 
 
 }
