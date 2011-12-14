@@ -13,7 +13,7 @@
 //
 // Original Author:  samantha hewamanage
 //         Created:  Tue Jul 26 22:15:44 CDT 2011
-// $Id: Factorization.cc,v 1.1 2011/11/15 21:55:50 samantha Exp $
+// $Id: Factorization.cc,v 1.2 2011/11/29 20:35:37 samantha Exp $
 //
 //
 
@@ -96,6 +96,7 @@ class Factorization : public edm::EDFilter {
 		edm::InputTag mhtInputTag_, htInputTag_;
 		edm::Handle<edm::View<reco::MET> > mhtHandle;
 		edm::Handle<double> htHandle;
+		edm::InputTag prescaleWeightInputTag;
 
 		struct RunLumiEvt_t
 		{
@@ -158,6 +159,8 @@ class Factorization : public edm::EDFilter {
 		double sumLumiWeights; //sum of lumi weights for cross checks
 		double Weight; //total weight for an event
 		int doLumiWeighing, doEventWeighing;
+		edm::Handle<double> prescaleWeightHandle;
+		bool usePrescaleWeight;
 
 
 };
@@ -193,6 +196,8 @@ Factorization::Factorization(const edm::ParameterSet& iConfig)
 	iVerbose        = iConfig.getUntrackedParameter<int>("verbose",0);
 	doLumiWeighing  = iConfig.getUntrackedParameter<int>("ApplyLumiWeighing",0);
 	doEventWeighing = iConfig.getUntrackedParameter<int>("ApplyEventWeighing",0);
+	prescaleWeightInputTag = iConfig.getParameter<edm::InputTag>("prescaleWeight");
+	usePrescaleWeight = iConfig.getUntrackedParameter<int>("usePrescaleWeight",0);
 	uProcessed       = 0;
 	uPassed          = 0;
 	uFailMinHTCut    = 0;
@@ -205,12 +210,12 @@ Factorization::Factorization(const edm::ParameterSet& iConfig)
 	edm::Service<TFileService> fs;
 
 	const float met_min = 0, met_max=500, met_bins=100;
-	MHT_by_phislice[0] = fs->make<TH1F> ("mht_phislice_lt0.1" ,"MHT (#Delta#Phi_{min}<0.1);MHT [GeV];Events;", met_bins, 0, met_max);
-	MHT_by_phislice[1] = fs->make<TH1F> ("mht_phislice_lt0.2" ,"MHT (0.1<#Delta#Phi_{min}<0.2);MHT [GeV];Events;", met_bins, 0, met_max);
-	MHT_by_phislice[2] = fs->make<TH1F> ("mht_phislice_lt0.3" ,"MHT (0.2<#Delta#Phi_{min}<0.3);MHT [GeV];Events;", met_bins, 0, met_max);
-	MHT_by_phislice[3] = fs->make<TH1F> ("mht_phislice_lt0.5" ,"MHT (0.3<#Delta#Phi_{min}<0.5);MHT [GeV];Events;", met_bins, 0, met_max);
-	MHT_by_phislice[4] = fs->make<TH1F> ("mht_phislice_lt0.8" ,"MHT (0.5<#Delta#Phi_{min}<0.8);MHT [GeV];Events;", met_bins, 0, met_max);
-	MHT_by_phislice[5] = fs->make<TH1F> ("mht_phislice_gt0.8" ,"MHT (#Delta#Phi_{min}>0.8);MHT [GeV];Events;", met_bins, 0, met_max);
+	MHT_by_phislice[0] = fs->make<TH1F> ("mht_phislice_lt0.1" ,"MHT (#Delta#Phi_{min}<0.1);MHT [GeV];Events;", met_bins, met_min, met_max);
+	MHT_by_phislice[1] = fs->make<TH1F> ("mht_phislice_lt0.2" ,"MHT (0.1<#Delta#Phi_{min}<0.2);MHT [GeV];Events;", met_bins, met_min, met_max);
+	MHT_by_phislice[2] = fs->make<TH1F> ("mht_phislice_lt0.3" ,"MHT (0.2<#Delta#Phi_{min}<0.3);MHT [GeV];Events;", met_bins, met_min, met_max);
+	MHT_by_phislice[3] = fs->make<TH1F> ("mht_phislice_lt0.5" ,"MHT (0.3<#Delta#Phi_{min}<0.5);MHT [GeV];Events;", met_bins, met_min, met_max);
+	MHT_by_phislice[4] = fs->make<TH1F> ("mht_phislice_lt0.8" ,"MHT (0.5<#Delta#Phi_{min}<0.8);MHT [GeV];Events;", met_bins, met_min, met_max);
+	MHT_by_phislice[5] = fs->make<TH1F> ("mht_phislice_gt0.8" ,"MHT (#Delta#Phi_{min}>0.8);MHT [GeV];Events;", met_bins, met_min, met_max);
 
 	//these are general event hist to check the PAT tuples cuts
 	const double evt_met_max = 800, evt_met_bins = 400;
@@ -428,6 +433,26 @@ Factorization::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 		Weight *= storedWeight;
 	}
 
+	/* 
+	 * prescaled trigger weights
+	 */
+	double prescaleWeight = 1;
+	if ( iEvent.isRealData() && usePrescaleWeight)
+	{
+		//iEvent.getByLabel("prescaleweightProducer:weight", prescaleWeightHandle);
+		iEvent.getByLabel(prescaleWeightInputTag, prescaleWeightHandle);
+	//	iEvent.getByLabel("prescaleweightProducer", prescaleWeightHandle);
+//		std::cout << "prescaleWeight = " << (*prescaleWeightHandle) << std::endl;
+		if ( ! prescaleWeightHandle.isValid()) 
+		{ 
+			std::cout << "prescaleWeightHandle found!" << std::endl;	
+		}
+		prescaleWeight = (*prescaleWeightHandle);
+		Weight *= prescaleWeight;
+		std::cout << "Weight = " << Weight << std::endl;
+	}
+
+
 	//std::cout << "Weight = " << Weight << std::endl;
 
 
@@ -559,13 +584,12 @@ Factorization::endJob() {
 	std::cout << "[ATM:02] Events Passed ------ = " << uPassed << std::endl;
 	std::cout << "[ATM:03] Lumi Weighing? ----- = " << doLumiWeighing << std::endl;
 	std::cout << "[ATM:04] Event Weighing? ---- = " << doEventWeighing << std::endl;
+	std::cout << "[ATM:05] Prescale Weighing? - = " << usePrescaleWeight << std::endl;
 	std::cout << "[ATM:31] Minimum HT --------- = " << dMinHT << std::endl;
 	std::cout << "[ATM:32] Minimum MHT -------- = " << dMinMHT << std::endl;
 	std::cout << "[ATM:40] PASS Summary --------- " << std::endl;
-	std::cout << "[ATM:43] Pass ht ------------ = " << (uProcessed - uFailMinHTCut) 
-																	<< " (" << uFailMinHTCut << ")" << std::endl;
-	std::cout << "[ATM:44] Pass mht ----------- = " << (uProcessed - uFailMinHTCut - uFailMinPFMHTCut) 
-																	<< " (" << uFailMinPFMHTCut << ")" << std::endl;
+	std::cout << "[ATM:43] Pass ht ------------ = " << (uProcessed - uFailMinHTCut) << std::endl;
+	std::cout << "[ATM:44] Pass mht ----------- = " << (uProcessed - uFailMinHTCut - uFailMinPFMHTCut)  << std::endl;
 	std::cout << "[ATM:50] LumiWeights Avg ---- = ";
 	if ( uPassed>0) std::cout << sumLumiWeights/(double)uPassed << std::endl;
 	else std::cout << "0" << std::endl;
