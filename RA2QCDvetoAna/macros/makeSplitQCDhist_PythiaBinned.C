@@ -141,13 +141,30 @@ void makeSplitQCDhist_PythiaBinned(const string histname, const string title, co
 	epsname << hists[0]->GetName() << ".eps";
 	gPad->Print(epsname.str().c_str());
 
+	Hist->SetName(hists[0]->GetName());
+
+	TFile f("Results.root","UPDATE");
+	Hist->Write();
+	f.Close();
+
+
 }
 
 void makeSplitQCDhist_PythiaBinned()
 {
-	makeSplitQCDhist_PythiaBinned("factorization_ht350/pf30_jet1_pt","RA2;Jet1-P_{T};Events;",1);
-	makeSplitQCDhist_PythiaBinned("factorization_ht350/pf30_jet2_pt","RA2;Jet2-P_{T};Events;",1);
-	makeSplitQCDhist_PythiaBinned("factorization_ht350/pf30_jet3_pt","RA2;Jet3-P_{T};Events;",1);
+	makeSplitQCDhist_PythiaBinned("factorization_ht500/pf30_jet1_pt","HT>500 GeV;Jet1-P_{T};Events;",1);
+	makeSplitQCDhist_PythiaBinned("factorization_ht500/ht","HT>500 GeV;HT;Events",1);
+	makeSplitQCDhist_PythiaBinned("factorization_ht500/mht","HT>500 GeV;MHT;Events",1);
+	makeSplitQCDhist_PythiaBinned("factorization_ht500/meteff","HT>500 GeV;MEff;Events",1);
+	makeSplitQCDhist_PythiaBinned("factorization_ht500/pf30_jet2_pt","RA2;Jet2-P_{T};Events;",1);
+	makeSplitQCDhist_PythiaBinned("factorization_ht500/pf30_jet3_pt","RA2;Jet3-P_{T};Events;",1);
+	makeSplitQCDhist_PythiaBinned("factorization_ht500/njet_et50eta24","HT>500 GeV;N Jets [E_{T}>50 GeV && |#eta|<2.5];Events",1);
+
+
+
+//	makeSplitQCDhist_PythiaBinned("factorization_ht350/pf30_jet1_pt","RA2;Jet1-P_{T};Events;",1);
+//	makeSplitQCDhist_PythiaBinned("factorization_ht350/pf30_jet2_pt","RA2;Jet2-P_{T};Events;",1);
+//	makeSplitQCDhist_PythiaBinned("factorization_ht350/pf30_jet3_pt","RA2;Jet3-P_{T};Events;",1);
 /*	makeSplitQCDhist_PythiaBinned("factorization_ht500/ra2b_pf30_jet1_eta","RA2b;Jet1-#{Eta};Events;",0);
 	makeSplitQCDhist_PythiaBinned("factorization_ht500/ra2b_pf30_jet2_eta","RA2b;Jet2-#{Eta};Events;",0);
 	makeSplitQCDhist_PythiaBinned("factorization_ht500/ra2b_pf30_jet3_eta","RA2b;Jet3-#{Eta};Events;",0);
