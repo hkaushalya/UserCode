@@ -595,7 +595,7 @@ void RA2QCDvetoAna::DoDelMinStudy(edm::Event& iEvent,
 	for (unsigned i = 0 ; i < jetHandle->size() ; ++i)
 	{
 		const TLorentzVector iJetVec((*jetHandle)[i].px(),(*jetHandle)[i].py(),(*jetHandle)[i].pz(),(*jetHandle)[i].energy());
-		//if (iJetVec.Pt()<50. || fabs(iJetVec.Eta())>2.5) continue;
+		if (iJetVec.Pt()<50. || fabs(iJetVec.Eta())>2.5) continue;
 		if (iJetVec.Pt()<dMinJetEt4MHt || fabs(iJetVec.Eta())>dMaxJetEta4MHt) continue;
 		if (iVerbose) std::cout << __LINE__ << ": pass jet et/eta cuts [" << i << std::endl; 
 		//loose jet id stuff
