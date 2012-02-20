@@ -53,7 +53,7 @@ class FlatTreeMaker : public edm::EDFilter{
     virtual bool beginRun(edm::Run&, const edm::EventSetup&);
     virtual bool endRun(edm::Run&, const edm::EventSetup&);
 
-	static const UInt_t Njet_max = 50;
+	 static const UInt_t Njet_max = 100;
 
     size run, event, ls; bool isdata;
     edm::InputTag vtxSrc_;
@@ -68,27 +68,6 @@ class FlatTreeMaker : public edm::EDFilter{
     size nJets;
     reco::Jet jet1, jet2, jet3, jetother;
     virtual void loadRecoJets(const edm::Event& iEvent);
-
-    edm::InputTag muonSrc_;
-    edm::Handle<edm::View<reco::Muon > > muons;
-    edm::InputTag eleSrc_;
-    edm::Handle<edm::View<pat::Electron > > electrons;
-    edm::InputTag tauSrc_;
-    edm::Handle<edm::View<pat::Tau > > taus;
-    size nMuons, nElectrons, nTaus;
-    edm::InputTag forVetoMuonSrc_;
-    edm::Handle<edm::View<reco::Muon > > forVetoMuons;
-    edm::InputTag forVetoElectronSrc_;
-    edm::Handle<edm::View<pat::Electron > > forVetoElectrons;
-    size nMuonsForVeto, nElectronsForVeto;
-    reco::Muon muon1, muon2; int muon1Charge, muon2Charge;
-    pat::Electron ele1, ele2; int ele1Charge, ele2Charge;
-    virtual void loadLeptons(const edm::Event& iEvent);
-
-    edm::InputTag photonSrc_;
-    edm::Handle<edm::View<pat::Photon> > photons;
-    size nPhotons;
-    virtual void loadPhotons(const edm::Event& iEvent);
 
     edm::InputTag metSrc_;
     edm::Handle<edm::View<reco::MET> > met;
@@ -121,13 +100,6 @@ class FlatTreeMaker : public edm::EDFilter{
 //    edm::Handle<int> externalBitToTree_;
 //    virtual void loadAUX(const edm::Event& iEvent);
 
-// Indices ==> 0 : for muon  1 : for electron 
-// Combination is the following:
-// 00 : veto all muons and electrons ==> standard RA2
-// 10 : muon control sample ==> for lost-lepton, hadronic tau, W+Jets
-// 20 : muon control sample ==> for Z+Jets
-// others : currently NOT used
-    std::vector<int> nLeptonsSels_;
 
     bool debug_;
 
@@ -142,19 +114,13 @@ class FlatTreeMaker : public edm::EDFilter{
     TFile *outRootFile;
     TTree *outTree;
     double evtWeight_TR;
-    double mht_TR, ht_TR, met_TR, mt_TR, meff;
+    double mht_TR, ht_TR, met_TR, meff;
     double mhtphi_TR, metphi_TR;
     double metSgnf_TR, metSgnfProb_TR;
     double jet1pt_TR, jet1eta_TR, jet1phi_TR;
     double jet2pt_TR, jet2eta_TR, jet2phi_TR;
     double jet3pt_TR, jet3eta_TR, jet3phi_TR;
     std::vector<double> *otherJetspt_TR, *otherJetseta_TR, *otherJetsphi_TR;
-    double mu1pt_TR, mu1eta_TR, mu1phi_TR;
-    double mu2pt_TR, mu2eta_TR, mu2phi_TR;
-    std::vector<double> *otherMuspt_TR, *otherMuseta_TR, *otherMusphi_TR;
-    double ele1pt_TR, ele1eta_TR, ele1phi_TR;
-    double ele2pt_TR, ele2eta_TR, ele2phi_TR;
-    std::vector<double> *otherElespt_TR, *otherEleseta_TR, *otherElesphi_TR;
     double dPhi0_CUT, dPhi1_CUT, dPhi2_CUT;
     int nJets_CUT;
     double genJet1pt_TR, genJet1eta_TR, genJet1phi_TR;
@@ -177,7 +143,7 @@ class FlatTreeMaker : public edm::EDFilter{
 
     TH1D *h1_metSgnf, *h1_lowPU_metSgnf, *h1_highPU_metSgnf;
     TH1D *h1_metSgnf_Prob, *h1_lowPU_metSgnf_Prob, *h1_highPU_metSgnf_Prob;
-    TH1D *h1_nVtx, *h1_nJets, *h1_nMuons, *h1_nEles;
+    TH1D *h1_nVtx, *h1_nJets;
 
     TH1D *h1_mhtphi, *h1_metphi;
     TH1D *h1_mht, *h1_ht, *h1_met, *h1_mt;
@@ -187,15 +153,6 @@ class FlatTreeMaker : public edm::EDFilter{
     TH1D *h1_alljetspt, *h1_jet1pt, *h1_jet2pt, *h1_jet3pt;
     TH1D *h1_alljetseta, *h1_jet1eta, *h1_jet2eta, *h1_jet3eta;
     TH1D *h1_alljetsphi, *h1_jet1phi, *h1_jet2phi, *h1_jet3phi;
-
-    TH1D *h1_allelept, *h1_alleleeta, *h1_allelephi;
-    TH1D *h1_allmupt, *h1_allmueta, *h1_allmuphi;
-    TH1D *h1_ele1pt, *h1_ele2pt;
-    TH1D *h1_ele1eta, *h1_ele2eta;
-    TH1D *h1_ele1phi, *h1_ele2phi;
-    TH1D *h1_mu1pt, *h1_mu2pt;
-    TH1D *h1_mu1eta, *h1_mu2eta;
-    TH1D *h1_mu1phi, *h1_mu2phi;
 
     TH1D *h1_allgenJetspt, *h1_genJet1pt, *h1_genJet2pt, *h1_genJet3pt;
     TH1D *h1_allgenJetseta, *h1_genJet1eta, *h1_genJet2eta, *h1_genJet3eta;
@@ -226,12 +183,6 @@ FlatTreeMaker::FlatTreeMaker(const edm::ParameterSet & iConfig) {
    isData = true;
  
    jetSrc_ = iConfig.getParameter<edm::InputTag>("jetSrc");
-   muonSrc_ = iConfig.getParameter<edm::InputTag>("muonSrc");
-   eleSrc_ = iConfig.getParameter<edm::InputTag>("eleSrc");
-//   tauSrc_ = iConfig.getParameter<edm::InputTag>("tauSrc");
-  
-   forVetoMuonSrc_ = iConfig.getParameter<edm::InputTag>("forVetoMuonSrc");
-   forVetoElectronSrc_ = iConfig.getParameter<edm::InputTag>("forVetoElectronSrc");
  
    genJetSrc_ = iConfig.getParameter<edm::InputTag>("genJetSrc");
    genMETSrc_ = iConfig.getParameter<edm::InputTag>("genMETSrc");
@@ -250,7 +201,6 @@ FlatTreeMaker::FlatTreeMaker(const edm::ParameterSet & iConfig) {
    //dPhis_CUT_vec_Src_ = iConfig.getParameter<edm::InputTag>("dPhis_CUT_vec_Src");
    //nJets_CUT_Src_ = iConfig.getParameter<edm::InputTag>("nJets_CUT_Src");
 
-   //nLeptonsSels_ = iConfig.getParameter<std::vector<int> >("nLeptonsSels");
  
    debug_ = iConfig.getParameter<bool>("debug");
 
@@ -267,8 +217,6 @@ FlatTreeMaker::FlatTreeMaker(const edm::ParameterSet & iConfig) {
    outRootFile = new TFile( outRootName_.c_str(), "RECREATE" );
 
    otherJetspt_TR = new std::vector<double>; otherJetseta_TR = new std::vector<double>; otherJetsphi_TR = new std::vector<double>;
-   otherMuspt_TR = new std::vector<double>; otherMuseta_TR = new std::vector<double>; otherMusphi_TR = new std::vector<double>;
-   otherElespt_TR = new std::vector<double>; otherEleseta_TR = new std::vector<double>; otherElesphi_TR = new std::vector<double>;
    otherGenJetspt_TR = new std::vector<double>; otherGenJetseta_TR = new std::vector<double>; otherGenJetsphi_TR = new std::vector<double>;
    otherJetsRes_TR = new std::vector<double>;
 
@@ -285,16 +233,11 @@ FlatTreeMaker::FlatTreeMaker(const edm::ParameterSet & iConfig) {
       outTree->Branch("avg_npv", &avg_npv, "avg_npv/D");
       outTree->Branch("vtxSize", &vtxSize, "vtxSize/I");
       outTree->Branch("nJets", &nJets, "nJets/I");
-      outTree->Branch("nMuons", &nMuons, "nMuons/I");
-      outTree->Branch("nMuons_CUT", &nMuonsForVeto, "nMuonsForVeto/I");
-      outTree->Branch("nElectrons", &nElectrons, "nElectrons/I");
-      outTree->Branch("nElectrons_CUT", &nElectronsForVeto, "nElectronsForVeto/I");
       outTree->Branch("evtWeight", &evtWeight_TR, "evtWeight/D");
       outTree->Branch("meff", &meff, "meff/D");
       outTree->Branch("mht", &mht_TR, "mht/D");
       outTree->Branch("ht", &ht_TR, "ht/D");
       outTree->Branch("met", &met_TR, "met/D");
-      outTree->Branch("mt", &mt_TR, "mt/D");
       outTree->Branch("mhtphi", &mhtphi_TR, "mhtphi/D");
       outTree->Branch("metphi", &metphi_TR, "metphi/D");
       outTree->Branch("metSgnf", &metSgnf_TR, "metSgnf/D");
@@ -311,24 +254,6 @@ FlatTreeMaker::FlatTreeMaker(const edm::ParameterSet & iConfig) {
       outTree->Branch("otherJetspt", "std::vector<double>", &otherJetspt_TR, 32000, 0);
       outTree->Branch("otherJetseta", "std::vector<double>", &otherJetseta_TR, 32000, 0);
       outTree->Branch("otherJetsphi", "std::vector<double>", &otherJetsphi_TR, 32000, 0);
-      outTree->Branch("mu1pt", &mu1pt_TR, "mu1pt/D");
-      outTree->Branch("mu1eta", &mu1eta_TR, "mu1eta/D");
-      outTree->Branch("mu1phi", &mu1phi_TR, "mu1phi/D");
-      outTree->Branch("mu2pt", &mu2pt_TR, "mu2pt/D");
-      outTree->Branch("mu2eta", &mu2eta_TR, "mu2eta/D");
-      outTree->Branch("mu2phi", &mu2phi_TR, "mu2phi/D");
-      outTree->Branch("otherMuspt", "std::vector<double>", &otherMuspt_TR, 32000, 0);
-      outTree->Branch("otherMuseta", "std::vector<double>", &otherMuseta_TR, 32000, 0);
-      outTree->Branch("otherMusphi", "std::vector<double>", &otherMusphi_TR, 32000, 0);
-      outTree->Branch("ele1pt", &ele1pt_TR, "ele1pt/D");
-      outTree->Branch("ele1eta", &ele1eta_TR, "ele1eta/D");
-      outTree->Branch("ele1phi", &ele1phi_TR, "ele1phi/D");
-      outTree->Branch("ele2pt", &ele2pt_TR, "ele2pt/D");
-      outTree->Branch("ele2eta", &ele2eta_TR, "ele2eta/D");
-      outTree->Branch("ele2phi", &ele2phi_TR, "ele2phi/D");
-      outTree->Branch("otherElespt", "std::vector<double>", &otherElespt_TR, 32000, 0);
-      outTree->Branch("otherEleseta", "std::vector<double>", &otherEleseta_TR, 32000, 0);
-      outTree->Branch("otherElesphi", "std::vector<double>", &otherElesphi_TR, 32000, 0);
       outTree->Branch("dPhi0_CUT", &dPhi0_CUT, "dPhi0_CUT/D"); 
       outTree->Branch("dPhi1_CUT", &dPhi1_CUT, "dPhi1_CUT/D"); 
       outTree->Branch("dPhi2_CUT", &dPhi2_CUT, "dPhi2_CUT/D");
@@ -374,8 +299,6 @@ FlatTreeMaker::FlatTreeMaker(const edm::ParameterSet & iConfig) {
  
    h1_nVtx = new TH1D("nVtx", "nVtx;n_{Vtx}", 50, 0, 50);
    h1_nJets = new TH1D("nJets", "nJets;n_{Jets}", 20, 0, 20);
-   h1_nMuons = new TH1D("nMuons", "nMuons;n_{Muons}", 20, 0, 20);
-   h1_nEles = new TH1D("nEles", "nEles;n_{Electrons}", 20, 0, 20);
  
    h1_metSgnf = new TH1D("METsgnf", "MET significance;S_{MET}", 200, 0, 20);     
    h1_lowPU_metSgnf = new TH1D("lowPU_METsgnf", "MET significance;S_{MET}", 200, 0, 20);
@@ -417,26 +340,6 @@ FlatTreeMaker::FlatTreeMaker(const edm::ParameterSet & iConfig) {
    h1_jet1phi = new TH1D("Jet1Phi", "#phi of jet_{1};#phi", 200, -3.2, 3.2);
    h1_jet2phi = new TH1D("Jet2Phi", "#phi of jet_{2};#phi", 200, -3.2, 3.2);
    h1_jet3phi = new TH1D("Jet3Phi", "#phi of jet_{3};#phi", 200, -3.2, 3.2);
- 
-   h1_allmupt = new TH1D("AllMuonsPt", "P_{T} of all muons;P_{T}(GeV)", 200, 0, 300);
-   h1_mu1pt = new TH1D("Mu1Pt", "P_{T} of #mu_{1};P_{T}(GeV)", 200, 0, 300);
-   h1_mu2pt = new TH1D("Mu2Pt", "P_{T} of #mu_{2};P_{T}(GeV)", 200, 0, 300);
-   h1_allmueta = new TH1D("AllMuonsEta", "#eta of all muons;#eta", 200, -3.2, 3.2);
-   h1_mu1eta = new TH1D("Mu1Eta", "#eta of #mu_{1};#eta", 200, -3.2, 3.2);
-   h1_mu2eta = new TH1D("Mu2Eta", "#eta of #mu_{2};#eta", 200, -3.2, 3.2);
-   h1_allmuphi = new TH1D("AllMuonsPhi", "#phi of all muons;#phi", 200, -3.2, 3.2);
-   h1_mu1phi = new TH1D("Mu1Phi", "#phi of #mu_{1};#phi", 200, -3.2, 3.2);
-   h1_mu2phi = new TH1D("Mu2Phi", "#phi of #mu_{2};#phi", 200, -3.2, 3.2);
- 
-   h1_allelept = new TH1D("AllElesPt", "P_{T} of all eles;P_{T}(GeV)", 200, 0, 300);
-   h1_ele1pt = new TH1D("Ele1Pt", "P_{T} of ele_{1};P_{T}(GeV)", 200, 0, 300);
-   h1_ele2pt = new TH1D("Ele2Pt", "P_{T} of ele_{2};P_{T}(GeV)", 200, 0, 300);
-   h1_alleleeta = new TH1D("AllElesEta", "#eta of all eles;#eta", 200, -3.2, 3.2);
-   h1_ele1eta = new TH1D("Ele1Eta", "#eta of ele_{1};#eta", 200, -3.2, 3.2);
-   h1_ele2eta = new TH1D("Ele2Eta", "#eta of ele_{2};#eta", 200, -3.2, 3.2);
-   h1_allelephi = new TH1D("AllElesPhi", "#phi of all eles;#phi", 200, -3.2, 3.2);
-   h1_ele1phi = new TH1D("Ele1Phi", "#phi of ele_{1};#phi", 200, -3.2, 3.2);
-   h1_ele2phi = new TH1D("Ele2Phi", "#phi of ele_{2};#phi", 200, -3.2, 3.2);
 
    h1_allgenJetspt = new TH1D("AllGenJetsPt", "P_{T} of all genJets;P_{T}(GeV)", 200, 0, 400);
    h1_genJet1pt = new TH1D("GenJet1Pt", "P_{T} of genJet_{1};P_{T}(GeV)", 200, 0, 400);
@@ -466,7 +369,7 @@ FlatTreeMaker::~FlatTreeMaker() {
 
    h1_evtWeight->Write();
     
-   h1_nVtx->Write(); h1_nJets->Write(); h1_nMuons->Write(); h1_nEles->Write();
+   h1_nVtx->Write(); h1_nJets->Write(); 
     
    h1_metSgnf->Write(); h1_lowPU_metSgnf->Write(); h1_highPU_metSgnf->Write();
    h1_metSgnf_Prob->Write(); h1_lowPU_metSgnf_Prob->Write(); h1_highPU_metSgnf_Prob->Write();
@@ -480,15 +383,6 @@ FlatTreeMaker::~FlatTreeMaker() {
    h1_alljetseta->Write(); h1_jet1eta->Write(); h1_jet2eta->Write(); h1_jet3eta->Write();
    h1_alljetsphi->Write(); h1_jet1phi->Write(); h1_jet2phi->Write(); h1_jet3phi->Write();
     
-   h1_allelept->Write(); h1_alleleeta->Write(); h1_allelephi->Write();
-   h1_allmupt->Write(); h1_allmueta->Write(); h1_allmuphi->Write();
-   h1_ele1pt->Write(); h1_ele2pt->Write();
-   h1_ele1eta->Write(); h1_ele2eta->Write();
-   h1_ele1phi->Write(); h1_ele2phi->Write();
-   h1_mu1pt->Write(); h1_mu2pt->Write();
-   h1_mu1eta->Write(); h1_mu2eta->Write();
-   h1_mu1phi->Write(); h1_mu2phi->Write();
-
    h1_allgenJetspt->Write(); h1_genJet1pt->Write(); h1_genJet2pt->Write(); h1_genJet3pt->Write();
    h1_allgenJetseta->Write(); h1_genJet1eta->Write(); h1_genJet2eta->Write(); h1_genJet3eta->Write();
    h1_allgenJetsphi->Write(); h1_genJet1phi->Write(); h1_genJet2phi->Write(); h1_genJet3phi->Write();
@@ -506,19 +400,13 @@ FlatTreeMaker::~FlatTreeMaker() {
 void FlatTreeMaker::setTreeDefaultVars(){
 
    evtWeight_TR = 1.0;
-   mht_TR= -99, ht_TR= -99, met_TR= -99, mt_TR= -99;
+   mht_TR= -99, ht_TR= -99, met_TR= -99;
    mhtphi_TR= -99, metphi_TR= -99;
    metSgnf_TR= -99, metSgnfProb_TR= -99;
    jet1pt_TR= -99, jet1eta_TR= -99, jet1phi_TR= -99;
    jet2pt_TR= -99, jet2eta_TR= -99, jet2phi_TR= -99;
    jet3pt_TR= -99, jet3eta_TR= -99, jet3phi_TR= -99;
    otherJetspt_TR->clear(); otherJetseta_TR->clear(); otherJetsphi_TR->clear();
-   mu1pt_TR= -99, mu1eta_TR= -99, mu1phi_TR= -99;
-   mu2pt_TR= -99, mu2eta_TR= -99, mu2phi_TR= -99;
-   otherMuspt_TR->clear(); otherMuseta_TR->clear(); otherMusphi_TR->clear();
-   ele1pt_TR= -99, ele1eta_TR= -99, ele1phi_TR= -99;
-   ele2pt_TR= -99, ele2eta_TR= -99, ele2phi_TR= -99;
-   otherElespt_TR->clear(); otherEleseta_TR->clear(); otherElesphi_TR->clear();
 
    dPhi0_CUT = -99, dPhi1_CUT = -99, dPhi2_CUT = -99;
    nJets_CUT = -99;
@@ -552,22 +440,8 @@ bool FlatTreeMaker::filter(edm::Event& iEvent, const edm::EventSetup& iSetup) {
 
    loadGenInfo(iEvent);
    loadRecoJets(iEvent);
-   loadLeptons(iEvent);
    loadMETMHT(iEvent);
    loadHT(iEvent);
-//   loadAUX(iEvent); if( externalBitToTree_.isValid() ) externalBitToTree_TR = (*externalBitToTree_);
-
-//   if( nLeptonsSels_.size() <2 ){ std::cout<<"\nERROR ... input nLeptonsSels_.size : "<<nLeptonsSels_.size()<<"  less than 2?!"<<std::endl; } 
-
-// If muons or electrons are not the size we require, don't go further
-//   if( (nLeptonsSels_[0] !=-1 && (int)nMuonsForVeto != nLeptonsSels_[0]) || (nLeptonsSels_[1] !=-1 && (int)nElectronsForVeto != nLeptonsSels_[1]) ){
-//      if( debug_ ){
-//         std::cout<<"nMuonsForVeto : "<<nMuonsForVeto<<"  nElectronsForVeto : "<<nElectronsForVeto<<std::endl;
-//         std::cout<<"nLeptonsSels_[0] : "<<nLeptonsSels_[0]<<"  nLeptonsSels_[1] : "<<nLeptonsSels_[1]<<std::endl;
-//      }
-//      return true;
-//   }
-
 
 	/* PU S3 reweighting for QCD MC sample
 	 */
@@ -582,15 +456,7 @@ bool FlatTreeMaker::filter(edm::Event& iEvent, const edm::EventSetup& iSetup) {
    double sgnfMET =0, probMET =0;
    if( doSgnf_ ){ sgnfMET = (*met)[0].significance(); probMET = TMath::Prob(sgnfMET, sgnfnDof); }
 
-   double mtw = -1;
-   if( nMuons == 1 ){
-      mtw = sqrt( 2*( (*met)[0].pt()*muon1.pt() -( (*met)[0].px()*muon1.px() + (*met)[0].py()*muon1.py() ) ) ); 
-   }
-   if( nMuons ==2 && muon1Charge*muon2Charge == -1 ){
-      mtw = sqrt( 2*( muon2.pt()*muon1.pt() -( muon2.px()*muon1.px() + muon2.py()*muon1.py() ) ) );
-   }
-
-   mht_TR = (*mht)[0].pt(); ht_TR = (*ht); met_TR = (*met)[0].pt(); mt_TR = mtw;
+   mht_TR = (*mht)[0].pt(); ht_TR = (*ht); met_TR = (*met)[0].pt(); 
    mhtphi_TR = (*mht)[0].phi(); metphi_TR = (*met)[0].phi();
    metSgnf_TR = sgnfMET; metSgnfProb_TR = probMET;
 	meff = mht_TR + ht_TR;
@@ -670,30 +536,6 @@ bool FlatTreeMaker::filter(edm::Event& iEvent, const edm::EventSetup& iSetup) {
       if( ij > 2 ){
          jetother = (*jets)[ij];
          otherJetspt_TR->push_back(jetother.pt()); otherJetseta_TR->push_back(jetother.eta()); otherJetsphi_TR->push_back(jetother.phi()); 
-      }
-   }
-
-   for(size im=0; im<nMuons; im++){
-      if( im == 0){
-         mu1pt_TR = muon1.pt(); mu1eta_TR = muon1.eta(); mu1phi_TR = muon1.phi();
-      }
-      if( im == 1){
-         mu2pt_TR = muon2.pt(); mu2eta_TR = muon2.eta(); mu2phi_TR = muon2.phi();
-      }
-      if( im >1 ){
-         otherMuspt_TR->push_back((*muons)[im].pt()); otherMuseta_TR->push_back((*muons)[im].eta()); otherMusphi_TR->push_back((*muons)[im].phi());
-      }
-   }
-
-   for(size ie=0; ie<nElectrons; ie++){
-      if( ie == 0){
-         ele1pt_TR = ele1.pt(); ele1eta_TR = ele1.eta(); ele1phi_TR = ele1.phi();
-      }
-      if( ie == 1){
-         ele2pt_TR = ele2.pt(); ele2eta_TR = ele2.eta(); ele2phi_TR = ele2.phi();
-      }
-      if( ie >1 ){
-         otherElespt_TR->push_back((*electrons)[ie].pt()); otherEleseta_TR->push_back((*electrons)[ie].eta()); otherElesphi_TR->push_back((*electrons)[ie].phi());
       }
    }
 
@@ -864,33 +706,6 @@ void FlatTreeMaker::loadGenInfo(const edm::Event& iEvent){
 
 void FlatTreeMaker::loadRecoJets(const edm::Event& iEvent){
    iEvent.getByLabel(jetSrc_, jets); nJets = jets->size();
-}
-
-void FlatTreeMaker::loadLeptons(const edm::Event& iEvent){
-   iEvent.getByLabel(muonSrc_, muons); nMuons = muons->size();
-   iEvent.getByLabel(eleSrc_, electrons); nElectrons = electrons->size();
-//   iEvent.getByLabel(tauSrc_, taus); nTaus = taus->size();
-   iEvent.getByLabel(forVetoMuonSrc_, forVetoMuons); nMuonsForVeto = forVetoMuons->size();
-   iEvent.getByLabel(forVetoElectronSrc_, forVetoElectrons); nElectronsForVeto = forVetoElectrons->size();
-
-   for( size im=0; im<nMuons; im++){
-      if( im ==0 ){ muon1 = (*muons)[im]; muon2 = (*muons)[im]; }
-      if( im ==1 ) muon2 = (*muons)[im];
-   }
-
-   muon1Charge = muon1.charge(); muon2Charge = muon2.charge();
-
-   for( size ie=0; ie<nElectrons; ie++){
-      if( ie ==0 ){ ele1 = (*electrons)[ie]; ele2 = (*electrons)[ie]; }
-      if( ie ==1 ) ele2 = (*electrons)[ie];
-   }
-
-   ele1Charge = ele1.charge(); ele2Charge = ele2.charge();
-
-}
-
-void FlatTreeMaker::loadPhotons(const edm::Event& iEvent){
-   iEvent.getByLabel(photonSrc_, photons); nPhotons = photons->size();
 }
 
 void FlatTreeMaker::loadMETMHT(const edm::Event& iEvent){
