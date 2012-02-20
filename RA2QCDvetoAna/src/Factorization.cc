@@ -13,7 +13,7 @@
 //
 // Original Author:  samantha hewamanage
 //         Created:  Tue Jul 26 22:15:44 CDT 2011
-// $Id: Factorization.cc,v 1.2 2011/11/29 20:35:37 samantha Exp $
+// $Id: Factorization.cc,v 1.3 2011/12/14 23:43:04 samantha Exp $
 //
 //
 
@@ -26,17 +26,12 @@
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
 #include "FWCore/Framework/interface/EDFilter.h"
-
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
-
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
-
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
- 
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
-
 #include "DataFormats/METReco/interface/METCollection.h"
 #include "DataFormats/METReco/interface/CaloMET.h"
 #include "DataFormats/METReco/interface/CaloMETCollection.h"
@@ -88,6 +83,7 @@ class Factorization : public edm::EDFilter {
       virtual bool endRun(edm::Run&, edm::EventSetup const&);
       virtual bool beginLuminosityBlock(edm::LuminosityBlock&, edm::EventSetup const&);
       virtual bool endLuminosityBlock(edm::LuminosityBlock&, edm::EventSetup const&);
+		bool storeHLT(const edm::Event& e, const edm::EventSetup& iSetup);
 
       // ----------member data ---------------------------
 		//jet collections
@@ -134,6 +130,16 @@ class Factorization : public edm::EDFilter {
 			TH1F* delphiMin_jetmht[3];
 		};
 
+		struct CutsPassedHists_t
+		{
+			TH1F *processed;
+			TH1F *njet; 
+			TH1F *ht;
+			TH1F *mht;
+		};
+
+		CutsPassedHists_t cutsHist;
+
 		TH1F* hDelPhiMin_mht[8];
 		TH1F* hPass[16];
 		TH1F* hFail[41];
@@ -142,6 +148,7 @@ class Factorization : public edm::EDFilter {
 		EventHist_t evtHist;
 		JetHist_t pf30_jet1Hist, pf30_jet2Hist, pf30_jet3Hist; //for upto 5 jets may be
 		JetHist_t pf50eta25_jet1Hist, pf50eta25_jet2Hist, pf50eta25_jet3Hist; //for upto 5 jets may be
+		TH1F* hDelPhiMin;
 
 		edm::InputTag patJetsPFPt50Eta25InputTag_;
 		edm::Handle<std::vector<pat::Jet> > pfpt50eta25JetHandle;
@@ -161,6 +168,11 @@ class Factorization : public edm::EDFilter {
 		int doLumiWeighing, doEventWeighing;
 		edm::Handle<double> prescaleWeightHandle;
 		bool usePrescaleWeight;
+		TH1F* hist_prescaleWeights;
+		TH1F* hist_eventWeights;
+		TH2F* hist_trigVsWeight;
+		std::vector<std::string> triggerPathsToStore_;  // Vector to store list of HLT paths to store results of in ntuple
+		edm::InputTag hlTriggerResults_;    // Input tag for TriggerResults
 
 
 };
@@ -187,6 +199,8 @@ static bool sort_using_less_than(double u, double v)
 Factorization::Factorization(const edm::ParameterSet& iConfig)
 {
    //now do what ever initialization is needed
+	triggerPathsToStore_ = iConfig.getParameter<std::vector<std::string> >("TriggerPathsToStore");
+	hlTriggerResults_    = iConfig.getParameter<edm::InputTag>("HltTriggerResults");	
 	patJetsPFPt50Eta25InputTag_ = iConfig.getParameter<edm::InputTag>("patJetsPFPt50Eta25InputTag");
 	mhtInputTag_    = iConfig.getParameter<edm::InputTag>("mhtInputTag");
 	htInputTag_     = iConfig.getParameter<edm::InputTag>("htInputTag");
@@ -208,6 +222,13 @@ Factorization::Factorization(const edm::ParameterSet& iConfig)
 
 	//generate hists
 	edm::Service<TFileService> fs;
+
+
+	cutsHist.processed  = fs->make<TH1F> ("evts_processed" ,"Number of events pass the processed cut", 5, 0, 5);
+	cutsHist.njet  = fs->make<TH1F> ("evtsPassedNjetCut" ,"Number of events pass the njet cut", 5, 0, 5);
+	cutsHist.ht    = fs->make<TH1F> ("evtsPassedHtCut" ,"Number of events pass the ht cut", 5, 0, 5);
+	cutsHist.mht   = fs->make<TH1F> ("evtsPassedMhtCut" ,"Number of events pass the mht cut", 5, 0, 5);
+
 
 	const float met_min = 0, met_max=500, met_bins=100;
 	MHT_by_phislice[0] = fs->make<TH1F> ("mht_phislice_lt0.1" ,"MHT (#Delta#Phi_{min}<0.1);MHT [GeV];Events;", met_bins, met_min, met_max);
@@ -231,17 +252,17 @@ Factorization::Factorization(const edm::ParameterSet& iConfig)
 	pf30_jet1Hist.pt  = fs->make<TH1F> ("pf30_jet1_pt"  ,"RA2: PF30-Jet1 pt;pt [GeV];Events;", pt_bins, 0, pt_max);
 	pf30_jet1Hist.eta = fs->make<TH1F> ("pf30_jet1_eta" ,"RA2: PF30-Jet1 eta;eta;Events;", 100, -5, 5);
 	pf30_jet1Hist.phi = fs->make<TH1F> ("pf30_jet1_phi" ,"RA2: PF30-Jet1 phi;phi;Events;", 160, -8, 8);
-//	pf30_jet1Hist.delphi = fs->make<TH1F> ("pf30_jet1_delphi" ,"RA2: PF30-Jet1: delphi;delphi;Events;", 160, -8, 8);
+	pf30_jet1Hist.delphi = fs->make<TH1F> ("pf30_jet1_delphi" ,"RA2: PF30-Jet1: #Delta#Phi; #Delta#Phi (jet, MHT) ;Events;", 40, 0, 4);
 
 	pf30_jet2Hist.pt  = fs->make<TH1F> ("pf30_jet2_pt"  ,"RA2: PF30-Jet2 pt;pt [GeV];Events;", pt_bins, 0, pt_max);
 	pf30_jet2Hist.eta = fs->make<TH1F> ("pf30_jet2_eta" ,"RA2: PF30-Jet2 eta;eta;Events;", 100, -5, 5);
 	pf30_jet2Hist.phi = fs->make<TH1F> ("pf30_jet2_phi" ,"RA2: PF30-Jet2 phi;phi;Events;", 160, -8, 8);
-//	pf30_jet2Hist.delphi = fs->make<TH1F> ("pf30_jet2_delphi" ,"RA2: PF30-Jet2: delphi;delphi;Events;", 160, -8, 8);
+	pf30_jet2Hist.delphi = fs->make<TH1F> ("pf30_jet2_delphi" ,"RA2: PF30-Jet2: #Delta#Phi; #Delta#Phi (jet, MHT);Events;", 40, 0, 4);
 
 	pf30_jet3Hist.pt = fs->make<TH1F> ("pf30_jet3_pt" ,"RA2: PF30-Jet3 pt;pt [GeV];Events;", pt_bins, 0, pt_max);
 	pf30_jet3Hist.eta = fs->make<TH1F> ("pf30_jet3_eta" ,"RA2: PF30-Jet3 eta;eta;Events;", 100, -5, 5);
 	pf30_jet3Hist.phi = fs->make<TH1F> ("pf30_jet3_phi" ,"RA2: PF30-Jet3 phi;phi;Events;", 160, -8, 8);
-//	pf30_jet3Hist.delphi = fs->make<TH1F> ("pf30_jet3_delphi" ,"RA2: PF30-Jet3: delphi;delphi;Events;", 160, -8, 8);
+	pf30_jet3Hist.delphi = fs->make<TH1F> ("pf30_jet3_delphi" ,"RA2: PF30-Jet3: #Delta#Phi; #Delta#Phi (jet, MHT);Events;", 40, 0, 4);
 
 	pf30_jet1Hist.pt->Sumw2();
 	pf30_jet2Hist.pt->Sumw2();
@@ -252,15 +273,15 @@ Factorization::Factorization(const edm::ParameterSet& iConfig)
 	pf30_jet1Hist.phi->Sumw2();
 	pf30_jet2Hist.phi->Sumw2();
 	pf30_jet3Hist.phi->Sumw2();
+	pf30_jet1Hist.delphi->Sumw2();
+	pf30_jet2Hist.delphi->Sumw2();
+	pf30_jet3Hist.delphi->Sumw2();
 
-	//const float npassFailHistBins = 16;
-	//const float passFailHistBins[] = {0,20,40,60,80,100,120,140,160,180,200,250,300,350,400,500,600};
-	//const float npassFailHistBins = 23;
-	//const float passFailHistBins[] = {50,55,60,65,70,75,80,85,90,95,100,105,110,115,120,130,140,150,175,200,250,350,600,1000};
-	//const float npassFailHistBins = 14;
-	//const float passFailHistBins[] = {50,60,70,80,90,100,110,120,140,160,200,250,350,600,1000};
-	const float npassFailHistBins = 13;
-	const float passFailHistBins[] = {50,60,70,80,90,100,110,120,140,160,200,300,500,1000};
+	//const float npassFailHistBins = 13;
+	//const float passFailHistBins[] = {50,60,70,80,90,100,110,120,140,160,200,300,500,1000};
+	//to check event counts in each of the signal bins
+	const float npassFailHistBins = 7;
+	const float passFailHistBins[] = {50,100,150,200,350,500,600,1000};
 
 	hPass[0]  = fs->make<TH1F> ("Pass_0","PASS from #Delta#Phi_{min} cut >0.15", npassFailHistBins, passFailHistBins);
 	hPass[1]  = fs->make<TH1F> ("Pass_1","PASS from #Delta#Phi_{min} cui >0.2", npassFailHistBins, passFailHistBins);
@@ -373,6 +394,27 @@ Factorization::Factorization(const edm::ParameterSet& iConfig)
 	hDelPhiMin_mht[5]->Sumw2();
 	hDelPhiMin_mht[6]->Sumw2();
 	hDelPhiMin_mht[7]->Sumw2();
+
+	hDelPhiMin = fs->make<TH1F> ("delPhiMin"  ,"RA2: #Delta#Phi_{min}" , 150, 0, 3);
+	hDelPhiMin->Sumw2();
+	
+	hist_prescaleWeights = fs->make<TH1F> ("prescaleWeights","Prescale Weights",2000,0,2000);
+	hist_prescaleWeights->Sumw2();
+	hist_eventWeights    = fs->make<TH1F> ("totalEventWeights","Total Event Weights",2000,0,2000);
+	hist_eventWeights->Sumw2();
+
+	//prescale weight with respective triggers
+	const int nBins = (int) triggerPathsToStore_.size();
+	hist_trigVsWeight = fs->make<TH2F> ("trigVsprescaleWeights","Trigger Vs Prescale Weights",nBins,0,nBins,2000,0,2000);
+	int i = 1;
+	for (std::vector<std::string>::const_iterator trigNameTempl = triggerPathsToStore_.begin();
+			trigNameTempl != triggerPathsToStore_.end(); ++trigNameTempl) 
+	{
+		hist_trigVsWeight->GetXaxis()->SetBinLabel(i,(*trigNameTempl).c_str());
+		++i;
+	}
+
+
 }
 
 
@@ -395,6 +437,7 @@ Factorization::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
    using namespace edm;
 	++uProcessed;
+	cutsHist.processed->Fill(1);
 	kRunLumiEvent.run  = iEvent.id().run();
 	kRunLumiEvent.lumi = iEvent.id().luminosityBlock(); 
 	kRunLumiEvent.evt  = iEvent.id().event();
@@ -439,24 +482,24 @@ Factorization::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 	double prescaleWeight = 1;
 	if ( iEvent.isRealData() && usePrescaleWeight)
 	{
-		//iEvent.getByLabel("prescaleweightProducer:weight", prescaleWeightHandle);
 		iEvent.getByLabel(prescaleWeightInputTag, prescaleWeightHandle);
-	//	iEvent.getByLabel("prescaleweightProducer", prescaleWeightHandle);
-//		std::cout << "prescaleWeight = " << (*prescaleWeightHandle) << std::endl;
+		//PrintHeader();
+      //std::cout << __LINE__ << ":: prescaleWeight = " << (*prescaleWeightHandle) << std::endl;
 		if ( ! prescaleWeightHandle.isValid()) 
 		{ 
 			std::cout << "prescaleWeightHandle found!" << std::endl;	
+			assert (false);
 		}
 		prescaleWeight = (*prescaleWeightHandle);
+		hist_prescaleWeights->Fill(prescaleWeight);
 		Weight *= prescaleWeight;
-		std::cout << "Weight = " << Weight << std::endl;
+		//std::cout << "Weight = " << Weight << std::endl;
 	}
 
-
+	hist_eventWeights->Fill(Weight);
 	//std::cout << "Weight = " << Weight << std::endl;
+	 // storeHLT(iEvent, iSetup);
 
-
-	
 
 	/*  Get all the handles needed and check their
 	 *  validity.
@@ -486,8 +529,12 @@ Factorization::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 	//APPLY RA2 cuts
 
 	if ( pfpt50eta25JetHandle->size() <3 ) return 0;
+	cutsHist.njet->Fill(1);
 	if ( (*htHandle) < dMinHT) { ++uFailMinHTCut; return 0; }
+	cutsHist.ht->Fill(1);
 	if ( (*mhtHandle)[0].pt() < dMinMHT ) {++uFailMinPFMHTCut; return 0; }
+	cutsHist.mht->Fill(1);
+
 
 	/*
 	 * Fill hists after RA2b base selection
@@ -497,12 +544,6 @@ Factorization::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 	evtHist.ht->Fill((*htHandle), Weight);
 	evtHist.meff->Fill( (*mhtHandle)[0].pt() + (*htHandle), Weight);
 
-	pf30_jet1Hist.pt->Fill((*pfpt50eta25JetHandle)[0].pt(), Weight);
-	pf30_jet2Hist.pt->Fill((*pfpt50eta25JetHandle)[1].pt(), Weight);
-	pf30_jet3Hist.pt->Fill((*pfpt50eta25JetHandle)[2].pt(), Weight);
-	pf30_jet1Hist.eta->Fill((*pfpt50eta25JetHandle)[0].eta(), Weight);
-	pf30_jet2Hist.eta->Fill((*pfpt50eta25JetHandle)[1].eta(), Weight);
-	pf30_jet3Hist.eta->Fill((*pfpt50eta25JetHandle)[2].eta(), Weight);
 
 	DoDelMinStudy(pfpt50eta25JetHandle,	mhtHandle);
 
@@ -594,6 +635,13 @@ Factorization::endJob() {
 	if ( uPassed>0) std::cout << sumLumiWeights/(double)uPassed << std::endl;
 	else std::cout << "0" << std::endl;
 
+	for (std::vector<std::string>::const_iterator trigNameTempl = triggerPathsToStore_.begin();
+			trigNameTempl != triggerPathsToStore_.end(); ++trigNameTempl) 
+	{
+		std::cout << "[" << *trigNameTempl << "]";
+	}
+	std::cout << std::endl;
+
 }
 
 // ------------ method called when starting to processes a run  ------------
@@ -655,6 +703,36 @@ void Factorization::DoDelMinStudy(edm::Handle<std::vector<pat::Jet> > pfpt50eta2
 	assert (vDelPhi_jetmht.size() == 3 && "ERROR: More than 3 dPhiMin calculations found!");
 	//std::cout << "vDelPhi_jetmht size = " << vDelPhi_jetmht.size() << std::endl;
 	const float dPhiMin = vDelPhi_jetmht.at(0);
+
+	const float jet1_pt  = (*pfpt50eta25JetHandle)[0].pt();
+	const float jet2_pt  = (*pfpt50eta25JetHandle)[1].pt();
+	const float jet3_pt  = (*pfpt50eta25JetHandle)[2].pt();
+	const float jet1_phi = (*pfpt50eta25JetHandle)[0].phi();
+	const float jet2_phi = (*pfpt50eta25JetHandle)[1].phi();
+	const float jet3_phi = (*pfpt50eta25JetHandle)[2].phi();
+	const float jet1_eta = (*pfpt50eta25JetHandle)[0].eta();
+	const float jet2_eta = (*pfpt50eta25JetHandle)[1].eta();
+	const float jet3_eta = (*pfpt50eta25JetHandle)[2].eta();
+	const float j1mht_dphi = fabs(TVector2::Phi_mpi_pi(jet1_phi - (*mhtHandle)[0].phi()));
+	const float j2mht_dphi = fabs(TVector2::Phi_mpi_pi(jet2_phi - (*mhtHandle)[0].phi()));
+	const float j3mht_dphi = fabs(TVector2::Phi_mpi_pi(jet3_phi - (*mhtHandle)[0].phi()));
+
+	pf30_jet1Hist.pt->Fill(jet1_pt, Weight);
+	pf30_jet2Hist.pt->Fill(jet2_pt, Weight);
+	pf30_jet3Hist.pt->Fill(jet3_pt, Weight);
+	pf30_jet1Hist.phi->Fill(jet1_phi, Weight);
+	pf30_jet2Hist.phi->Fill(jet2_phi, Weight);
+	pf30_jet3Hist.phi->Fill(jet3_phi, Weight);
+	pf30_jet1Hist.eta->Fill(jet1_eta, Weight);
+	pf30_jet2Hist.eta->Fill(jet2_eta, Weight);
+	pf30_jet3Hist.eta->Fill(jet3_eta, Weight);
+
+	pf30_jet1Hist.delphi->Fill(j1mht_dphi, Weight);
+	pf30_jet2Hist.delphi->Fill(j2mht_dphi, Weight);
+	pf30_jet3Hist.delphi->Fill(j3mht_dphi, Weight);
+
+	hDelPhiMin->Fill(dPhiMin);
+
 
 	// dphimin in slices of MHT
 	if ( mht >= 60 && mht< 80 ) hDelPhiMin_mht[0]->Fill(dPhiMin, Weight);
@@ -879,6 +957,63 @@ void Factorization::PrintHeader()
 {
 	std::cout  << "======= Run/Event: " << kRunLumiEvent.run
 			<< ":" << kRunLumiEvent.evt << std::endl;
+}
+
+
+bool Factorization::storeHLT(const edm::Event& e, const edm::EventSetup& iSetup){
+	//////////////////////////////////////////////////////////////////////
+	////  Trigger Section: Analyzing HLT Trigger Results (TriggerResults) // 
+	////////////////////////////////////////////////////////////////////////
+	using namespace edm;
+
+	bool accept(kFALSE);      
+	int ntrigs(0);
+	// get hold of TriggerResults
+	Handle<TriggerResults> TrgResultsHandle;
+	e.getByLabel(hlTriggerResults_, TrgResultsHandle);
+
+	if (TrgResultsHandle.isValid()) {
+		const TriggerResults *hltResults = TrgResultsHandle.product();
+		const TriggerNames TrgNames = e.triggerNames(*hltResults);
+		ntrigs=TrgNames.size();
+		//std::cout << "%HLTInfo --  Number of HLT Triggers: " << ntrigs << std::endl;
+
+		for (int i=0;i < ntrigs; ++i)
+		{
+			const std::string trigName = TrgNames.triggerName(i);
+			std::cout << "Triger [" << i << "] " << trigName << std::endl;
+		}
+
+		for ( std::vector<std::string>::const_iterator trigNameTempl = triggerPathsToStore_.begin();  trigNameTempl != triggerPathsToStore_.end(); ++trigNameTempl) {
+			int index = TrgNames.triggerIndex(*trigNameTempl);
+			std::cout << "my trig: " << *trigNameTempl << " & index = " << index << std::endl;
+			if (index !=  ntrigs )
+			{
+				accept = TrgResultsHandle->accept(index);
+				if (accept) 
+				{
+					std::cout << "my trig: " << *trigNameTempl << " & accept = " << accept << std::endl;
+					//return accept;
+				}
+			}
+		}
+
+
+		// add prescale information
+/*		for ( std::vector<std::string>::const_iterator trigNameTempl = triggerPrescaleToStore_.begin();  trigNameTempl != triggerPrescaleToStore_.end(); ++trigNameTempl) {
+			int index = TrgNames.triggerIndex(*trigNameTempl);
+			int hlt_prescale = 0;
+			if (index !=  ntrigs )
+			{
+				hlt_prescale = hltConfig_.prescaleValue(e, iSetup, *trigNameTempl);
+				std::cout << __LINE__ << "hlt_prescale = " << hlt_prescale << std::endl;
+			}
+		}
+*/		
+
+	} else { std::cout << "%HLTInfo -- No Trigger Result" << std::endl;}
+
+	return accept;
 }
 
 
