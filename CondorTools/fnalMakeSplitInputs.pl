@@ -6,22 +6,12 @@ if ($#ARGV < 0){
    exit;
 }
 
-print "$ARGV[0]  $ARGV[1]\n";
-$numArgs = $#ARGV + 1;
-print "number of args = $numArgs\n";
-
-#if ($#ARGV == 1){
-if ($numArgs == 2){
+if($#ARGV ==0 ){
    
    $perNumFile = $ARGV[0];
-   $nJobs = $ARGV[1];
-
-   print "nJobs      : $nJobs\n";
    print "perNumFile : $perNumFile\n";
 
-   #open(IN, "wjets_wz.list");
-   #open(IN, "qcd_pt1800.list");
-   open(IN, "file.list");
+   open(IN, "wjets_wz.list");
    $cnt = -1;
    $appendix = 0;
 
@@ -35,7 +25,6 @@ if ($numArgs == 2){
          $appendix++;
       }
       print OUT $_;
-		last if $appendix > $nJobs
    }
    close(OUT);
 }

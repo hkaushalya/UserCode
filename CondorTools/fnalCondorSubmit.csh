@@ -3,13 +3,10 @@
 setenv PYTHONHOME `python-config --prefix` 
 echo "PYTHONHOME : $PYTHONHOME\n"
 
-rm -rf inputList_*.rtlst run_*.sh
-
-
 set maxNum=$1
 set perNum=$2
 
-perl fnalMakeSplitInputs.pl ${perNum} ${maxNum}
+perl fnalMakeSplitInputs.pl ${perNum}
 
 set i=0
 

@@ -6,8 +6,7 @@ export filetail="_"$configSpecStr
 
 export currDir=`pwd`
 
-#export outputDir=${currDir}'/output6/'
-export outputDir=${currDir}'/QCD1/'
+export outputDir=${currDir}'/output/'
 export logDir=$outputDir'log'
 
 echo $configSpecStr
@@ -41,8 +40,7 @@ initialdir = ${outputDir}
 Output = ${logDir}_${configSpecStr}_\$(Cluster)_\$(Process).stdout
 Error = ${logDir}_${configSpecStr}_\$(Cluster)_\$(Process).stderr
 Log = ${logDir}_${configSpecStr}_\$(Cluster)_\$(Process).log
-#Arguments = ${currDir}/SusyPAT_data42X_cfg.py $filetail $inputlist
-Arguments = ${currDir}/SusyPAT_data42X_cfg.py $filetail $inputlist \$(Cluster) ${configSpecStr}
+Arguments = ${currDir}/analyzePatBasics_cfg.py $filetail $inputlist
 Queue 
 
 #exit
