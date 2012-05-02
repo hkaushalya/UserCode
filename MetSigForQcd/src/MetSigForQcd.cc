@@ -13,7 +13,7 @@
 //
 // Original Author:  samantha hewamanage
 //         Created:  Thu Mar 15 13:34:25 CDT 2012
-// $Id$
+// $Id: MetSigForQcd.cc,v 1.1 2012/03/16 16:31:51 samantha Exp $
 //
 //
 
@@ -68,13 +68,9 @@ class MetSigForQcd : public edm::EDAnalyzer {
 		};
 
 		struct EventHist_t {
-			TH1F* processed;
-			TH1F* passed;
 			TH1F* nvtx;
 			TH1F* mht;
-			TH1F* pfmht;
-			TH1F* ht;	//calculated by hand
-			TH1F* pfht; //ht in PAT
+			TH1F* ht;
 			TH1F* njet30;
 			TH1F* njet50;
 			TH1F* meff;
@@ -82,7 +78,16 @@ class MetSigForQcd : public edm::EDAnalyzer {
 			TH1F* metprob;
 			TH2F* metsigVsSumEt;
 			TH2F* metprobVsSumEt;
+			TProfile* metsigVsSumEt_prof;
 			TProfile* metprobVsSumEt_prof;
+			TProfile* metsigVsNjet30_prof;
+			TProfile* metprobVsNjet30_prof;
+			TProfile* metsigVsNjet50_prof;
+			TProfile* metprobVsNjet50_prof;
+			TProfile* metsigVsHT;
+			TProfile* metprobVsHT;
+			TProfile* metsigVsMHT;
+			TProfile* metprobVsMHT;
 			TH1F* metsigerr;
 			TH1F* prescaleWeights;
 			TH1F* eventWeights;
@@ -118,8 +123,7 @@ class MetSigForQcd : public edm::EDAnalyzer {
 				edm::Handle<reco::VertexCollection> vertexHandle,
 				edm::Handle<std::vector<pat::Jet> > pf30eta50JetHandle,
 				edm::Handle<std::vector<pat::Jet> > pf50eta25JetHandle,
-				edm::Handle<edm::View<reco::MET> > mhtHandle,
-				edm::Handle<double> htHandle, const float& myht, const float& mymht,
+				const float ht, const float& mht, const float mhtphi,
 				const float prescaleWeight,
 				const float Weight,
 				Hist_t& hist
@@ -132,28 +136,27 @@ class MetSigForQcd : public edm::EDAnalyzer {
 		edm::Handle<double> htHandle;
 		edm::InputTag prescaleWeightInputTag;
 
-		unsigned int uProcessed; // number of processed events
-		unsigned int uPassed; //number of events passed the filter
 		RunLumiEvt_t kRunLumiEvent;
 		int iVerbose; // control print levels
-		double dMinHT;
-		double dMinMHT;
+		double dMinHT_, dMinMHT_, dMinNjet_, dMinMetSig_;
 		edm::InputTag patJetsPFPt50Eta25InputTag_, patJetsPFPt30Eta50InputTag_;
 		edm::Handle<std::vector<pat::Jet> > pfpt50eta25JetHandle, pfpt30eta50JetHandle;
-		unsigned uFailMinHTCut, uFailMinPFMHTCut;
+		unsigned uFailMinHTCut, uFailMinPFMHTCut, uFailNjetCut, uFailDphiCut, uFailMetSigCut;
 
-		edm::LumiReWeighting LumiWeights_;
 		std::vector<float> vMCNvtxDist, vDATANvtxDist;
 		double sumLumiWeights; //sum of lumi weights for cross checks
 		double Weight; //total weight for an event
 		int doLumiWeighing, doEventWeighing;
 		edm::Handle<double> prescaleWeightHandle;
 		bool usePrescaleWeight;
+		bool bApplyNjetCut, bApplyHtCut, bApplyMhtCut, bApplyDphiCut;
 
 		edm::Handle<std::vector<reco::PFMET> >pfMetHandle;
     	std::vector<double> htBins_;
 		std::vector<Hist_t> vHist;
 		float myHt, myMht;
+		TH1F* processed;
+		TH1F* passed;
 };
 
 //
@@ -175,8 +178,9 @@ MetSigForQcd::MetSigForQcd(const edm::ParameterSet& iConfig)
 	patJetsPFPt30Eta50InputTag_ = iConfig.getParameter<edm::InputTag>("patJetsPFPt30Eta50InputTag");
 	mhtInputTag_    = iConfig.getParameter<edm::InputTag>("mhtInputTag");
 	htInputTag_     = iConfig.getParameter<edm::InputTag>("htInputTag");
-	dMinHT          = iConfig.getUntrackedParameter<double>("dMinHT",0.0);
-	dMinMHT         = iConfig.getUntrackedParameter<double>("dMinMHT",0.0);
+	dMinNjet_        = iConfig.getUntrackedParameter<double>("dMinNjet",3.0);
+	dMinHT_          = iConfig.getUntrackedParameter<double>("dMinHT",0.0);
+	dMinMHT_         = iConfig.getUntrackedParameter<double>("dMinMHT",0.0);
 	iVerbose        = iConfig.getUntrackedParameter<int>("verbose",0);
 	doLumiWeighing  = iConfig.getUntrackedParameter<int>("ApplyLumiWeighing",0);
 	doEventWeighing = iConfig.getUntrackedParameter<int>("ApplyEventWeighing",0);
@@ -185,8 +189,15 @@ MetSigForQcd::MetSigForQcd(const edm::ParameterSet& iConfig)
 	sumLumiWeights   = 0;
 	Weight           = 1;
 	htBins_ = iConfig.getParameter<std::vector<double > >("htBins");
+	bApplyNjetCut = iConfig.getUntrackedParameter<int>("applyNjetCut",1);
+	bApplyHtCut   = iConfig.getUntrackedParameter<int>("applyHtCut",1);
+	bApplyMhtCut  = iConfig.getUntrackedParameter<int>("applyMhtCut",1);
+	bApplyDphiCut = iConfig.getUntrackedParameter<int>("applyDphiCut",1);
+	dMinMetSig_   = iConfig.getUntrackedParameter<double>("dMinMetSig",0.0);
 
 	BookHistograms();
+	uFailNjetCut = 0; uFailMinHTCut = 0; uFailMinPFMHTCut = 0; uFailDphiCut = 0;
+	uFailMetSigCut = 0;
 }
 
 
@@ -208,8 +219,7 @@ void
 MetSigForQcd::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
    using namespace edm;
-	++uProcessed;
-	//cutsHist.processed->Fill(1);
+	processed->Fill(1);
 	kRunLumiEvent.run  = iEvent.id().run();
 	kRunLumiEvent.lumi = iEvent.id().luminosityBlock(); 
 	kRunLumiEvent.evt  = iEvent.id().event();
@@ -233,14 +243,14 @@ MetSigForQcd::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 	/* PU S3 reweighting for QCD MC sample
 	*/
 	double lumiWeight = 1;
-	if ( doLumiWeighing )
+/*	if ( doLumiWeighing )
 	{
 		lumiWeight = LumiWeights_.weight( iEvent );
 		//std::cout << "lum wgt = " << lumiWeight << std::endl;
 		sumLumiWeights += lumiWeight;
 		Weight *= lumiWeight;
 	}
-
+*/
 	//event weights for flat QCD samples
 	double storedWeight = 1;
 	if ( doEventWeighing )
@@ -309,33 +319,36 @@ MetSigForQcd::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 		assert(false);
 	}
 
-	//APPLY RA2 cuts
-
-	if ( pfpt50eta25JetHandle->size() <3 ) return;
-	if ( (*htHandle) < dMinHT) { ++uFailMinHTCut; return; }
-	if ( (*mhtHandle)[0].pt() < dMinMHT ) {++uFailMinPFMHTCut; return; }
 
 	//recalc ht/mht
-	float myHt = 0, myMht = 0;
-	for (unsigned i=0; i<pfpt50eta25JetHandle->size(); ++i) myHt += (*pfpt50eta25JetHandle)[i].pt();
-
-	TLorentzVector tlVec(0,0,0,0);
-	for (unsigned i=0; i<pfpt30eta50JetHandle->size(); ++i)
-	{
-		const TLorentzVector iJetVec(
-					(*pfpt30eta50JetHandle)[i].px(), (*pfpt30eta50JetHandle)[i].py(),
-					(*pfpt30eta50JetHandle)[i].pz(), (*pfpt30eta50JetHandle)[i].energy()
-					);
-		tlVec += iJetVec;
+	float htTemp = 0;
+	for (unsigned i=0; i < pfpt50eta25JetHandle->size(); ++i) 
+	{ 
+		htTemp += (*pfpt50eta25JetHandle)[i].pt(); 
 	}
-	myMht = tlVec.Pt();
 
+	const float myMht    = (*mhtHandle)[0].pt();
+	const float myMhtPhi = (*mhtHandle)[0].phi();
+	const float myHt     = htTemp;
+	const unsigned myNjet= pfpt50eta25JetHandle->size(); 
+	const float myMetSig = (*pfmet)[0].significance();
 
 	//Check if RA2 dphi cuts are satisfied
 	bool bPassRA2dphiCut = true;
-	bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[0].phi(), (*mhtHandle)[0].phi())) > 0.5);
-	bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[1].phi(), (*mhtHandle)[0].phi())) > 0.5);
-	bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[2].phi(), (*mhtHandle)[0].phi())) > 0.3);
+
+	if (myNjet>0) bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[0].phi(), myMhtPhi)) > 0.5);
+	if (myNjet>1) bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[1].phi(), myMhtPhi)) > 0.5);
+	if (myNjet>2) bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[2].phi(), myMhtPhi)) > 0.3);
+
+
+	//APPLY RA2 cuts
+
+	if ( bApplyNjetCut && myNjet < (unsigned) dMinNjet_ ) { ++uFailNjetCut;  return; }
+	if ( bApplyHtCut   && myHt < dMinHT_                ) { ++uFailMinHTCut; return; }
+	if ( bApplyMhtCut  && myMht < dMinMHT_              ) { ++uFailMinPFMHTCut; return; }
+	if ( bApplyDphiCut && ! bPassRA2dphiCut             ) { ++uFailDphiCut;   return; }
+	if ( myMetSig < dMinMetSig_                         ) { ++uFailMetSigCut; return; }
+
 
 
 	//loop over all ht bins
@@ -351,10 +364,7 @@ MetSigForQcd::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 				vertexHandle,
 				pfpt30eta50JetHandle,
 				pfpt50eta25JetHandle,
-				mhtHandle,
-				htHandle,
-				myHt, 
-				myMht,
+				myHt, myMht, myMhtPhi,
 				prescaleWeight,
 				Weight,
 				vHist.at(i)
@@ -363,10 +373,7 @@ MetSigForQcd::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 		}
 	}
 
-	++uPassed;
-
-
-
+	passed->Fill(1);
 }
 
 
@@ -374,62 +381,6 @@ MetSigForQcd::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 void 
 MetSigForQcd::beginJob()
 {
-	//2011 Pileup Scenarios https://twiki.cern.ch/twiki/bin/viewauth/CMS/PileupInformation#2011_Pileup_Scenarios
-	//"Flat to 10 plus tail" scenario shown above, the relative normalization of each bin is: 
-	vMCNvtxDist.push_back(0.069286816); //1
-	vMCNvtxDist.push_back(0.069286816); //2
-	vMCNvtxDist.push_back(0.069286816); //3
-	vMCNvtxDist.push_back(0.069286816); //4
-	vMCNvtxDist.push_back(0.069286816); //5
-	vMCNvtxDist.push_back(0.069286816); //6
-	vMCNvtxDist.push_back(0.069286816); //7
-	vMCNvtxDist.push_back(0.069286816); //8
-	vMCNvtxDist.push_back(0.069286816); //9
-	vMCNvtxDist.push_back(0.069286816); //10
-	vMCNvtxDist.push_back(0.069286816); //11
-	vMCNvtxDist.push_back(0.06518604 ); //12
-	vMCNvtxDist.push_back(0.053861878); //13
-	vMCNvtxDist.push_back(0.040782032); //14
-	vMCNvtxDist.push_back(0.030135062); //15
-	vMCNvtxDist.push_back(0.019550796); //16
-	vMCNvtxDist.push_back(0.012264707); //17
-	vMCNvtxDist.push_back(0.007449117); //18
-	vMCNvtxDist.push_back(0.004502075); //19
-	vMCNvtxDist.push_back(0.002194605); //20
-	vMCNvtxDist.push_back(0.001166276); //21
-	vMCNvtxDist.push_back(0.000476543); //22
-	vMCNvtxDist.push_back(0.000188109); //23
-	vMCNvtxDist.push_back(7.52436E-05); //24
-	vMCNvtxDist.push_back(1.25406E-05); //25
-
-	//DATA Nvtx distribution from Pileup_2011_EPS_8_jul.root
-	vDATANvtxDist.push_back(1.45417e+07); //1
-	vDATANvtxDist.push_back(3.47743e+07); //2
-	vDATANvtxDist.push_back(7.89247e+07); //3
-	vDATANvtxDist.push_back(1.26467e+08); //4
-	vDATANvtxDist.push_back(1.59329e+08); //5
-	vDATANvtxDist.push_back(1.67603e+08); //6
-	vDATANvtxDist.push_back(1.52684e+08); //7
-	vDATANvtxDist.push_back(1.23794e+08); //8
-	vDATANvtxDist.push_back(9.09462e+07); //9
-	vDATANvtxDist.push_back(6.13973e+07); //10
-	vDATANvtxDist.push_back(3.8505e+07); //11
-	vDATANvtxDist.push_back(2.2628e+07); //12
-	vDATANvtxDist.push_back(1.25503e+07); //13
-	vDATANvtxDist.push_back(6.61051e+06); //14
-	vDATANvtxDist.push_back(3.32403e+06); //15
-	vDATANvtxDist.push_back(1.60286e+06); //16
-	vDATANvtxDist.push_back(743920); //17
-	vDATANvtxDist.push_back(333477); //18
-	vDATANvtxDist.push_back(144861); //19
-	vDATANvtxDist.push_back(61112.7); //20
-	vDATANvtxDist.push_back(25110.2); //21
-	vDATANvtxDist.push_back(10065.1); //22
-	vDATANvtxDist.push_back(3943.98); //23
-	vDATANvtxDist.push_back(1513.54); //24
-	vDATANvtxDist.push_back(896.161); //25
-
-	LumiWeights_ = edm::LumiReWeighting(vMCNvtxDist, vDATANvtxDist);
 
 }
 
@@ -437,6 +388,17 @@ MetSigForQcd::beginJob()
 void 
 MetSigForQcd::endJob() 
 {
+	std::cout << "------------- " << __FUNCTION__ << ": summary " << std::endl;
+	std::cout <<"MSQ: Events Processed  = " << processed->GetEntries() << std::endl;
+	std::cout <<"MSQ: Events Passed     = " << passed->GetEntries() << std::endl;
+	std::cout <<"MSQ: MetSig min        = " << dMinMetSig_ << std::endl;
+	std::cout <<"MSQ: HT min            = " << dMinHT_ << std::endl;
+	std::cout <<"MSQ: MHT min           = " << dMinMHT_ << std::endl;
+	std::cout <<"MSQ: Njet min          = " << dMinNjet_ << std::endl;
+	std::cout <<"MSQ: ApplyNjetCut      = " << bApplyNjetCut << std::endl;
+	std::cout <<"MSQ: ApplyHtCut        = " << bApplyHtCut << std::endl;
+	std::cout <<"MSQ: ApplyMhtCut       = " << bApplyMhtCut << std::endl;
+	std::cout <<"MSQ: ApplyDphiCut      = " << bApplyDphiCut << std::endl;
 }
 
 // ------------ method called when starting to processes a run  ------------
@@ -478,6 +440,9 @@ void MetSigForQcd::BookHistograms()
 	edm::Service<TFileService> fs;
 	assert (htBins_.size()>1 && "MetSigForQcd:: htBins_ size must be >1!");
 	
+	processed = fs->make<TH1F> ("processed"  ,"Events Processed;", 10, 0, 10);
+	passed    = fs->make<TH1F> ("passed"  ,"Events Passed;", 10, 0, 10);
+
 	for (unsigned i =0; i < htBins_.size()-1; ++i)
 	{
 		stringstream dirName;
@@ -498,20 +463,16 @@ void MetSigForQcd::BookCommonHistograms(TFileDirectory& dir, const float htMin,
 	const double evt_mht_max = 1500, evt_mht_bins = 750;
 	const double evt_ht_max = 4000, evt_ht_bins = 800;
 	hist.evt.nvtx   = dir.make<TH1F> ("nvtx"  ,"RA2 Good Vertices; N Vtx;Events;", 40, 0, 40);
-	hist.evt.pfmht  = dir.make<TH1F> ("pfmht","MHT from PFmetHandle;MHT [GeV];Events;", evt_mht_bins, 0, evt_mht_max);
 	hist.evt.mht    = dir.make<TH1F> ("mht"  ,"Calculated MHT;MHT [GeV];Events;", evt_mht_bins, 0, evt_mht_max);
 	hist.evt.ht     = dir.make<TH1F> ("ht"   ,"HT from pfHT Handle ;pfHT [GeV];Events;", evt_ht_bins, 0, evt_ht_max);
-	hist.evt.pfht   = dir.make<TH1F> ("pfht" ,"HT from Jets ET>50 GeV && |#Eta|<2.4;HT [GeV];Events;", evt_ht_bins, 0, evt_ht_max);
 	hist.evt.njet30 = dir.make<TH1F> ("njet30" ,"Njets (Et>30 GeV && | #Eta |<5.0;NJETS;Events;", 20, 0, 20);
 	hist.evt.njet50 = dir.make<TH1F> ("njet50" ,"Njets (Et>50 GeV && | #Eta |<2.4;NJETS;Events;", 20, 0, 20);
 	hist.evt.meff   = dir.make<TH1F> ("meff" ,"RA2:;MEff;Events;", 50, 0, 5000);
 	hist.evt.prescaleWeights = dir.make<TH1F> ("prescaleWeights","Prescale Weights",2000,0,2000);
 	hist.evt.eventWeights    = dir.make<TH1F> ("totalEventWeights","Total Event Weights",2000,0,2000);
 
-	hist.evt.pfmht->Sumw2();
 	hist.evt.mht->Sumw2();
 	hist.evt.ht->Sumw2();
-	hist.evt.pfht->Sumw2();
 	hist.evt.njet30->Sumw2();
 	hist.evt.njet50->Sumw2();
 	hist.evt.meff->Sumw2();
@@ -543,12 +504,24 @@ void MetSigForQcd::BookCommonHistograms(TFileDirectory& dir, const float htMin,
 		hist.jet[i].delphi->Sumw2();
 	}
 	
-	hist.evt.metsig = dir.make<TH1F> ("metsig","pf MET SIG", 1000,0,100); 
-	hist.evt.metprob = dir.make<TH1F> ("metsidprob","pf MET SIG Prob", 100,0,1); 
+	hist.evt.metsig = dir.make<TH1F> ("metsig","pf MET SIG", 100,0,500); 
+	hist.evt.metprob = dir.make<TH1F> ("metsigprob","pf MET SIG Prob", 100,0,1); 
 	hist.evt.metsigerr = dir.make<TH1F> ("metsigerr","pf MET SIG Err", 200,0,20); 
 	hist.evt.metsigVsSumEt = dir.make<TH2F> ("metsigVsSumEt","pf MET SIG vs sqrt(SumEt)",500,0,1000, 1000,0,100); 
 	hist.evt.metprobVsSumEt = dir.make<TH2F> ("metprobVsSumEt","pf MET Prob vs sqrt(SumEt)",500,0,1000, 100,0,1); 
-	hist.evt.metprobVsSumEt_prof = dir.make<TProfile> ("metprobVsSumEtProf","pf MET Prob Vs sqrt(SumEt)",500,0,1000,0,1); 
+	hist.evt.metsigVsSumEt_prof = dir.make<TProfile> ("metsigVsSumEtProf","pf MET Prob Vs sqrt(SumEt)",50,0,50,0,100); 
+	hist.evt.metprobVsSumEt_prof = dir.make<TProfile> ("metprobVsSumEtProf","pf MET Prob Vs sqrt(SumEt)",50,0,50,0,1); 
+
+	hist.evt.metsigVsNjet30_prof = dir.make<TProfile> ("metsigVsNjet30Prof","pf MET Sig Vs Njet (Et>30)",50,0,50,0,100); 
+	hist.evt.metprobVsNjet30_prof = dir.make<TProfile> ("metprobVsNjet30Prof","pf MET Prob Vs Njet (Et>30)",50,0,50,0,1); 
+
+	hist.evt.metsigVsNjet50_prof = dir.make<TProfile> ("metsigVsNjet50Prof","pf MET Sig Vs Njet (Et>50)",50,0,50,0,100); 
+	hist.evt.metprobVsNjet50_prof = dir.make<TProfile> ("metprobVsNjet50Prof","pf MET Prob Vs Njet (Et>50)",50,0,50,0,1); 
+
+	hist.evt.metsigVsHT = dir.make<TProfile> ("metsigVsHT","pf METSig Vs HT",300,0,3000,0,100); 
+	hist.evt.metprobVsHT = dir.make<TProfile> ("metprobVsHT","pf METProb Vs HT",300,0,3000,0,1); 
+	hist.evt.metsigVsMHT = dir.make<TProfile> ("metsigVsMHT","pf METSig Vs MHT",100,0,1000,0,100); 
+	hist.evt.metprobVsMHT = dir.make<TProfile> ("metprobVsMHT","pf METProb Vs MHT",100,0,1000,0,1); 
 
 }
 void MetSigForQcd::FillHistograms(
@@ -556,8 +529,7 @@ void MetSigForQcd::FillHistograms(
 				edm::Handle<reco::VertexCollection> vertexHandle,
 				edm::Handle<std::vector<pat::Jet> > pf30eta50JetHandle,
 				edm::Handle<std::vector<pat::Jet> > pf50eta25JetHandle,
-				edm::Handle<edm::View<reco::MET> > mhtHandle,
-				edm::Handle<double> htHandle, const float& myht, const float& mymht,
+				const float ht, const float& mht, const float mhtphi,
 				const float prescaleWeight,
 				const float Weight,
 				Hist_t& hist
@@ -569,31 +541,27 @@ void MetSigForQcd::FillHistograms(
 
 	hist.evt.nvtx->Fill(vertexHandle->size(), Weight);
 
-	const float mht = (*mhtHandle)[0].pt();
-	const float ht  = (*htHandle);
-
 	hist.evt.njet50->Fill(pfpt50eta25JetHandle->size(), Weight);
 	hist.evt.njet30->Fill(pfpt30eta50JetHandle->size(), Weight);
 
-	hist.evt.pfmht->Fill(mht, Weight);
-	hist.evt.pfht->Fill(ht, Weight);
 	hist.evt.meff->Fill(mht+ht, Weight);
-	hist.evt.mht->Fill(mymht, Weight);
-	hist.evt.ht->Fill(myht, Weight);
+	hist.evt.mht->Fill(mht, Weight);
+	hist.evt.ht->Fill(ht, Weight);
 	
 	const int njets = (*pf30eta50JetHandle).size();
 	const int maxJets =  (njets>10) ? 10 : njets;
 	for (int i=0; i < maxJets; ++i)
 	{
-		const float pt  = (*pf30eta50JetHandle)[0].pt();
-		const float phi = (*pf30eta50JetHandle)[0].phi();
-		const float eta = (*pf30eta50JetHandle)[0].eta();
-		const float dphi= fabs(TVector2::Phi_mpi_pi(phi - (*mhtHandle)[0].phi()));
+		const float pt  = (*pf30eta50JetHandle)[i].pt();
+		const float phi = (*pf30eta50JetHandle)[i].phi();
+		const float eta = (*pf30eta50JetHandle)[i].eta();
+		const float dphi= fabs(TVector2::Phi_mpi_pi(phi - mhtphi));
 
 		hist.jet[i].pt->Fill(pt, Weight);
 		hist.jet[i].phi->Fill(phi, Weight);
 		hist.jet[i].eta->Fill(eta, Weight);
 		hist.jet[i].delphi->Fill(dphi, Weight);
+
 	}
 
 	float mpfMET_  = -1, mpfSumET_ = -1, mpfMETSign_ = -1, mpfMETSign_err = -1,
@@ -615,7 +583,21 @@ void MetSigForQcd::FillHistograms(
 
 	hist.evt.metsigVsSumEt->Fill(sqrt(mpfSumET_), mpfMETSign_, Weight);
 	hist.evt.metprobVsSumEt->Fill(sqrt(mpfSumET_), prob, Weight);
+
 	hist.evt.metprobVsSumEt_prof->Fill(sqrt(mpfSumET_), prob, Weight);
+	hist.evt.metsigVsSumEt_prof->Fill(sqrt(mpfSumET_), mpfMETSign_, Weight);
+
+	hist.evt.metprobVsNjet30_prof->Fill(pfpt30eta50JetHandle->size(), prob, Weight);
+	hist.evt.metsigVsNjet30_prof->Fill(pfpt30eta50JetHandle->size(), mpfMETSign_, Weight);
+
+	hist.evt.metprobVsNjet50_prof->Fill(pfpt50eta25JetHandle->size(), prob, Weight);
+	hist.evt.metsigVsNjet50_prof->Fill(pfpt50eta25JetHandle->size(), mpfMETSign_, Weight);
+	
+	hist.evt.metsigVsHT->Fill(ht, mpfMETSign_, Weight);
+	hist.evt.metprobVsHT->Fill(ht, prob, Weight);
+
+	hist.evt.metsigVsMHT->Fill(mht, mpfMETSign_, Weight);
+	hist.evt.metprobVsMHT->Fill(mht, prob, Weight);
 
 }
 
