@@ -147,7 +147,7 @@ void TrigPrescaleWeightProducer::produce(edm::Event& iEvent, const edm::EventSet
 	iEvent.put(pOut,"prescaleWeight");
 	iEvent.put(pOut2,"highestPrescaledTriggerName");
 
-	//if (fired > 1) cout <<  "\t :: accept = " << accept  << " /nFired = " << fired << endl;
+	if (debug && fired > 1) cout <<  "\t :: accept = " << accept  << " /nFired = " << fired << endl;
 }
 
 // ------------ method called once each job just before starting event loop  ------------
