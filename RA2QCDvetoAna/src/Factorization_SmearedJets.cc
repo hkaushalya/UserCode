@@ -67,10 +67,21 @@
 #include "TVector3.h"
 #include <iomanip>
 #include "TPad.h"
+#include "TRandom3.h"
+#include "TF1.h"
 
+#include "DataFormats/Math/interface/LorentzVector.h"
+#include "DataFormats/Math/interface/deltaR.h"
+#include "PhysicsTools/KinFitter/interface/TKinFitter.h"
+#include "PhysicsTools/KinFitter/interface/TFitParticleEtEtaPhi.h"
+#include "PhysicsTools/KinFitter/interface/TFitConstraintEp.h"
+#include "DataFormats/Candidate/interface/Candidate.h"
+#include "CommonTools/Utils/interface/PtComparator.h"
 //
 // class declaration
 //
+
+using namespace std;
 
 class Factorization_SmearedJets : public edm::EDFilter {
    public:
@@ -161,6 +172,7 @@ class Factorization_SmearedJets : public edm::EDFilter {
 		void CalcSmearedHTMHT(edm::Handle<std::vector<pat::Jet> > smearedJetsHandle, 
 									int &smearedNJet, float &smearedHT, 
 									float &smearedMHT, float &smearedMEFF, TLorentzVector &smearedMHTVEC);
+		void GenerateJets(edm::Event& iEvent, const edm::EventSetup& iSetup);
 
 		void PrintHeader();
 		TLorentzVector vMetVec;
@@ -181,6 +193,152 @@ class Factorization_SmearedJets : public edm::EDFilter {
 		TLorentzVector smearedMHTVEC;
 		int binningOption_;
 
+		/**********************************************
+		 *  R+S smearing stuff 
+		 **********************************************/
+      
+      typedef math::XYZTLorentzVector LorentzVector;
+      typedef std::vector<std::string>::const_iterator StrIter;
+
+      double rebalancedJetPt_;
+      std::string rebalanceMode_; // "MHTall", "MHThigh" or "MET" only for smearCollection = "Reco"
+
+      int nSmearedJets_;
+      double smearedJetPt_;
+      std::vector<double> PtBinEdges_scaling_;
+      std::vector<double> EtaBinEdges_scaling_;
+      std::vector<double> AdditionalSmearing_;
+      std::vector<double> LowerTailScaling_;
+      std::vector<double> UpperTailScaling_;
+      double AdditionalSmearing_variation_;
+      double LowerTailScaling_variation_;
+      double UpperTailScaling_variation_;
+		
+		std::string smearCollection_; // "Gen" or "Reco"
+      edm::InputTag genjets_;
+      edm::InputTag jets_;
+      edm::InputTag weightName_;
+      std::string jets_reb_;
+      std::string met_reb_;
+      std::string jets_smeared_;
+      std::string genjets_smeared_;
+
+      //// vector of response function
+      std::vector<std::vector<std::vector<TH1F*> > > smearFunc;
+      std::vector<std::vector<std::vector<TH1F*> > > smearFunc_Core;
+      std::vector<std::vector<std::vector<TH1F*> > > smearFunc_LowerTail;
+      std::vector<std::vector<std::vector<TH1F*> > > smearFunc_UpperTail;
+      std::vector<std::vector<std::vector<TH1F*> > > smearFunc_scaled;
+      std::vector<std::vector<TH1F*> > SigmaPtHist;
+      std::vector<std::vector<TF1*> > SigmaPt;
+      std::vector<std::vector<TH1F*> > SigmaPtHist_scaled;
+      std::vector<std::vector<TF1*> > SigmaPt_scaled;
+      std::vector<double> PtBinEdges_;
+      std::vector<double> EtaBinEdges_;
+      std::string inputhist1_;
+      std::string inputhist2_;
+      std::string inputhist3p_;
+      std::string smearingfile_;
+      std::string outputfile_;
+      int NRebin_;
+      bool controlPlots_;
+      bool absoluteTailScaling_;
+      bool cleverPrescaleTreating_;
+      double A0RMS_;
+      double A1RMS_;
+      double probExtreme_;
+      double MHTmin_;
+      double MHTmax_;
+      double HTmin_;
+      double HTmax_;
+      int NbinsMHT_;
+      int NbinsHT_;
+      int Ntries_;
+      int NJets_;
+      double JetsHTPt_;
+      double JetsHTEta_;
+      double JetsMHTPt_;
+      double JetsMHTEta_;
+      std::vector<double> JetDeltaMin_;
+      double MHTcut_low_;
+      double MHTcut_medium_;
+      double MHTcut_high_;
+      double HTcut_low_;
+      double HTcut_medium_;
+      double HTcut_high_;
+      double HTcut_veryhigh_;
+      double HTcut_extremehigh_;
+
+      std::string uncertaintyName_;
+
+      int plotindex_;
+      TRandom3 *rand_;
+
+      double JetResolution_Pt2(const double&, const double&, const int&);
+      double JetResolution_Ptrel(const double&, const double&, const int&);
+      double JetResolution_Eta2(const double&, const double&);
+      double JetResolution_Phi2(const double&, const double&);
+      double JetResolutionHist_Pt_Smear(const double&, const double&, const int&);
+      double GetAdditionalSmearing(const double&, const double&);
+      double GetLowerTailScaling(const double&, const double&);
+      double GetUpperTailScaling(const double&, const double&);
+      int GetIndex(const double&, const std::vector<double>*);
+      void FoldWithGaussian(const TH1&, TH1&, const double&);
+      void StretchHisto(const TH1&, TH1&, const double&);
+      void FillPredictionHistos(const std::vector<pat::Jet>&, const int&, const double&);
+      double calcHT(const std::vector<pat::Jet>&);
+      double calcHT_gen(const std::vector<reco::GenJet>&);
+      math::PtEtaPhiMLorentzVector calcMHT(const std::vector<pat::Jet>&);
+      math::PtEtaPhiMLorentzVector calcMHT_gen(const std::vector<reco::GenJet>&);
+      int calcNJets(const std::vector<pat::Jet>&);
+      int calcNJets_gen(const std::vector<reco::GenJet>&);
+      bool calcMinDeltaPhi(const std::vector<pat::Jet>&, math::PtEtaPhiMLorentzVector&);
+      bool calcMinDeltaPhi_gen(const std::vector<reco::GenJet>&, math::PtEtaPhiMLorentzVector&);
+
+      bool RebalanceJets_KinFitter(edm::View<pat::Jet>*, std::vector<pat::Jet> &);
+      void SmearingJets(const std::vector<pat::Jet>&, std::vector<pat::Jet> &);
+      void SmearingGenJets(edm::View<reco::GenJet>*, std::vector<reco::GenJet> &);
+      void FillPredictionHistos_gen(const std::vector<reco::GenJet>&, const int&, const double&);
+
+      std::string GetName(const std::string plot, const std::string uncert = "", const std::string ptbin = "") const;
+
+      TH2F* h_RecJetRes_Pt;
+      TH2F* h_RecJetRes_Eta;
+      TH2F* h_RebJetRes_Pt;
+      TH2F* h_RebJetRes_Eta;
+      TH2F* h_SmearedJetRes_Pt;
+      TH2F* h_SmearedJetRes_Eta;
+
+      TH1F *h_HTall_gen, *h_HTall_rec, *h_HTall_smeared, *h_HTall_reb;
+      TH1F *h_HThigh_gen, *h_HThigh_rec, *h_HThigh_smeared, *h_HThigh_reb;
+      TH1F *h_MHTall_gen, *h_MHTall_rec, *h_MHTall_smeared, *h_MHTall_reb;
+      TH1F *h_MHThigh_gen, *h_MHThigh_rec, *h_MHThigh_smeared, *h_MHThigh_reb;
+
+      TH1F *h_fitProb;
+      TH1F *h_weight;
+      TH1F *h_weightedWeight;
+
+      TH2F *h_presel_MHT_prediction;
+      TH2F *h_presel_HT_prediction;
+      TH2F *h_presel_Meff_prediction;
+      TH2F *h_baselineNoDeltaPhi_MHT_prediction;
+      TH2F *h_baselineNoDeltaPhi_HT_prediction;
+      TH2F *h_baselineNoDeltaPhi_Meff_prediction;
+      TH2F *h_lowHT_MHT_prediction;
+      TH2F *h_lowHT_Meff_prediction;
+      TH2F *h_lowMHT_HT_prediction;
+      TH2F *h_mediumHT_MHT_prediction;
+      TH2F *h_mediumHT_Meff_prediction;
+      TH2F *h_mediumMHT_HT_prediction;
+      TH2F *h_highHT_MHT_prediction;
+      TH2F *h_highHT_Meff_prediction;
+      TH2F *h_highMHT_HT_prediction;
+      TH2F *h_veryhighHT_MHT_prediction;
+      TH2F *h_veryhighHT_Meff_prediction;
+      TH2F *h_extremehighHT_MHT_prediction;
+      TH2F *h_extremehighHT_Meff_prediction;
+
+      double weight_;
 
 };
 
@@ -224,10 +382,356 @@ Factorization_SmearedJets::Factorization_SmearedJets(const edm::ParameterSet& iC
 	sumLumiWeights   = 0;
 	Weight           = 1;
 
+	//inputs for R+S smearing
+   rebalancedJetPt_ = iConfig.getParameter<double> ("RebalanceJetPt");
+   rebalanceMode_ = iConfig.getParameter<std::string> ("RebalanceMode");
+   //nSmearedJets_ = iConfig.getParameter<int> ("NSmearedJets");
+   smearedJetPt_ = iConfig.getParameter<double> ("SmearedJetPt");
+   PtBinEdges_scaling_ = iConfig.getParameter<std::vector<double> > ("PtBinEdges_scaling");
+   EtaBinEdges_scaling_ = iConfig.getParameter<std::vector<double> > ("EtaBinEdges_scaling");
+   AdditionalSmearing_ = iConfig.getParameter<std::vector<double> > ("AdditionalSmearing");
+   LowerTailScaling_ = iConfig.getParameter<std::vector<double> > ("LowerTailScaling");
+   UpperTailScaling_ = iConfig.getParameter<std::vector<double> > ("UpperTailScaling");
+   AdditionalSmearing_variation_ = iConfig.getParameter<double> ("AdditionalSmearing_variation");
+   LowerTailScaling_variation_ = iConfig.getParameter<double> ("LowerTailScaling_variation");
+   UpperTailScaling_variation_ = iConfig.getParameter<double> ("UpperTailScaling_variation");
+   smearCollection_ = iConfig.getParameter<std::string> ("SmearCollection");
+
+   genjets_ = iConfig.getParameter<edm::InputTag> ("genjetCollection");
+   jets_ = iConfig.getParameter<edm::InputTag> ("jetCollection");
+   jets_reb_ = iConfig.getParameter<std::string> ("jetCollection_reb");
+   jets_smeared_ = iConfig.getParameter<std::string> ("jetCollection_smeared");
+   genjets_smeared_ = iConfig.getParameter<std::string> ("genjetCollection_smeared");
+   uncertaintyName_ = iConfig.getParameter<std::string> ("uncertaintyName");
+   inputhist1_ = iConfig.getParameter<std::string> ("InputHisto1");
+   inputhist2_ = iConfig.getParameter<std::string> ("InputHisto2");
+   inputhist3p_ = iConfig.getParameter<std::string> ("InputHisto3p");
+   controlPlots_ = iConfig.getParameter<bool> ("ControlPlots");
+   smearingfile_ = iConfig.getParameter<std::string> ("SmearingFile");
+   outputfile_ = iConfig.getParameter<std::string> ("OutputFile");
+   NRebin_ = iConfig.getParameter<int> ("NRebin");
+   weightName_ = iConfig.getParameter<edm::InputTag> ("weightName");
+   absoluteTailScaling_ = iConfig.getParameter<bool> ("absoluteTailScaling");
+   cleverPrescaleTreating_ = iConfig.getParameter<bool> ("cleverPrescaleTreating");
+   A0RMS_ = iConfig.getParameter<double> ("A0RMS");
+   A1RMS_ = iConfig.getParameter<double> ("A1RMS");
+   probExtreme_ = iConfig.getParameter<double> ("probExtreme");
+   MHTmin_ = iConfig.getParameter<double> ("MHTmin");
+   MHTmax_ = iConfig.getParameter<double> ("MHTmax");
+   HTmin_ = iConfig.getParameter<double> ("HTmin");
+   HTmax_ = iConfig.getParameter<double> ("HTmax");
+   NbinsMHT_ = iConfig.getParameter<int> ("NbinsMHT");
+   NbinsHT_ = iConfig.getParameter<int> ("NbinsHT");
+   Ntries_ = iConfig.getParameter<int> ("Ntries");
+   NJets_ = iConfig.getParameter<int> ("NJets");
+   JetsHTPt_ = iConfig.getParameter<double> ("JetsHTPt");
+   JetsHTEta_ = iConfig.getParameter<double> ("JetsHTEta");
+   JetsMHTPt_ = iConfig.getParameter<double> ("JetsMHTPt");
+   JetsMHTEta_ = iConfig.getParameter<double> ("JetsMHTEta");
+   JetDeltaMin_ = iConfig.getParameter<std::vector<double> > ("JetDeltaMin");
+   MHTcut_low_ = iConfig.getParameter<double> ("MHTcut_low");
+   MHTcut_medium_ = iConfig.getParameter<double> ("MHTcut_medium");
+   MHTcut_high_ = iConfig.getParameter<double> ("MHTcut_high");
+   HTcut_low_ = iConfig.getParameter<double> ("HTcut_low");
+   HTcut_medium_ = iConfig.getParameter<double> ("HTcut_medium");
+   HTcut_high_ = iConfig.getParameter<double> ("HTcut_high");
+   HTcut_veryhigh_ = iConfig.getParameter<double> ("HTcut_veryhigh");
+   HTcut_extremehigh_ = iConfig.getParameter<double> ("HTcut_extremehigh");
+
+   PtBinEdges_ = iConfig.getParameter<std::vector<double> > ("PtBinEdges");
+   EtaBinEdges_ = iConfig.getParameter<std::vector<double> > ("EtaBinEdges");
+
+   unsigned int needed_dim = (PtBinEdges_scaling_.size() - 1) * (EtaBinEdges_scaling_.size() - 1);
+   if (AdditionalSmearing_.size() != needed_dim) {
+      throw edm::Exception(edm::errors::Configuration, "AdditionalSmearing has not correct dimension");
+   }
+   if (LowerTailScaling_.size() != needed_dim) {
+      throw edm::Exception(edm::errors::Configuration, "LowerTailScaling has not correct dimension");
+   }
+   if (UpperTailScaling_.size() != needed_dim) {
+      throw edm::Exception(edm::errors::Configuration, "UpperTailScaling has not correct dimension");
+   }
+
+   // Different seed per initialization
+   gRandom->SetSeed(0);
+   rand_ = new TRandom3(0);
+
+}
+
+
+Factorization_SmearedJets::~Factorization_SmearedJets()
+{
+ 
+   // do anything here that needs to be done at desctruction time
+   // (e.g. close files, deallocate resources etc.)
+
+	//R+S Smearing stuff
+   for (std::vector<std::vector<std::vector<TH1F*> > >::iterator it = smearFunc.begin(); it != smearFunc.end(); ++it) {
+      for (std::vector<std::vector<TH1F*> >::iterator jt = it->begin(); jt != it->end(); ++jt) {
+         for (std::vector<TH1F*>::iterator kt = jt->begin(); kt != jt->end(); ++kt) {
+            delete *kt;
+         }
+      }
+   }
+   smearFunc.clear();
+
+   for (std::vector<std::vector<std::vector<TH1F*> > >::iterator it = smearFunc_Core.begin(); it
+         != smearFunc_Core.end(); ++it) {
+      for (std::vector<std::vector<TH1F*> >::iterator jt = it->begin(); jt != it->end(); ++jt) {
+         for (std::vector<TH1F*>::iterator kt = jt->begin(); kt != jt->end(); ++kt) {
+            delete *kt;
+         }
+      }
+   }
+   smearFunc_Core.clear();
+
+   for (std::vector<std::vector<std::vector<TH1F*> > >::iterator it = smearFunc_LowerTail.begin(); it
+         != smearFunc_LowerTail.end(); ++it) {
+      for (std::vector<std::vector<TH1F*> >::iterator jt = it->begin(); jt != it->end(); ++jt) {
+         for (std::vector<TH1F*>::iterator kt = jt->begin(); kt != jt->end(); ++kt) {
+            delete *kt;
+         }
+      }
+   }
+   smearFunc_LowerTail.clear();
+
+   for (std::vector<std::vector<std::vector<TH1F*> > >::iterator it = smearFunc_UpperTail.begin(); it
+         != smearFunc_UpperTail.end(); ++it) {
+      for (std::vector<std::vector<TH1F*> >::iterator jt = it->begin(); jt != it->end(); ++jt) {
+         for (std::vector<TH1F*>::iterator kt = jt->begin(); kt != jt->end(); ++kt) {
+            delete *kt;
+         }
+      }
+   }
+   smearFunc_UpperTail.clear();
+
+   for (std::vector<std::vector<std::vector<TH1F*> > >::iterator it = smearFunc_scaled.begin(); it
+         != smearFunc_scaled.end(); ++it) {
+      for (std::vector<std::vector<TH1F*> >::iterator jt = it->begin(); jt != it->end(); ++jt) {
+         for (std::vector<TH1F*>::iterator kt = jt->begin(); kt != jt->end(); ++kt) {
+            delete *kt;
+         }
+      }
+   }
+   smearFunc_scaled.clear();
+
+   PtBinEdges_.clear();
+   EtaBinEdges_.clear();
+
+   if (rand_)
+      delete rand_;
+
+}
+
+
+//
+// member functions
+//
+
+// ------------ method called on each new Event  ------------
+bool
+Factorization_SmearedJets::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
+{
+   using namespace edm;
+	++uProcessed;
+	cutsHist.processed->Fill(1);
+	kRunLumiEvent.run  = iEvent.id().run();
+	kRunLumiEvent.lumi = iEvent.id().luminosityBlock(); 
+	kRunLumiEvent.evt  = iEvent.id().event();
+
+//    std::cout << __LINE__<< ":: Processing event: "
+//		 	<<  kRunLumiEvent.run << ":" << kRunLumiEvent.lumi 
+//			<< ":" << kRunLumiEvent.evt << std::endl;
+//			return 0;
+
+	smearedHT   = 0;
+	smearedMHT  = 0;
+	smearedMEFF = 0 ;
+	smearedMHTVEC.SetPxPyPzE(0,0,0,0);
+
+    if (iVerbose) std::cout << __LINE__<< ":: Processing event: "
+		 	<<  kRunLumiEvent.run << ":" << kRunLumiEvent.lumi 
+			<< ":" << kRunLumiEvent.evt << std::endl;
+
+
+	Weight = 1;
+
+	/* PU S3 reweighting for QCD MC sample
+	*/
+	double lumiWeight = 1;
+	if ( doLumiWeighing )
+	{
+		lumiWeight = LumiWeights_.weight( iEvent );
+		//std::cout << "lum wgt = " << lumiWeight << std::endl;
+		sumLumiWeights += lumiWeight;
+		Weight *= lumiWeight;
+	}
+
+	//event weights for flat QCD samples
+	double storedWeight = 1;
+	if ( doEventWeighing )
+	{
+		edm::Handle<GenEventInfoProduct> genEvtInfoHandle;
+		iEvent.getByLabel("generator", genEvtInfoHandle);
+		storedWeight = genEvtInfoHandle->weight();
+		//std::cout << "storedWeight = " << storedWeight << std::endl;
+		Weight *= storedWeight;
+	}
+
+	/* 
+	 * prescaled trigger weights
+	 */
+	double prescaleWeight = 1;
+	if ( iEvent.isRealData() && usePrescaleWeight)
+	{
+		//iEvent.getByLabel("prescaleweightProducer:weight", prescaleWeightHandle);
+		iEvent.getByLabel(prescaleWeightInputTag, prescaleWeightHandle);
+	   //iEvent.getByLabel("prescaleweightProducer", prescaleWeightHandle);
+      //std::cout << "prescaleWeight = " << (*prescaleWeightHandle) << std::endl;
+		if ( ! prescaleWeightHandle.isValid()) 
+		{ 
+			std::cout << "prescaleWeightHandle found!" << std::endl;	
+			assert (false);
+		}
+		prescaleWeight = (*prescaleWeightHandle);
+		hist_prescaleWeights->Fill(prescaleWeight);
+		Weight *= prescaleWeight;
+		//std::cout << "Weight = " << Weight << std::endl;
+	}
+
+	hist_eventWeights->Fill(Weight);
+	//std::cout << "Weight = " << Weight << std::endl;
+
+	/*  Get all the handles needed and check their
+	 *  validity.
+	 */
+
+	const bool bUseRSMod = true;
+	if (bUseRSMod)
+	{
+		iEvent.getByLabel(smearedGenJetInputTag_, smearedJetsHandle);
+		//iEvent.getByLabel("QCDfromSmearing:smearedJets", smearedJetsHandle);
+		//std::cout << __FILE__ << ":" << __FUNCTION__ << ":: smearedGenJetInputTag_ = " << smearedGenJetInputTag_ << std::endl;
+		smearedNJetEt50Eta25 = 0;
+		smearedHT = 0;
+		smearedMHT = 0;
+		smearedMEFF = 0;
+		smearedMHTVEC.SetPxPyPzE(0,0,0,0);
+
+		if (! smearedJetsHandle.isValid()) 
+		{
+			std::cout << __FUNCTION__ << ":" << __LINE__ << ":smearedJetsHandle handle not found!" << std::endl;
+			assert(false);
+		} else {
+			CalcSmearedHTMHT(smearedJetsHandle, smearedNJetEt50Eta25,
+					smearedHT, smearedMHT, smearedMEFF, smearedMHTVEC);
+		}
+	} else 
+	{ //this is to do the smearing mutiple times per event
+	  // all i need to do is use rebalance jets and do mutiple
+	  // experiments per event
+
+		
+		GenerateJets(iEvent, iSetup);
+		return 0;
+		iEvent.getByLabel(smearedGenJetInputTag_, smearedJetsHandle);
+		smearedNJetEt50Eta25 = 0;
+		smearedHT = 0;
+		smearedMHT = 0;
+		smearedMEFF = 0;
+		smearedMHTVEC.SetPxPyPzE(0,0,0,0);
+		CalcSmearedHTMHT(smearedJetsHandle, smearedNJetEt50Eta25,
+				smearedHT, smearedMHT, smearedMEFF, smearedMHTVEC);
+	}
+
+	//APPLY RA2 cuts
+	//std::cout << "smeared jet size = " << smearedJetsHandle->size() << std::endl;
+	// need to count number of jets after smearing. Ideally, I want to remove RA2 preselection and use a
+								  // skim without njet selection so the jets flutuating upward can be included. For now I do not have 
+								  // skim as I am using Seema's dataset.
+	
+	if ( smearedNJetEt50Eta25 < 3 ) return 0;
+	cutsHist.njet->Fill(1);
+	if ( smearedHT < dMinHT) { ++uFailMinHTCut; return 0; }
+	cutsHist.ht->Fill(1);
+	if ( smearedMHT < dMinMHT ) {++uFailMinPFMHTCut; return 0; }
+	cutsHist.mht->Fill(1);
+
+	evtHist.njet->Fill(smearedNJetEt50Eta25, Weight);
+	evtHist.mht->Fill(smearedMHT, Weight);
+	evtHist.ht->Fill(smearedHT, Weight);
+	evtHist.meff->Fill(smearedMEFF, Weight);
+
+	DoDelMinStudy(smearedJetsHandle,	smearedMHTVEC);
+
+	++uPassed;
+   return true;
+}
+
+// ------------ method called once each job just before starting event loop  ------------
+void 
+Factorization_SmearedJets::beginJob()
+{
+	//2011 Pileup Scenarios https://twiki.cern.ch/twiki/bin/viewauth/CMS/PileupInformation#2011_Pileup_Scenarios
+	//"Flat to 10 plus tail" scenario shown above, the relative normalization of each bin is: 
+	vMCNvtxDist.push_back(0.069286816); //1
+	vMCNvtxDist.push_back(0.069286816); //2
+	vMCNvtxDist.push_back(0.069286816); //3
+	vMCNvtxDist.push_back(0.069286816); //4
+	vMCNvtxDist.push_back(0.069286816); //5
+	vMCNvtxDist.push_back(0.069286816); //6
+	vMCNvtxDist.push_back(0.069286816); //7
+	vMCNvtxDist.push_back(0.069286816); //8
+	vMCNvtxDist.push_back(0.069286816); //9
+	vMCNvtxDist.push_back(0.069286816); //10
+	vMCNvtxDist.push_back(0.069286816); //11
+	vMCNvtxDist.push_back(0.06518604 ); //12
+	vMCNvtxDist.push_back(0.053861878); //13
+	vMCNvtxDist.push_back(0.040782032); //14
+	vMCNvtxDist.push_back(0.030135062); //15
+	vMCNvtxDist.push_back(0.019550796); //16
+	vMCNvtxDist.push_back(0.012264707); //17
+	vMCNvtxDist.push_back(0.007449117); //18
+	vMCNvtxDist.push_back(0.004502075); //19
+	vMCNvtxDist.push_back(0.002194605); //20
+	vMCNvtxDist.push_back(0.001166276); //21
+	vMCNvtxDist.push_back(0.000476543); //22
+	vMCNvtxDist.push_back(0.000188109); //23
+	vMCNvtxDist.push_back(7.52436E-05); //24
+	vMCNvtxDist.push_back(1.25406E-05); //25
+
+	//DATA Nvtx distribution from Pileup_2011_EPS_8_jul.root
+	vDATANvtxDist.push_back(1.45417e+07); //1
+	vDATANvtxDist.push_back(3.47743e+07); //2
+	vDATANvtxDist.push_back(7.89247e+07); //3
+	vDATANvtxDist.push_back(1.26467e+08); //4
+	vDATANvtxDist.push_back(1.59329e+08); //5
+	vDATANvtxDist.push_back(1.67603e+08); //6
+	vDATANvtxDist.push_back(1.52684e+08); //7
+	vDATANvtxDist.push_back(1.23794e+08); //8
+	vDATANvtxDist.push_back(9.09462e+07); //9
+	vDATANvtxDist.push_back(6.13973e+07); //10
+	vDATANvtxDist.push_back(3.8505e+07); //11
+	vDATANvtxDist.push_back(2.2628e+07); //12
+	vDATANvtxDist.push_back(1.25503e+07); //13
+	vDATANvtxDist.push_back(6.61051e+06); //14
+	vDATANvtxDist.push_back(3.32403e+06); //15
+	vDATANvtxDist.push_back(1.60286e+06); //16
+	vDATANvtxDist.push_back(743920); //17
+	vDATANvtxDist.push_back(333477); //18
+	vDATANvtxDist.push_back(144861); //19
+	vDATANvtxDist.push_back(61112.7); //20
+	vDATANvtxDist.push_back(25110.2); //21
+	vDATANvtxDist.push_back(10065.1); //22
+	vDATANvtxDist.push_back(3943.98); //23
+	vDATANvtxDist.push_back(1513.54); //24
+	vDATANvtxDist.push_back(896.161); //25
+
+	LumiWeights_ = edm::LumiReWeighting(vMCNvtxDist, vDATANvtxDist);
+
 
 	//generate hists
 	edm::Service<TFileService> fs;
-
 
 	cutsHist.processed  = fs->make<TH1F> ("evts_processed" ,"Number of events pass the processed cut", 5, 0, 5);
 	cutsHist.njet  = fs->make<TH1F> ("evtsPassedNjetCut" ,"Number of events pass the njet cut", 5, 0, 5);
@@ -426,205 +930,473 @@ Factorization_SmearedJets::Factorization_SmearedJets(const edm::ParameterSet& iC
 	hist_prescaleWeights->Sumw2();
 	hist_eventWeights    = fs->make<TH1F> ("totalEventWeights","Total Event Weights",2000,0,2000);
 	hist_eventWeights->Sumw2();
-
-}
-
-
-Factorization_SmearedJets::~Factorization_SmearedJets()
-{
- 
-   // do anything here that needs to be done at desctruction time
-   // (e.g. close files, deallocate resources etc.)
-
-}
-
-
-//
-// member functions
-//
-
-// ------------ method called on each new Event  ------------
-bool
-Factorization_SmearedJets::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
-{
-   using namespace edm;
-	++uProcessed;
-	cutsHist.processed->Fill(1);
-	kRunLumiEvent.run  = iEvent.id().run();
-	kRunLumiEvent.lumi = iEvent.id().luminosityBlock(); 
-	kRunLumiEvent.evt  = iEvent.id().event();
-
-//    std::cout << __LINE__<< ":: Processing event: "
-//		 	<<  kRunLumiEvent.run << ":" << kRunLumiEvent.lumi 
-//			<< ":" << kRunLumiEvent.evt << std::endl;
-//			return 0;
-
-	smearedHT   = 0;
-	smearedMHT  = 0;
-	smearedMEFF = 0 ;
-	smearedMHTVEC.SetPxPyPzE(0,0,0,0);
-
-    if (iVerbose) std::cout << __LINE__<< ":: Processing event: "
-		 	<<  kRunLumiEvent.run << ":" << kRunLumiEvent.lumi 
-			<< ":" << kRunLumiEvent.evt << std::endl;
-
-
-	Weight = 1;
-
-	/* PU S3 reweighting for QCD MC sample
-	*/
-	double lumiWeight = 1;
-	if ( doLumiWeighing )
-	{
-		lumiWeight = LumiWeights_.weight( iEvent );
-		//std::cout << "lum wgt = " << lumiWeight << std::endl;
-		sumLumiWeights += lumiWeight;
-		Weight *= lumiWeight;
-	}
-
-	//event weights for flat QCD samples
-	double storedWeight = 1;
-	if ( doEventWeighing )
-	{
-		edm::Handle<GenEventInfoProduct> genEvtInfoHandle;
-		iEvent.getByLabel("generator", genEvtInfoHandle);
-		storedWeight = genEvtInfoHandle->weight();
-		//std::cout << "storedWeight = " << storedWeight << std::endl;
-		Weight *= storedWeight;
-	}
-
-	/* 
-	 * prescaled trigger weights
-	 */
-	double prescaleWeight = 1;
-	if ( iEvent.isRealData() && usePrescaleWeight)
-	{
-		//iEvent.getByLabel("prescaleweightProducer:weight", prescaleWeightHandle);
-		iEvent.getByLabel(prescaleWeightInputTag, prescaleWeightHandle);
-	   //iEvent.getByLabel("prescaleweightProducer", prescaleWeightHandle);
-      //std::cout << "prescaleWeight = " << (*prescaleWeightHandle) << std::endl;
-		if ( ! prescaleWeightHandle.isValid()) 
-		{ 
-			std::cout << "prescaleWeightHandle found!" << std::endl;	
-			assert (false);
-		}
-		prescaleWeight = (*prescaleWeightHandle);
-		hist_prescaleWeights->Fill(prescaleWeight);
-		Weight *= prescaleWeight;
-		//std::cout << "Weight = " << Weight << std::endl;
-	}
-
-	hist_eventWeights->Fill(Weight);
-	//std::cout << "Weight = " << Weight << std::endl;
-
-
-	/*  Get all the handles needed and check their
-	 *  validity.
-	 */
-
-	iEvent.getByLabel(smearedGenJetInputTag_, smearedJetsHandle);
-	//iEvent.getByLabel("QCDfromSmearing:smearedJets", smearedJetsHandle);
-	//std::cout << __FILE__ << ":" << __FUNCTION__ << ":: smearedGenJetInputTag_ = " << smearedGenJetInputTag_ << std::endl;
-	smearedNJetEt50Eta25 = 0;
-	smearedHT = 0;
-	smearedMHT = 0;
-	smearedMEFF = 0;
-	smearedMHTVEC.SetPxPyPzE(0,0,0,0);
-
-	if (! smearedJetsHandle.isValid()) 
-	{
-		std::cout << __FUNCTION__ << ":" << __LINE__ << ":smearedJetsHandle handle not found!" << std::endl;
-		assert(false);
-	} else {
-		CalcSmearedHTMHT(smearedJetsHandle, smearedNJetEt50Eta25,
-						smearedHT, smearedMHT, smearedMEFF, smearedMHTVEC);
-	}
-
-
-	//APPLY RA2 cuts
-	//std::cout << "smeared jet size = " << smearedJetsHandle->size() << std::endl;
-	// need to count number of jets after smearing. Ideally, I want to remove RA2 preselection and use a
-								  // skim without njet selection so the jets flutuating upward can be included. For now I do not have 
-								  // skim as I am using Seema's dataset.
 	
-	if ( smearedNJetEt50Eta25 < 3 ) return 0;
-	cutsHist.njet->Fill(1);
-	if ( smearedHT < dMinHT) { ++uFailMinHTCut; return 0; }
-	cutsHist.ht->Fill(1);
-	if ( smearedMHT < dMinMHT ) {++uFailMinPFMHTCut; return 0; }
-	cutsHist.mht->Fill(1);
+	/******************************
+	* R+S PLOTS
+	******************************/
 
-	evtHist.njet->Fill(smearedNJetEt50Eta25, Weight);
-	evtHist.mht->Fill(smearedMHT, Weight);
-	evtHist.ht->Fill(smearedHT, Weight);
-	evtHist.meff->Fill(smearedMEFF, Weight);
+   if (controlPlots_) {
+      h_RecJetRes_Pt = fs->make<TH2F> ("RecJetRes_Pt", "RecJetRes_Pt", 100, 0., 1000., 100, 0., 3.);
+      h_RecJetRes_Pt->Sumw2();
+      h_RecJetRes_Eta = fs->make<TH2F> ("RecJetRes_Eta", "RecJetRes_Eta", 100, -5., 5., 100, 0., 3.);
+      h_RecJetRes_Eta->Sumw2();
+      h_RebJetRes_Pt = fs->make<TH2F> ("RebJetRes_Pt", "RebJetRes_Pt", 100, 0., 1000., 100, 0., 3.);
+      h_RebJetRes_Pt->Sumw2();
+      h_RebJetRes_Eta = fs->make<TH2F> ("RebJetRes_Eta", "RebJetRes_Eta", 100, -5., 5., 100, 0., 3.);
+      h_RebJetRes_Eta->Sumw2();
+      h_SmearedJetRes_Pt = fs->make<TH2F> ("SmearedJetRes_Pt", "SmearedJetRes_Pt", 100, 0., 1000., 100, 0., 3.);
+      h_SmearedJetRes_Pt->Sumw2();
+      h_SmearedJetRes_Eta = fs->make<TH2F> ("SmearedJetRes_Eta", "SmearedJetRes_Eta", 100, -5., 5., 100, 0., 3.);
+      h_SmearedJetRes_Eta->Sumw2();
+      h_HTall_gen = fs->make<TH1F> ("HTall_gen", "HTall_gen", NbinsHT_, HTmin_, HTmax_);
+      h_HTall_gen->Sumw2();
+      h_HTall_rec = fs->make<TH1F> ("HTall_rec", "HTall_rec", NbinsHT_, HTmin_, HTmax_);
+      h_HTall_rec->Sumw2();
+      h_HTall_smeared = fs->make<TH1F> ("HTall_smeared", "HTall_smeared", NbinsHT_, HTmin_, HTmax_);
+      h_HTall_smeared->Sumw2();
+      h_HTall_reb = fs->make<TH1F> ("HTall_reb", "HTall_reb", NbinsHT_, HTmin_, HTmax_);
+      h_HTall_reb->Sumw2();
+      h_HThigh_gen = fs->make<TH1F> ("HThigh_gen", "HThigh_gen", NbinsHT_, HTmin_, HTmax_);
+      h_HThigh_gen->Sumw2();
+      h_HThigh_rec = fs->make<TH1F> ("HThigh_rec", "HThigh_rec", NbinsHT_, HTmin_, HTmax_);
+      h_HThigh_rec->Sumw2();
+      h_HThigh_smeared = fs->make<TH1F> ("HThigh_smeared", "HThigh_smeared", NbinsHT_, HTmin_, HTmax_);
+      h_HThigh_smeared->Sumw2();
+      h_HThigh_reb = fs->make<TH1F> ("HThigh_reb", "HThigh_reb", NbinsHT_, HTmin_, HTmax_);
+      h_HThigh_reb->Sumw2();
+      h_MHTall_gen = fs->make<TH1F> ("MHTall_gen", "MHTall_gen", NbinsMHT_, MHTmin_, MHTmax_);
+      h_MHTall_gen->Sumw2();
+      h_MHTall_rec = fs->make<TH1F> ("MHTall_rec", "MHTall_rec", NbinsMHT_, MHTmin_, MHTmax_);
+      h_MHTall_rec->Sumw2();
+      h_MHTall_smeared = fs->make<TH1F> ("MHTall_smeared", "MHTall_smeared", NbinsMHT_, MHTmin_, MHTmax_);
+      h_MHTall_smeared->Sumw2();
+      h_MHTall_reb = fs->make<TH1F> ("MHTall_reb", "MHTall_reb", NbinsMHT_, MHTmin_, MHTmax_);
+      h_MHTall_reb->Sumw2();
+      h_MHThigh_gen = fs->make<TH1F> ("MHThigh_gen", "MHThigh_gen", NbinsMHT_, MHTmin_, MHTmax_);
+      h_MHThigh_gen->Sumw2();
+      h_MHThigh_rec = fs->make<TH1F> ("MHThigh_rec", "MHThigh_rec", NbinsMHT_, MHTmin_, MHTmax_);
+      h_MHThigh_rec->Sumw2();
+      h_MHThigh_smeared = fs->make<TH1F> ("MHThigh_smeared", "MHThigh_smeared", NbinsMHT_, MHTmin_, MHTmax_);
+      h_MHThigh_smeared->Sumw2();
+      h_MHThigh_reb = fs->make<TH1F> ("MHThigh_reb", "MHThigh_reb", NbinsMHT_, MHTmin_, MHTmax_);
+      h_MHThigh_reb->Sumw2();
+      h_fitProb = fs->make<TH1F> ("h_fitProb", "h_fitProb", 100, 0., 1.);
+      h_fitProb->Sumw2();
+      h_weight = fs->make<TH1F> ("h_weight", "h_weight", 70, -1., 6.);
+      h_weight->Sumw2();
+      h_weightedWeight = fs->make<TH1F> ("h_weightedWeight", "h_weightedWeight", 70, -1., 6.);
+      h_weightedWeight->Sumw2();
+   }
 
-	DoDelMinStudy(smearedJetsHandle,	smearedMHTVEC);
+   //// Bootstrap plots
 
-	++uPassed;
-   return true;
-}
+   //// Preselection
+   h_presel_MHT_prediction = fs->make<TH2F> ("presel_MHT_prediction", "presel_MHT_prediction", NbinsMHT_, MHTmin_,
+         MHTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_presel_MHT_prediction->Sumw2();
+   h_presel_HT_prediction = fs->make<TH2F> ("presel_HT_prediction", "presel_HT_prediction", NbinsHT_, HTmin_, HTmax_,
+         Ntries_, 0.5, Ntries_ + 0.5);
+   h_presel_HT_prediction->Sumw2();
+   h_presel_Meff_prediction = fs->make<TH2F> ("presel_Meff_prediction", "presel_Meff_prediction", NbinsHT_, HTmin_,
+         HTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_presel_Meff_prediction->Sumw2();
 
-// ------------ method called once each job just before starting event loop  ------------
-void 
-Factorization_SmearedJets::beginJob()
-{
-	//2011 Pileup Scenarios https://twiki.cern.ch/twiki/bin/viewauth/CMS/PileupInformation#2011_Pileup_Scenarios
-	//"Flat to 10 plus tail" scenario shown above, the relative normalization of each bin is: 
-	vMCNvtxDist.push_back(0.069286816); //1
-	vMCNvtxDist.push_back(0.069286816); //2
-	vMCNvtxDist.push_back(0.069286816); //3
-	vMCNvtxDist.push_back(0.069286816); //4
-	vMCNvtxDist.push_back(0.069286816); //5
-	vMCNvtxDist.push_back(0.069286816); //6
-	vMCNvtxDist.push_back(0.069286816); //7
-	vMCNvtxDist.push_back(0.069286816); //8
-	vMCNvtxDist.push_back(0.069286816); //9
-	vMCNvtxDist.push_back(0.069286816); //10
-	vMCNvtxDist.push_back(0.069286816); //11
-	vMCNvtxDist.push_back(0.06518604 ); //12
-	vMCNvtxDist.push_back(0.053861878); //13
-	vMCNvtxDist.push_back(0.040782032); //14
-	vMCNvtxDist.push_back(0.030135062); //15
-	vMCNvtxDist.push_back(0.019550796); //16
-	vMCNvtxDist.push_back(0.012264707); //17
-	vMCNvtxDist.push_back(0.007449117); //18
-	vMCNvtxDist.push_back(0.004502075); //19
-	vMCNvtxDist.push_back(0.002194605); //20
-	vMCNvtxDist.push_back(0.001166276); //21
-	vMCNvtxDist.push_back(0.000476543); //22
-	vMCNvtxDist.push_back(0.000188109); //23
-	vMCNvtxDist.push_back(7.52436E-05); //24
-	vMCNvtxDist.push_back(1.25406E-05); //25
+   //// Baseline, no DeltaPhi
+   h_baselineNoDeltaPhi_MHT_prediction = fs->make<TH2F> ("baselineNoDeltaPhi_MHT_prediction",
+         "baselineNoDeltaPhi_MHT_prediction", NbinsMHT_, MHTmin_, MHTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_baselineNoDeltaPhi_MHT_prediction->Sumw2();
+   h_baselineNoDeltaPhi_HT_prediction = fs->make<TH2F> ("baselineNoDeltaPhi_HT_prediction",
+         "baselineNoDeltaPhi_HT_prediction", NbinsHT_, HTmin_, HTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_baselineNoDeltaPhi_HT_prediction->Sumw2();
+   h_baselineNoDeltaPhi_Meff_prediction = fs->make<TH2F> ("baselineNoDeltaPhi_Meff_prediction",
+         "baselineNoDeltaPhi_Meff_prediction", NbinsHT_, HTmin_, HTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_baselineNoDeltaPhi_Meff_prediction->Sumw2();
 
-	//DATA Nvtx distribution from Pileup_2011_EPS_8_jul.root
-	vDATANvtxDist.push_back(1.45417e+07); //1
-	vDATANvtxDist.push_back(3.47743e+07); //2
-	vDATANvtxDist.push_back(7.89247e+07); //3
-	vDATANvtxDist.push_back(1.26467e+08); //4
-	vDATANvtxDist.push_back(1.59329e+08); //5
-	vDATANvtxDist.push_back(1.67603e+08); //6
-	vDATANvtxDist.push_back(1.52684e+08); //7
-	vDATANvtxDist.push_back(1.23794e+08); //8
-	vDATANvtxDist.push_back(9.09462e+07); //9
-	vDATANvtxDist.push_back(6.13973e+07); //10
-	vDATANvtxDist.push_back(3.8505e+07); //11
-	vDATANvtxDist.push_back(2.2628e+07); //12
-	vDATANvtxDist.push_back(1.25503e+07); //13
-	vDATANvtxDist.push_back(6.61051e+06); //14
-	vDATANvtxDist.push_back(3.32403e+06); //15
-	vDATANvtxDist.push_back(1.60286e+06); //16
-	vDATANvtxDist.push_back(743920); //17
-	vDATANvtxDist.push_back(333477); //18
-	vDATANvtxDist.push_back(144861); //19
-	vDATANvtxDist.push_back(61112.7); //20
-	vDATANvtxDist.push_back(25110.2); //21
-	vDATANvtxDist.push_back(10065.1); //22
-	vDATANvtxDist.push_back(3943.98); //23
-	vDATANvtxDist.push_back(1513.54); //24
-	vDATANvtxDist.push_back(896.161); //25
+   //// low HT
+   h_lowHT_MHT_prediction = fs->make<TH2F> ("lowHT_MHT_prediction", "lowHT_MHT_prediction", NbinsMHT_, MHTmin_,
+         MHTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_lowHT_MHT_prediction->Sumw2();
+   h_lowHT_Meff_prediction = fs->make<TH2F> ("lowHT_Meff_prediction", "lowHT_Meff_prediction", NbinsHT_, HTmin_,
+         HTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_lowHT_Meff_prediction->Sumw2();
 
-	LumiWeights_ = edm::LumiReWeighting(vMCNvtxDist, vDATANvtxDist);
+   //// low MHT
+   h_lowMHT_HT_prediction = fs->make<TH2F> ("lowMHT_HT_prediction", "lowMHT_HT_prediction", NbinsHT_, HTmin_, HTmax_,
+         Ntries_, 0.5, Ntries_ + 0.5);
+   h_lowMHT_HT_prediction->Sumw2();
+
+   //// medium HT
+   h_mediumHT_MHT_prediction = fs->make<TH2F> ("mediumHT_MHT_prediction", "mediumHT_MHT_prediction", NbinsMHT_,
+         MHTmin_, MHTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_mediumHT_MHT_prediction->Sumw2();
+   h_mediumHT_Meff_prediction = fs->make<TH2F> ("mediumHT_Meff_prediction", "mediumHT_Meff_prediction", NbinsHT_,
+         HTmin_, HTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_mediumHT_Meff_prediction->Sumw2();
+
+   //// medium MHT
+   h_mediumMHT_HT_prediction = fs->make<TH2F> ("mediumMHT_HT_prediction", "mediumMHT_HT_prediction", NbinsHT_, HTmin_,
+         HTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_mediumMHT_HT_prediction->Sumw2();
+
+   //// high HT
+   h_highHT_MHT_prediction = fs->make<TH2F> ("highHT_MHT_prediction", "highHT_MHT_prediction", NbinsMHT_, MHTmin_,
+         MHTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_highHT_MHT_prediction->Sumw2();
+   h_highHT_Meff_prediction = fs->make<TH2F> ("highHT_Meff_prediction", "highHT_Meff_prediction", NbinsHT_, HTmin_,
+         HTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_highHT_Meff_prediction->Sumw2();
+
+   //// high MHT
+   h_highMHT_HT_prediction = fs->make<TH2F> ("highMHT_HT_prediction", "highMHT_HT_prediction", NbinsHT_, HTmin_,
+         HTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_highMHT_HT_prediction->Sumw2();
+
+   //// very high HT
+   h_veryhighHT_MHT_prediction = fs->make<TH2F> ("veryhighHT_MHT_prediction", "veryhighHT_MHT_prediction", NbinsMHT_,
+         MHTmin_, MHTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_veryhighHT_MHT_prediction->Sumw2();
+   h_veryhighHT_Meff_prediction = fs->make<TH2F> ("veryhighHT_Meff_prediction", "veryhighHT_Meff_prediction", NbinsHT_,
+         HTmin_, HTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_veryhighHT_Meff_prediction->Sumw2();
+
+   //// extreme high HT
+   h_extremehighHT_MHT_prediction = fs->make<TH2F> ("extremehighHT_MHT_prediction", "extremehighHT_MHT_prediction",
+         NbinsMHT_, MHTmin_, MHTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_extremehighHT_MHT_prediction->Sumw2();
+   h_extremehighHT_Meff_prediction = fs->make<TH2F> ("extremehighHT_Meff_prediction", "extremehighHT_Meff_prediction",
+         NbinsHT_, HTmin_, HTmax_, Ntries_, 0.5, Ntries_ + 0.5);
+   h_extremehighHT_Meff_prediction->Sumw2();
+
+
+
+	/*************************
+	 *  R+S Plots
+	 ************************/
+   //// load response histos
+
+   //// open root file/tree and create SmearingFunction histo
+   TFile *f1 = new TFile(smearingfile_.c_str(), "READ", "", 0);
+
+   smearFunc.resize(3); //// three bins for jet rank
+   for (std::vector<std::vector<std::vector<TH1F*> > >::iterator it = smearFunc.begin(); it != smearFunc.end(); ++it) {
+      it->resize(EtaBinEdges_.size() - 1);
+      for (std::vector<std::vector<TH1F*> >::iterator jt = it->begin(); jt != it->end(); ++jt) {
+         jt->resize(PtBinEdges_.size() - 1);
+      }
+   }
+
+   smearFunc_Core.resize(3); //// three bins for jet rank
+   for (std::vector<std::vector<std::vector<TH1F*> > >::iterator it = smearFunc_Core.begin(); it
+         != smearFunc_Core.end(); ++it) {
+      it->resize(EtaBinEdges_.size() - 1);
+      for (std::vector<std::vector<TH1F*> >::iterator jt = it->begin(); jt != it->end(); ++jt) {
+         jt->resize(PtBinEdges_.size() - 1);
+      }
+   }
+
+   smearFunc_LowerTail.resize(3); //// three bins for jet rank
+   for (std::vector<std::vector<std::vector<TH1F*> > >::iterator it = smearFunc_LowerTail.begin(); it
+         != smearFunc_LowerTail.end(); ++it) {
+      it->resize(EtaBinEdges_.size() - 1);
+      for (std::vector<std::vector<TH1F*> >::iterator jt = it->begin(); jt != it->end(); ++jt) {
+         jt->resize(PtBinEdges_.size() - 1);
+      }
+   }
+
+   smearFunc_UpperTail.resize(3); //// three bins for jet rank
+   for (std::vector<std::vector<std::vector<TH1F*> > >::iterator it = smearFunc_UpperTail.begin(); it
+         != smearFunc_UpperTail.end(); ++it) {
+      it->resize(EtaBinEdges_.size() - 1);
+      for (std::vector<std::vector<TH1F*> >::iterator jt = it->begin(); jt != it->end(); ++jt) {
+         jt->resize(PtBinEdges_.size() - 1);
+      }
+   }
+
+   smearFunc_scaled.resize(3); //// three bins for jet rank
+   for (std::vector<std::vector<std::vector<TH1F*> > >::iterator it = smearFunc_scaled.begin(); it
+         != smearFunc_scaled.end(); ++it) {
+      it->resize(EtaBinEdges_.size() - 1);
+      for (std::vector<std::vector<TH1F*> >::iterator jt = it->begin(); jt != it->end(); ++jt) {
+         jt->resize(PtBinEdges_.size() - 1);
+      }
+   }
+
+   SigmaPtHist_scaled.resize(3);
+   for (int i_jet = 0; i_jet < 3; ++i_jet) {
+      SigmaPtHist_scaled.at(i_jet).resize(EtaBinEdges_.size() - 1);
+      for (unsigned int i_eta = 0; i_eta < EtaBinEdges_.size() - 1; ++i_eta) {
+         char hname[100];
+         sprintf(hname, "SigmaPtHist_scaled_Eta%i_Jet%i", i_eta, i_jet + 1);
+         SigmaPtHist_scaled.at(i_jet).at(i_eta) = fs->make<TH1F> (hname, hname, PtBinEdges_.size() - 1,
+               &(PtBinEdges_.at(0)));
+         SigmaPtHist_scaled.at(i_jet).at(i_eta)->Sumw2();
+      }
+   }
+
+   SigmaPtHist.resize(3);
+   for (int i_jet = 0; i_jet < 3; ++i_jet) {
+      SigmaPtHist.at(i_jet).resize(EtaBinEdges_.size() - 1);
+      for (unsigned int i_eta = 0; i_eta < EtaBinEdges_.size() - 1; ++i_eta) {
+         char hname[100];
+         sprintf(hname, "SigmaPtHist_Eta%i_Jet%i", i_eta, i_jet + 1);
+         SigmaPtHist.at(i_jet).at(i_eta) = fs->make<TH1F> (hname, hname, PtBinEdges_.size() - 1, &(PtBinEdges_.at(0)));
+         SigmaPtHist.at(i_jet).at(i_eta)->Sumw2();
+      }
+   }
+
+   SigmaPt_scaled.resize(3);
+   for (unsigned int i_jet = 0; i_jet < 3; ++i_jet) {
+      SigmaPt_scaled.at(i_jet).resize(EtaBinEdges_.size() - 1);
+   }
+
+   SigmaPt.resize(3);
+   for (unsigned int i_jet = 0; i_jet < 3; ++i_jet) {
+      SigmaPt.at(i_jet).resize(EtaBinEdges_.size() - 1);
+   }
+
+   //// Fetch histos and fit gaussian core
+   for (unsigned int i_Pt = 0; i_Pt < PtBinEdges_.size() - 1; ++i_Pt) {
+      for (unsigned int i_eta = 0; i_eta < EtaBinEdges_.size() - 1; ++i_eta) {
+         //// Get the histos
+         char hname[100];
+         sprintf(hname, "%s_Pt%i_Eta%i", inputhist1_.c_str(), i_Pt, i_eta);
+         smearFunc.at(0).at(i_eta).at(i_Pt) = (TH1F*) f1->FindObjectAny(hname);
+         sprintf(hname, "%s_Pt%i_Eta%i", inputhist2_.c_str(), i_Pt, i_eta);
+         smearFunc.at(1).at(i_eta).at(i_Pt) = (TH1F*) f1->FindObjectAny(hname);
+         sprintf(hname, "%s_Pt%i_Eta%i", inputhist3p_.c_str(), i_Pt, i_eta);
+         smearFunc.at(2).at(i_eta).at(i_Pt) = (TH1F*) f1->FindObjectAny(hname);
+         for (unsigned int i_jet = 0; i_jet < 3; ++i_jet) {
+            smearFunc.at(i_jet).at(i_eta).at(i_Pt)->Rebin(NRebin_);
+            if (probExtreme_ > 0) {
+               double p = probExtreme_ * smearFunc.at(i_jet).at(i_eta).at(i_Pt)->Integral();
+               smearFunc.at(i_jet).at(i_eta).at(i_Pt)->SetBinContent(1, p);
+            }
+            //// Get width of gaussian core
+            if (smearFunc.at(i_jet).at(i_eta).at(i_Pt)->GetEntries() > 50) {
+               double RMS = smearFunc.at(i_jet).at(i_eta).at(i_Pt)->GetRMS();
+               double MEAN = smearFunc.at(i_jet).at(i_eta).at(i_Pt)->GetMean();
+               TF1* fitfunction = new TF1("f", "gaus(0)", MEAN - 1 * RMS, MEAN + 1 * RMS);
+               fitfunction->SetParameters(smearFunc.at(i_jet).at(i_eta).at(i_Pt)->GetMaximum(), MEAN, RMS);
+               smearFunc.at(i_jet).at(i_eta).at(i_Pt)->Fit(fitfunction, "LLRQN");
+               double Pt = SigmaPtHist_scaled.at(i_jet).at(i_eta)->GetBinCenter(i_Pt);
+               double eta = (EtaBinEdges_.at(i_eta) + EtaBinEdges_.at(i_eta + 1)) / 2;
+               double f = GetAdditionalSmearing(Pt, eta);
+               SigmaPtHist.at(i_jet).at(i_eta)->SetBinContent(i_Pt + 1, std::abs(fitfunction->GetParameter(2)));
+               SigmaPtHist.at(i_jet).at(i_eta)->SetBinError(i_Pt + 1, fitfunction->GetParError(2));
+               SigmaPtHist_scaled.at(i_jet).at(i_eta)->SetBinContent(i_Pt + 1, std::abs(fitfunction->GetParameter(2))
+                     * f);
+               SigmaPtHist_scaled.at(i_jet).at(i_eta)->SetBinError(i_Pt + 1, fitfunction->GetParError(2) * f);
+
+               //// Split smearFunc in Core and Tail
+               TH1F* hResponseFit = new TH1F(*smearFunc.at(i_jet).at(i_eta).at(i_Pt));
+               hResponseFit->Reset();
+               for (int i = 0; i < hResponseFit->GetNbinsX(); ++i) {
+                  hResponseFit->SetBinContent(i, fitfunction->Eval(hResponseFit->GetBinCenter(i)));
+               }
+
+               //// Split lower tail
+               smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt) = new TH1F(*smearFunc.at(i_jet).at(i_eta).at(i_Pt));
+               smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt)->Add(hResponseFit, -1.);
+               for (int i = 0; i <= smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt)->GetNbinsX(); ++i) {
+                  double tmp_v = smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt)->GetBinContent(i);
+                  double tmp_e = smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt)->GetBinError(i);
+                  //// by definition a tail has positive entries
+                  if (tmp_v < 0) {
+                     tmp_v = 0;
+                     tmp_e = 0;
+                  } else {
+                     //// suppress everything except for low response tail
+                     double scale = 1;
+                     double x = smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt)->GetBinCenter(i);
+                     if (x > MEAN - 1 * RMS)
+                        scale = 0.;
+                     tmp_v = scale * smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt)->GetBinContent(i);
+                     tmp_e = scale * smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt)->GetBinError(i);
+                  }
+                  smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt)->SetBinContent(i, tmp_v);
+                  smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt)->SetBinError(i, tmp_e);
+               }
+
+               //// Split upper tail
+               smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt) = new TH1F(*smearFunc.at(i_jet).at(i_eta).at(i_Pt));
+               smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt)->Add(hResponseFit, -1.);
+               for (int i = 0; i <= smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt)->GetNbinsX(); ++i) {
+                  double tmp_v = smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt)->GetBinContent(i);
+                  double tmp_e = smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt)->GetBinError(i);
+                  //// by definition a tail has positive entries
+                  if (tmp_v < 0) {
+                     tmp_v = 0;
+                     tmp_e = 0;
+                  } else {
+                     //// suppress everything except for low response tail
+                     double scale = 1;
+                     double x = smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt)->GetBinCenter(i);
+                     if (x < MEAN + 1 * RMS)
+                        scale = 0.;
+                     tmp_v = scale * smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt)->GetBinContent(i);
+                     tmp_e = scale * smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt)->GetBinError(i);
+                  }
+                  smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt)->SetBinContent(i, tmp_v);
+                  smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt)->SetBinError(i, tmp_e);
+               }
+
+               smearFunc_Core.at(i_jet).at(i_eta).at(i_Pt) = new TH1F(*smearFunc.at(i_jet).at(i_eta).at(i_Pt));
+               smearFunc_Core.at(i_jet).at(i_eta).at(i_Pt)->Add(smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt), -1.);
+               smearFunc_Core.at(i_jet).at(i_eta).at(i_Pt)->Add(smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt), -1.);
+
+            } else {
+               //// Set core and tail if needed
+               smearFunc_Core.at(i_jet).at(i_eta).at(i_Pt) = new TH1F(*smearFunc.at(i_jet).at(i_eta).at(i_Pt));
+               smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt) = new TH1F(*smearFunc.at(i_jet).at(i_eta).at(i_Pt));
+               smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt)->Reset();
+               smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt) = new TH1F(*smearFunc.at(i_jet).at(i_eta).at(i_Pt));
+               smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt)->Reset();
+            }
+         }
+      }
+   }
+
+   //// Fit scaled gaussian sigma as function of pt
+   for (unsigned int i_jet = 0; i_jet < 3; ++i_jet) {
+      for (unsigned int i_eta = 0; i_eta < EtaBinEdges_.size() - 1; ++i_eta) {
+         char fname[100];
+         sprintf(fname, "SigmaPtScaled_Eta%i_Jet%i", i_eta, i_jet + 1);
+         bool first = false;
+         int FirstBin = 1;
+         int LastBin = SigmaPtHist_scaled.at(i_jet).at(i_eta)->GetNbinsX();
+         for (int j = 1; j <= SigmaPtHist_scaled.at(i_jet).at(i_eta)->GetNbinsX(); ++j) {
+            if (!first && SigmaPtHist_scaled.at(i_jet).at(i_eta)->GetBinContent(j) > 0) {
+               first = true;
+               FirstBin = j;
+            }
+            if (first && SigmaPtHist_scaled.at(i_jet).at(i_eta)->GetBinContent(j) < 0.001) {
+               LastBin = j - 1;
+               break;
+            }
+         }
+         SigmaPt_scaled.at(i_jet).at(i_eta) = new TF1(fname,
+               "TMath::Sqrt(sign([0])*pow([0]/x,2)+pow([1],2)*pow(x,[2]-1.)+pow([3],2))",
+               SigmaPtHist_scaled.at(i_jet).at(i_eta)->GetBinCenter(FirstBin),
+               SigmaPtHist_scaled.at(i_jet).at(i_eta)->GetBinCenter(LastBin));
+         SigmaPt_scaled.at(i_jet).at(i_eta)->SetParameters(1.2, 0., 0.03);
+         SigmaPtHist_scaled.at(i_jet).at(i_eta)->Fit(SigmaPt_scaled.at(i_jet).at(i_eta), "LLRQ");
+      }
+   }
+
+   //// Fit gaussian sigma as function of pt
+   for (unsigned int i_jet = 0; i_jet < 3; ++i_jet) {
+      for (unsigned int i_eta = 0; i_eta < EtaBinEdges_.size() - 1; ++i_eta) {
+         char fname[100];
+         sprintf(fname, "SigmaPt_Eta%i_Jet%i", i_eta, i_jet + 1);
+         bool first = false;
+         int FirstBin = 1;
+         int LastBin = SigmaPtHist.at(i_jet).at(i_eta)->GetNbinsX();
+         for (int j = 1; j <= SigmaPtHist.at(i_jet).at(i_eta)->GetNbinsX(); ++j) {
+            if (!first && SigmaPtHist.at(i_jet).at(i_eta)->GetBinContent(j) > 0) {
+               first = true;
+               FirstBin = j;
+            }
+            if (first && SigmaPtHist.at(i_jet).at(i_eta)->GetBinContent(j) < 0.001) {
+               LastBin = j - 1;
+               break;
+            }
+         }
+         SigmaPt.at(i_jet).at(i_eta) = new TF1(fname,
+               "TMath::Sqrt(sign([0])*pow([0]/x,2)+pow([1],2)*pow(x,[2]-1.)+pow([3],2))", SigmaPtHist.at(i_jet).at(
+                     i_eta)->GetBinCenter(FirstBin), SigmaPtHist.at(i_jet).at(i_eta)->GetBinCenter(LastBin));
+         SigmaPt.at(i_jet).at(i_eta)->SetParameters(1.2, 0., 0.03);
+         SigmaPtHist.at(i_jet).at(i_eta)->Fit(SigmaPt.at(i_jet).at(i_eta), "LLRQ");
+      }
+   }
+
+   //// Book and fill histograms for smeared and scaled response functions
+   for (unsigned int i_jet = 0; i_jet < 3; ++i_jet) {
+      for (unsigned int i_Pt = 0; i_Pt < PtBinEdges_.size() - 1; ++i_Pt) {
+         for (unsigned int i_eta = 0; i_eta < EtaBinEdges_.size() - 1; ++i_eta) {
+            char hname[100];
+            sprintf(hname, "SmearedAndScaledResolution_Pt%i_Eta%i_Jet%i", i_Pt, i_eta, i_jet + 1);
+            smearFunc_scaled.at(i_jet).at(i_eta).at(i_Pt) = fs->make<TH1F> (hname, hname,
+                  smearFunc.at(i_jet).at(i_eta).at(i_Pt)->GetNbinsX(),
+                  smearFunc.at(i_jet).at(i_eta).at(i_Pt)->GetXaxis()->GetXmin(),
+                  smearFunc.at(i_jet).at(i_eta).at(i_Pt)->GetXaxis()->GetXmax());
+
+            if (smearFunc.at(i_jet).at(i_eta).at(i_Pt)->GetEntries() > 50) {
+               //// fold core and tail with additional gaussian
+               TH1F smearFunc_Core_tmp(*smearFunc_Core.at(i_jet).at(i_eta).at(i_Pt));
+               TH1F smearFunc_LowerTail_tmp(*smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt));
+               TH1F smearFunc_UpperTail_tmp(*smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt));
+               double AddSmear = GetAdditionalSmearing(PtBinEdges_.at(i_Pt), EtaBinEdges_.at(i_eta));
+               if (AddSmear > 1) {
+                  //// additional sigma from (1+x)*sigma = sqrt(sigma^2+add_sigma^2)
+                  //// or from sigma' = sqrt((sigma'/(1+x))^2+add_sigma^2)
+                  double sigma = SigmaPtHist_scaled.at(i_jet).at(i_eta)->GetBinContent(i_Pt + 1);
+                  //// if no sigma was fitted use the extrapolation
+                  if (sigma == 0)
+                     sigma = SigmaPt_scaled.at(i_jet).at(i_eta)->Eval(
+                           SigmaPtHist_scaled.at(i_jet).at(i_eta)->GetBinCenter(i_Pt + 1));
+                  double AdditionalSigma = TMath::Sqrt(1 - 1 / pow(AddSmear, 2)) * sigma;
+                  smearFunc_Core_tmp.Reset();
+                  smearFunc_LowerTail_tmp.Reset();
+                  smearFunc_UpperTail_tmp.Reset();
+                  FoldWithGaussian(*smearFunc_Core.at(i_jet).at(i_eta).at(i_Pt), smearFunc_Core_tmp, AdditionalSigma);
+                  FoldWithGaussian(*smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt), smearFunc_LowerTail_tmp,
+                        AdditionalSigma);
+                  FoldWithGaussian(*smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt), smearFunc_UpperTail_tmp,
+                        AdditionalSigma);
+               } else if (AddSmear < 1) {
+                  smearFunc_Core_tmp.Reset();
+                  StretchHisto(*smearFunc_Core.at(i_jet).at(i_eta).at(i_Pt), smearFunc_Core_tmp, AddSmear);
+               }
+
+               //// Scale tails
+               double LowerTailScale = GetLowerTailScaling(PtBinEdges_.at(i_Pt), EtaBinEdges_.at(i_eta));
+               double UpperTailScale = GetUpperTailScaling(PtBinEdges_.at(i_Pt), EtaBinEdges_.at(i_eta));
+               //cout << "absolute scaling factor: " << TailScale << endl;
+               if (absoluteTailScaling_) {
+                  double RMS = smearFunc.at(i_jet).at(i_eta).at(i_Pt)->GetRMS();
+                  //cout << "Integral from " << 1-A1RMS_*RMS << " to " << 1-A0RMS_*RMS << endl;
+
+                  //// get integral of tails
+                  int i_min = smearFunc.at(i_jet).at(i_eta).at(i_Pt)->FindBin(1 - A1RMS_ * RMS);
+                  int i_max = smearFunc.at(i_jet).at(i_eta).at(i_Pt)->FindBin(1 - A0RMS_ * RMS);
+                  double RLowerTail = smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt)->Integral(i_min, i_max);
+                  double Rcore = smearFunc_Core.at(i_jet).at(i_eta).at(i_Pt)->Integral(i_min, i_max);
+                  if (RLowerTail > 0)
+                     LowerTailScale = (LowerTailScale * (RLowerTail + Rcore) - Rcore) / RLowerTail;
+
+                  i_min = smearFunc.at(i_jet).at(i_eta).at(i_Pt)->FindBin(1 + A0RMS_ * RMS);
+                  i_max = smearFunc.at(i_jet).at(i_eta).at(i_Pt)->FindBin(1 + A1RMS_ * RMS);
+                  double RUpperTail = smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt)->Integral(i_min, i_max);
+                  Rcore = smearFunc_Core.at(i_jet).at(i_eta).at(i_Pt)->Integral(i_min, i_max);
+                  if (RUpperTail > 0)
+                     UpperTailScale = (UpperTailScale * (RUpperTail + Rcore) - Rcore) / RUpperTail;
+
+               }
+               //cout << "tail scaling factor: " << TailScale << endl;
+               smearFunc_scaled.at(i_jet).at(i_eta).at(i_Pt)->Add(&smearFunc_Core_tmp);
+               smearFunc_scaled.at(i_jet).at(i_eta).at(i_Pt)->Add(&smearFunc_LowerTail_tmp, LowerTailScale);
+               smearFunc_scaled.at(i_jet).at(i_eta).at(i_Pt)->Add(&smearFunc_UpperTail_tmp, UpperTailScale);
+            } else {
+               //// Replace Histograms with only few entries by gaussians
+               double N = 1;
+               if (smearFunc.at(i_jet).at(i_eta).at(i_Pt)->GetEntries() > 0) {
+                  N = smearFunc.at(i_jet).at(i_eta).at(i_Pt)->Integral();
+               }
+               cout << "Too few entries for (i_Pt, i_eta, i_jet): " << i_Pt << ", " << i_eta << ", " << i_jet
+                     << ", entries = " << smearFunc.at(i_jet).at(i_eta).at(i_Pt)->GetEntries() << endl;
+               for (int j = 1; j <= smearFunc_scaled.at(i_jet).at(i_eta).at(i_Pt)->GetNbinsX(); ++j) {
+                  double pt = (PtBinEdges_.at(i_Pt) + PtBinEdges_.at(i_Pt + 1)) / 2;
+                  double g = N * TMath::Gaus(smearFunc_scaled.at(i_jet).at(i_eta).at(i_Pt)->GetBinCenter(j), 1.,
+                        SigmaPt_scaled.at(i_jet).at(i_eta)->Eval(pt));
+                  smearFunc_scaled.at(i_jet).at(i_eta).at(i_Pt)->SetBinContent(j, g);
+                  smearFunc_Core.at(i_jet).at(i_eta).at(i_Pt)->SetBinContent(j, g);
+                  smearFunc_LowerTail.at(i_jet).at(i_eta).at(i_Pt)->SetBinContent(j, 0.);
+                  smearFunc_UpperTail.at(i_jet).at(i_eta).at(i_Pt)->SetBinContent(j, 0.);
+               }
+            }
+         }
+      }
+   }
 
 
 }
@@ -974,7 +1746,7 @@ void Factorization_SmearedJets::CalcSmearedHTMHT(
 				int &NJET, float &HT, float &MHT, float &MEFF, TLorentzVector &MHTVEC)
 {
 	int njet = 0;
-	float ht = 0, mht = 0, meff = 0;
+	float ht = 0;
 	TLorentzVector tlSumJets(0,0,0,0);
 	PrintHeader();
 
@@ -1004,6 +1776,909 @@ void Factorization_SmearedJets::CalcSmearedHTMHT(
 
 }
 
+void Factorization_SmearedJets::GenerateJets(edm::Event& iEvent, 
+				const edm::EventSetup& iSetup)
+{
 
+   //Weight
+   edm::Handle<double> event_weight;
+   iEvent.getByLabel(weightName_, event_weight);
+   weight_ = (event_weight.isValid() ? (*event_weight) : 1.0);
+   //if (!event_weight.isValid()) cout << "weight not found" << endl;
+
+   if (controlPlots_) {
+      h_weight->Fill(log10(weight_));
+      h_weightedWeight->Fill(log10(weight_), weight_);
+   }
+
+   //GenJets
+   edm::Handle<edm::View<reco::GenJet> > gj;
+   edm::View<reco::GenJet> Jets_gen;
+   bool gj_present = iEvent.getByLabel(genjets_, gj);
+   if (gj_present) {
+      Jets_gen = *gj;
+   }
+
+   //PATJets
+   edm::Handle<edm::View<pat::Jet> > Jets;
+   iEvent.getByLabel(jets_, Jets);
+   edm::View<pat::Jet> Jets_rec = *Jets;
+
+   // collection of rebalanced jets
+   std::auto_ptr<vector<pat::Jet> > Jets_reb(new vector<pat::Jet> );
+
+   // collection of smeared jets
+   std::auto_ptr<vector<pat::Jet> > Jets_smeared(new vector<pat::Jet> );
+
+   // collection of smeared gen jets
+   std::auto_ptr<vector<reco::GenJet> > GenJets_smeared(new vector<reco::GenJet> );
+
+   double HTall_rec = 0;
+   double HTlow_rec = 0;
+   double HThigh_rec = 0;
+   math::PtEtaPhiMLorentzVector vMHTall_rec(0., 0., 0., 0.);
+   math::PtEtaPhiMLorentzVector vMHTlow_rec(0., 0., 0., 0.);
+   math::PtEtaPhiMLorentzVector vMHThigh_rec(0., 0., 0., 0.);
+   //// Fill measured particles to vector
+   for (edm::View<pat::Jet>::const_iterator it = Jets_rec.begin(); it != Jets_rec.end(); ++it) {
+      if (it->pt() < JetsHTPt_) {
+         vMHTall_rec -= it->p4();
+         vMHTlow_rec -= it->p4();
+         HTall_rec += it->pt();
+         HTlow_rec += it->pt();
+      } else {
+         vMHTall_rec -= it->p4();
+         vMHThigh_rec -= it->p4();
+         HTall_rec += it->pt();
+         HThigh_rec += it->pt();
+      }
+   }
+   if (controlPlots_) {
+      h_HTall_rec->Fill(HTall_rec, weight_);
+      h_HThigh_rec->Fill(HThigh_rec, weight_);
+      h_MHTall_rec->Fill(vMHTall_rec.pt(), weight_);
+      h_MHThigh_rec->Fill(vMHThigh_rec.pt(), weight_);
+   }
+
+   double HTall_gen = 0;
+   double HTlow_gen = 0;
+   double HThigh_gen = 0;
+   math::PtEtaPhiMLorentzVector vMHTall_gen(0., 0., 0., 0.);
+   math::PtEtaPhiMLorentzVector vMHTlow_gen(0., 0., 0., 0.);
+   math::PtEtaPhiMLorentzVector vMHThigh_gen(0., 0., 0., 0.);
+   //// Fill measured particles to vector
+   for (edm::View<reco::GenJet>::const_iterator it = Jets_gen.begin(); it != Jets_gen.end(); ++it) {
+      if (it->pt() < JetsHTPt_) {
+         vMHTall_gen -= it->p4();
+         vMHTlow_gen -= it->p4();
+         HTall_gen += it->pt();
+         HTlow_gen += it->pt();
+      } else {
+         vMHTall_gen -= it->p4();
+         vMHThigh_gen -= it->p4();
+         HTall_gen += it->pt();
+         HThigh_gen += it->pt();
+      }
+   }
+   if (controlPlots_) {
+      h_HTall_gen->Fill(HTall_gen, weight_);
+      h_HThigh_gen->Fill(HThigh_gen, weight_);
+      h_MHTall_gen->Fill(vMHTall_gen.pt(), weight_);
+      h_MHThigh_gen->Fill(vMHThigh_gen.pt(), weight_);
+   }
+   //cout << "HT gen  = " << HThigh_gen << endl;
+
+   //// Pt resolution of reconstructed CaloJets
+   if (gj_present) {
+      for (edm::View<reco::GenJet>::const_iterator it = Jets_gen.begin(); it != Jets_gen.end(); ++it) {
+         double dRmin = 100;
+         const reco::Jet* matchedJet = 0;
+         for (edm::View<pat::Jet>::const_iterator jt = Jets_rec.begin(); jt != Jets_rec.end(); ++jt) {
+            double dR = deltaR(*jt, *it);
+            if (dR < dRmin) {
+               dRmin = dR;
+               matchedJet = &(*jt);
+            }
+         }
+         if (controlPlots_) {
+            if (dRmin < 0.15) {
+               if (fabs(it->eta()) < 1.5)
+                  h_RecJetRes_Pt->Fill(it->pt(), matchedJet->pt() / it->pt(), weight_);
+               if (it->pt() > 100.)
+                  h_RecJetRes_Eta->Fill(it->eta(), matchedJet->pt() / it->pt(), weight_);
+            }
+         }
+      }
+   }
+
+   Jets_reb->reserve(Jets_rec.size());
+   Jets_smeared->reserve(Jets_rec.size());
+
+   //
+   // Rebalance multi jet system
+   //
+   if (smearCollection_ == "Reco") {
+      bool isRebalanced = RebalanceJets_KinFitter(&Jets_rec, *(Jets_reb.get()));
+      if (!isRebalanced) {
+         cout << "Bad event: Not possible to rebalance!" << endl;
+         weight_ = 0;
+      }
+      double HThigh_reb = 0;
+      math::PtEtaPhiMLorentzVector vMHThigh_reb(0., 0., 0., 0.);
+      double HTlow_reb = 0;
+      math::PtEtaPhiMLorentzVector vMHTlow_reb(0., 0., 0., 0.);
+      double HTall_reb = 0;
+      math::PtEtaPhiMLorentzVector vMHTall_reb(0., 0., 0., 0.);
+      for (vector<pat::Jet>::const_iterator it = Jets_reb-> begin(); it != Jets_reb->end(); ++it) {
+         if (it->pt() > JetsHTPt_) {
+            vMHThigh_reb -= it->p4();
+            HThigh_reb += it->pt();
+            vMHTall_reb -= it->p4();
+            HTall_reb += it->pt();
+         } else {
+            vMHTlow_reb -= it->p4();
+            HTlow_reb += it->pt();
+            vMHTall_reb -= it->p4();
+            HTall_reb += it->pt();
+         }
+      }
+      if (!isRebalanced) {
+         cout << "Bad event: Can't be rebalanced!!!" << endl;
+         cout << "Reconstructed: HT, MHT = " << HThigh_rec << ", " << vMHThigh_rec.pt() << endl;
+         cout << "Rebalanced: HT, MHT = " << HTall_reb << ", " << vMHTall_reb.pt() << endl;
+      }
+      if (controlPlots_) {
+         h_HTall_reb->Fill(HTall_reb, weight_);
+         h_HThigh_reb->Fill(HThigh_reb, weight_);
+         //         if (abs(HThigh_reb - HThigh_rec) > 100) {
+         //            cout << "WARNING!!!!!!!!!!!!!!!!!!!" << endl;
+         //            cout << uncertaintyName_ << ": HTall reb = " << HTall_reb << " HThigh reb = " << HThigh_reb
+         //                  << " HTall rec = " << HTall_rec << " HThigh rec = " << HThigh_rec << " weight = " << weight_ << endl;
+         //         }
+         h_MHTall_reb->Fill(vMHTall_reb.pt(), weight_);
+         h_MHThigh_reb->Fill(vMHThigh_reb.pt(), weight_);
+      }
+
+      //// Pt resolution of rebalanced CaloJets
+      if (gj_present) {
+         for (edm::View<reco::GenJet>::const_iterator it = Jets_gen.begin(); it != Jets_gen.end(); ++it) {
+            double dRmin = 100;
+            const pat::Jet* matchedJet = 0;
+            for (vector<pat::Jet>::const_iterator jt = Jets_reb-> begin(); jt != Jets_reb->end(); ++jt) {
+               double dR = deltaR(*jt, *it);
+               if (dR < dRmin) {
+                  dRmin = dR;
+                  matchedJet = &(*jt);
+               }
+            }
+            if (controlPlots_) {
+               if (dRmin < 0.15) {
+                  if (fabs(it->eta()) < 1.5)
+                     h_RebJetRes_Pt->Fill(it->pt(), matchedJet->pt() / it->pt(), weight_);
+                  if (it->pt() > 100.)
+                     h_RebJetRes_Eta->Fill(it->eta(), matchedJet->pt() / it->pt(), weight_);
+               }
+            }
+         }
+      }
+   }
+
+   //
+   // Smear rebalanced multi jet system
+   //
+   if (smearCollection_ == "Reco") {
+      SmearingJets(*(Jets_reb.get()), *(Jets_smeared.get()));
+   } else if (smearCollection_ == "Gen") {
+      SmearingGenJets(&Jets_gen, *(GenJets_smeared.get()));
+   }
+
+   double HThigh_smeared = 0;
+   math::PtEtaPhiMLorentzVector vMHThigh_smeared(0., 0., 0., 0.);
+   if (smearCollection_ == "Reco") {
+      for (vector<pat::Jet>::const_iterator it = Jets_smeared-> begin(); it != Jets_smeared->end(); ++it) {
+         vMHThigh_smeared -= it->p4();
+         HThigh_smeared += it->pt();
+      }
+   } else if (smearCollection_ == "Gen") {
+      for (vector<reco::GenJet>::const_iterator it = GenJets_smeared-> begin(); it != GenJets_smeared->end(); ++it) {
+         vMHThigh_smeared -= it->p4();
+         HThigh_smeared += it->pt();
+      }
+   }
+   if (controlPlots_) {
+      h_HTall_smeared->Fill(HTlow_rec + HThigh_smeared, weight_);
+      h_HThigh_smeared->Fill(HThigh_smeared, weight_);
+      h_MHTall_smeared->Fill((vMHTlow_rec + vMHThigh_smeared).pt(), weight_);
+      h_MHThigh_smeared->Fill(vMHThigh_smeared.pt(), weight_);
+   }
+
+   //// Pt resolution of smeared Jets
+   if (smearCollection_ == "Gen") {
+      if (gj_present) {
+         for (edm::View<reco::GenJet>::const_iterator it = Jets_gen.begin(); it != Jets_gen.end(); ++it) {
+            double dRmin = 100;
+            const reco::GenJet* matchedJet = 0;
+            for (vector<reco::GenJet>::const_iterator jt = GenJets_smeared-> begin(); jt != GenJets_smeared->end(); ++jt) {
+               double dR = deltaR(*jt, *it);
+               if (dR < dRmin) {
+                  dRmin = dR;
+                  matchedJet = &(*jt);
+               }
+            }
+            if (controlPlots_) {
+               if (dRmin < 0.15) {
+                  if (fabs(it->eta()) < 1.5)
+                     h_SmearedJetRes_Pt->Fill(it->pt(), matchedJet->pt() / it->pt(), weight_);
+                  if (it->pt() > 100.)
+                     h_SmearedJetRes_Eta->Fill(it->eta(), matchedJet->pt() / it->pt(), weight_);
+               }
+            }
+         }
+      }
+   } else if (smearCollection_ == "Reco") {
+      if (gj_present) {
+         for (edm::View<reco::GenJet>::const_iterator it = Jets_gen.begin(); it != Jets_gen.end(); ++it) {
+            double dRmin = 100;
+            const pat::Jet* matchedJet = 0;
+            for (vector<pat::Jet>::const_iterator jt = Jets_smeared-> begin(); jt != Jets_smeared->end(); ++jt) {
+               double dR = deltaR(*jt, *it);
+               if (dR < dRmin) {
+                  dRmin = dR;
+                  matchedJet = &(*jt);
+               }
+            }
+            if (controlPlots_) {
+               if (dRmin < 0.15) {
+                  if (fabs(it->eta()) < 1.5)
+                     h_SmearedJetRes_Pt->Fill(it->pt(), matchedJet->pt() / it->pt(), weight_);
+                  if (it->pt() > 100.)
+                     h_SmearedJetRes_Eta->Fill(it->eta(), matchedJet->pt() / it->pt(), weight_);
+               }
+            }
+         }
+      }
+   }
+
+   // put products into event
+
+   if (smearCollection_ == "Reco") {
+      GreaterByPt<pat::Jet> ptComparator_;
+      std::sort(Jets_reb->begin(), Jets_reb->end(), ptComparator_);
+      //iEvent.put(Jets_reb, jets_reb_ + uncertaintyName_);
+      iEvent.put(Jets_reb, jets_reb_);
+      std::sort(Jets_smeared->begin(), Jets_smeared->end(), ptComparator_);
+      //iEvent.put(Jets_smeared, jets_smeared_ + uncertaintyName_);
+      iEvent.put(Jets_smeared, jets_smeared_);
+   }
+
+   if (smearCollection_ == "Gen") {
+
+      std::vector<pat::Jet> * sJets = new std::vector<pat::Jet>();
+      std::auto_ptr<std::vector<pat::Jet> > smearedJets(sJets);
+
+      edm::View<reco::GenJet>::const_iterator it = Jets_gen.begin();
+      for (vector<reco::GenJet>::const_iterator jt = GenJets_smeared->begin(); jt != GenJets_smeared->end() && it
+            != Jets_gen.end(); ++jt, ++it) {
+
+         reco::GenJet Jet = *jt;
+         reco::GenJet oJet = *it;
+
+         //pat::Jet myNewJet(pat::Jet(reco::CaloJet(Jet.p4(), math::XYZPoint(0., 0., 0.), reco::CaloJet::Specific())));
+         pat::Jet myNewJet(pat::Jet(reco::Jet(Jet.p4(), math::XYZPoint(0., 0., 0.))));
+         myNewJet.setJetCharge(oJet.pt());
+
+         sJets->push_back(myNewJet);
+      }
+
+      //iEvent.put(GenJets_smeared, genjets_smeared_);
+      //iEvent.put(smearedJets, jets_smeared_);
+
+   }
+}
+
+
+//--------------------------------------------------------------------------
+// rebalance the events using a kinematic fit and transverse momentum balance
+bool Factorization_SmearedJets::RebalanceJets_KinFitter(edm::View<pat::Jet>* Jets_rec, std::vector<pat::Jet> &Jets_reb) {
+
+   bool result = true;
+
+   //// Interface to KinFitter
+   TKinFitter* myFit = new TKinFitter();
+
+   std::vector<TLorentzVector*> lvec_m;
+
+   std::vector<TMatrixD*> covMat_m;
+
+   std::vector<TFitParticleEtEtaPhi*> fitted;
+   std::vector<TFitParticleEtEtaPhi*> measured;
+   std::map<int, const pat::Jet*> JetMap;
+   double dPx = 0;
+   double dPy = 0;
+   double HTreco = 0;
+   double HTreb = 0;
+   double MHTx_low = 0;
+   double MHTy_low = 0;
+   double MHTx_high = 0;
+   double MHTy_high = 0;
+
+   //// Fill measured particles to vector
+   int i = 0;
+   for (edm::View<pat::Jet>::const_iterator it = Jets_rec-> begin(); it != Jets_rec->end(); ++it) {
+
+      //if (it->pt() < rebalancedJetPt_ || abs(it->pt()) > 3.0) {
+      //if (it->pt() < rebalancedJetPt_ || it->chargedEmEnergyFraction()>0.9 || it->muonEnergyFraction()>0.9) {
+      if (it->pt() < rebalancedJetPt_) {
+         if (rebalanceMode_ == "MHTall") {
+            MHTx_low -= it->px();
+            MHTy_low -= it->py();
+            pat::Jet rebalancedJet(*((pat::Jet*) &(*it)));
+            Jets_reb.push_back(rebalancedJet);
+         }
+      } else {
+         MHTx_high -= it->px();
+         MHTy_high -= it->py();
+         JetMap[i] = &(*it);
+
+         // The particles before fitting
+         double tmppx, tmppy, tmppz, tmpe;
+         tmppx = it->px();
+         tmppy = it->py();
+         tmppz = it->pz();
+         tmpe = it->energy();
+
+         TLorentzVector* lv = new TLorentzVector(tmppx, tmppy, tmppz, tmpe);
+         lvec_m.push_back(lv);
+         TMatrixD* cM = new TMatrixD(3, 3);
+         (*cM)(0, 0) = JetResolution_Pt2(it->pt(), it->eta(), i);
+         (*cM)(1, 1) = JetResolution_Eta2(it->energy(), it->eta());
+         (*cM)(2, 2) = JetResolution_Phi2(it->energy(), it->eta());
+         covMat_m.push_back(cM);
+         char name[10];
+         sprintf(name, "jet%i", i);
+         TFitParticleEtEtaPhi* jet1 = new TFitParticleEtEtaPhi(name, name, lvec_m.back(), covMat_m.back());
+         measured.push_back(jet1);
+         TFitParticleEtEtaPhi* jet2 = new TFitParticleEtEtaPhi(name, name, lvec_m.back(), covMat_m.back());
+         fitted.push_back(jet2);
+         myFit->addMeasParticle(fitted.back());
+         ++i;
+      }
+   }
+
+   //// Add momentum constraints
+   double MET_constraint_x = 0.;
+   double MET_constraint_y = 0.;
+   if (rebalanceMode_ == "MHTall") {
+      //// rebalance MHT of all jets
+      MET_constraint_x = MHTx_low;
+      MET_constraint_y = MHTy_low;
+   } else if (rebalanceMode_ == "MHThigh") {
+      //// rebalance MHT of fitted jets
+      MET_constraint_x = 0.;
+      MET_constraint_y = 0.;
+   } else {
+      //// default: rebalance MHT of fitted jets
+      MET_constraint_x = 0.;
+      MET_constraint_y = 0.;
+   }
+   TFitConstraintEp* momentumConstr1 = new TFitConstraintEp("px", "px", 0, TFitConstraintEp::pX, MET_constraint_x);
+   TFitConstraintEp* momentumConstr2 = new TFitConstraintEp("py", "py", 0, TFitConstraintEp::pY, MET_constraint_y);
+   for (unsigned int i = 0; i < fitted.size(); ++i) {
+      momentumConstr1->addParticle(fitted.at(i));
+      momentumConstr2->addParticle(fitted.at(i));
+   }
+   myFit->addConstraint(momentumConstr1);
+   myFit->addConstraint(momentumConstr2);
+
+   //// Set fit parameters
+   myFit->setVerbosity(0);
+   myFit->setMaxNbIter(100);
+   myFit->setMaxF(0.01 * 2);
+   myFit->setMaxDeltaS(1.e-3);
+   myFit->fit();
+   //cout << "KinFitter: " << myFit->getStatus() << endl;
+   int status = myFit->getStatus();
+
+   double chi2 = 0;
+   double F = 0;
+   double prob = 0;
+   //if (status == 0 || status == 1) {
+   if (status == 0) {
+      chi2 = myFit->getS();
+      F = myFit->getF();
+      int dof = myFit->getNDF();
+      prob = TMath::Prob(chi2, dof);
+      //if (prob < 1.e-8) result = false;
+      //cout << "chi2, prop, F = " << chi2 << " " << prob << " " << F << endl;
+   } else {
+      chi2 = 99999;
+      prob = 0;
+      F = 99999;
+      result = false;
+      //cout << "chi2, prop, F = " << chi2 << " " << prob << " " << F << endl;
+   }
+   if (controlPlots_)
+      h_fitProb->Fill(prob);
+
+   //// Get the output of KinFitter
+   for (unsigned int i = 0; i < measured.size(); ++i) {
+      // create new rebalanced Jet
+      pat::Jet::LorentzVector newP4(fitted.at(i)->getCurr4Vec()->Px(), fitted.at(i)->getCurr4Vec()->Py(),
+            fitted.at(i)->getCurr4Vec()->Pz(), fitted.at(i)->getCurr4Vec()->E());
+      pat::Jet rebalancedJet(*((pat::Jet*) JetMap[i]));
+      HTreco += rebalancedJet.pt();
+      //cout << "RECO: " << i << "th: pt = " << rebalancedJet.pt() << " phi = " << rebalancedJet.phi() << endl;
+      rebalancedJet.setP4(newP4);
+      //cout << "REB: " << i << "th: pt = " << rebalancedJet.pt() << " phi = " << rebalancedJet.phi() << endl;
+      Jets_reb.push_back(rebalancedJet);
+      dPx -= newP4.Px() - measured.at(i)->getCurr4Vec()->Px();
+      dPy -= newP4.Py() - measured.at(i)->getCurr4Vec()->Py();
+      HTreb += rebalancedJet.pt();
+   }
+   //cout << "HT reco = " << HTreco << endl;
+   //cout << "HT reb  = " << HTreb << endl;
+
+   delete myFit;
+   for (unsigned int i = 0; i < measured.size(); ++i) {
+      delete lvec_m.at(i);
+      delete covMat_m.at(i);
+      delete measured.at(i);
+      delete fitted.at(i);
+   }
+   delete momentumConstr1;
+   delete momentumConstr2;
+
+   return result;
+}
+//--------------------------------------------------------------------------
+
+//--------------------------------------------------------------------------
+void Factorization_SmearedJets::SmearingJets(const std::vector<pat::Jet> &Jets_reb, std::vector<pat::Jet> &Jets_smeared) {
+
+   double dPx = 0;
+   double dPy = 0;
+
+   for (int i = 1; i <= Ntries_; ++i) {
+      int Ntries2 = 1;
+      double w = weight_;
+      if (cleverPrescaleTreating_ == true && weight_ > 1) {
+         Ntries2 = (int) weight_;
+         w = weight_ / Ntries2;
+      }
+      for (int j = 1; j <= Ntries2; ++j) {
+         Jets_smeared.clear();
+         int i_jet = 0;
+         for (std::vector<pat::Jet>::const_iterator it = Jets_reb.begin(); it != Jets_reb.end(); ++it) {
+            if (it->pt() > smearedJetPt_) {
+               double newPt = 0;
+               newPt = it->pt() * JetResolutionHist_Pt_Smear(it->pt(), it->eta(), i_jet);
+               //double newEta = rand_->Gaus(it->eta(), TMath::Sqrt(JetResolution_Eta2(it->energy(), it->eta())));
+               //double newPhi = rand_->Gaus(it->phi(), TMath::Sqrt(JetResolution_Phi2(it->energy(), it->eta())));
+               double newEta = it->eta();
+               double newPhi = it->phi();
+               pat::Jet::PolarLorentzVector newP4(newPt, newEta, newPhi, it->mass());
+               pat::Jet smearedJet(*it);
+               smearedJet.setP4(newP4);
+               Jets_smeared.push_back(smearedJet);
+               dPx -= newP4.Px() - it->px();
+               dPy -= newP4.Py() - it->py();
+               ++i_jet;
+            } else {
+               pat::Jet smearedJet(*it);
+               Jets_smeared.push_back(smearedJet);
+            }
+         }
+         GreaterByPt<reco::Candidate> ptComparator_;
+         std::sort(Jets_smeared.begin(), Jets_smeared.end(), ptComparator_);
+         //Fill HT and MHT prediction histos for i-th iteration of smearing
+         FillPredictionHistos(Jets_smeared, i, w);
+      }
+   }
+
+   return;
+}
+//--------------------------------------------------------------------------
+
+//--------------------------------------------------------------------------
+void Factorization_SmearedJets::SmearingGenJets(edm::View<reco::GenJet>* Jets_gen, std::vector<reco::GenJet> &GenJets_smeared) {
+
+   double dPx = 0;
+   double dPy = 0;
+
+   for (int i = 1; i <= Ntries_; ++i) {
+      GenJets_smeared.clear();
+      int i_jet = 0;
+
+      for (edm::View<reco::GenJet>::const_iterator it = Jets_gen->begin(); it != Jets_gen->end(); ++it) {
+
+         if (it->pt() > smearedJetPt_) {
+            double newPt = 0;
+            newPt = it->pt() * JetResolutionHist_Pt_Smear(it->pt(), it->eta(), i_jet);
+            //double newEta = rand_->Gaus(it->eta(), TMath::Sqrt(JetResolution_Eta2(it->energy(), it->eta())));
+            //double newPhi = rand_->Gaus(it->phi(), TMath::Sqrt(JetResolution_Phi2(it->energy(), it->eta())));
+            double newEta = it->eta();
+            double newPhi = it->phi();
+            reco::GenJet::PolarLorentzVector newP4(newPt, newEta, newPhi, it->mass());
+            reco::GenJet smearedJet(*it);
+            smearedJet.setP4(newP4);
+            GenJets_smeared.push_back(smearedJet);
+            dPx -= newP4.Px() - it->px();
+            dPy -= newP4.Py() - it->py();
+            ++i_jet;
+         } else {
+            reco::GenJet smearedJet(*it);
+            GenJets_smeared.push_back(smearedJet);
+         }
+      }
+      GreaterByPt<reco::Candidate> ptComparator_;
+      std::sort(GenJets_smeared.begin(), GenJets_smeared.end(), ptComparator_);
+      //Fill HT and MHT prediction histos for i-th iteration of smearing
+      FillPredictionHistos_gen(GenJets_smeared, i, weight_);
+   }
+
+   return;
+}
+//--------------------------------------------------------------------------
+// pt resolution for KinFitter
+double Factorization_SmearedJets::JetResolution_Pt2(const double& pt, const double& eta, const int& i) {
+   int i_jet;
+   i < 2 ? i_jet = i : i_jet = 2;
+   int i_eta = GetIndex(eta, &EtaBinEdges_);
+   //return pow(pt, 2) * pow(SigmaPt_scaled.at(i_jet).at(i_eta)->Eval(pt), 2);
+   return pow(pt, 2) * pow(SigmaPt.at(i_jet).at(i_eta)->Eval(pt), 2);
+}
+//--------------------------------------------------------------------------
+
+//--------------------------------------------------------------------------
+// relative pt resolution for KinFitter
+double Factorization_SmearedJets::JetResolution_Ptrel(const double& pt, const double& eta, const int& i) {
+   int i_jet;
+   i < 2 ? i_jet = i : i_jet = 2;
+   int i_eta = GetIndex(eta, &EtaBinEdges_);
+   return SigmaPt_scaled.at(i_jet).at(i_eta)->Eval(pt);
+}
+//--------------------------------------------------------------------------
+
+//--------------------------------------------------------------------------
+// eta resolution for KinFitter
+double Factorization_SmearedJets::JetResolution_Eta2(const double& e, const double& eta) {
+   //may be artifically reduced (no angular fit)
+   return (pow(0.05 / TMath::Sqrt(e), 2) + pow(0.005, 2)) / 1.e6;
+}
+//--------------------------------------------------------------------------
+
+//--------------------------------------------------------------------------
+// phi resolution for KinFitter
+double Factorization_SmearedJets::JetResolution_Phi2(const double& e, const double& eta) {
+   //may be artifically reduced (no angular fit)
+   return (pow(0.05 / TMath::Sqrt(e), 2) + pow(0.005, 2)) / 1.e6;
+}
+
+//--------------------------------------------------------------------------
+void Factorization_SmearedJets::FillPredictionHistos_gen(const std::vector<reco::GenJet>& Jets_smeared, const int& i,
+      const double& w) {
+
+   int NJets = calcNJets_gen(Jets_smeared);
+   double HT = calcHT_gen(Jets_smeared);
+   math::PtEtaPhiMLorentzVector vMHT = calcMHT_gen(Jets_smeared);
+   double MHT = vMHT.pt();
+   bool minDeltaPhi = calcMinDeltaPhi_gen(Jets_smeared, vMHT);
+   double Meff = HT + MHT;
+
+   if (NJets >= NJets_) {
+
+      h_presel_MHT_prediction->Fill(MHT, double(i), w);
+      h_presel_HT_prediction->Fill(HT, double(i), w);
+      h_presel_Meff_prediction->Fill(Meff, double(i), w);
+
+      if (HT > HTcut_low_)
+         h_baselineNoDeltaPhi_MHT_prediction->Fill(MHT, double(i), w);
+      if (HT > HTcut_low_ && MHT > MHTcut_low_)
+         h_baselineNoDeltaPhi_Meff_prediction->Fill(Meff, double(i), w);
+      if (MHT > MHTcut_low_)
+         h_baselineNoDeltaPhi_HT_prediction->Fill(HT, double(i), w);
+
+      if (minDeltaPhi) {
+
+         if (HT > HTcut_low_)
+            h_lowHT_MHT_prediction->Fill(MHT, double(i), w);
+         if (HT > HTcut_low_ && MHT > MHTcut_low_)
+            h_lowHT_Meff_prediction->Fill(Meff, double(i), w);
+         if (MHT > MHTcut_low_)
+            h_lowMHT_HT_prediction->Fill(HT, double(i), w);
+
+         if (HT > HTcut_medium_)
+            h_mediumHT_MHT_prediction->Fill(MHT, double(i), w);
+         if (HT > HTcut_medium_ && MHT > MHTcut_low_)
+            h_mediumHT_Meff_prediction->Fill(Meff, double(i), w);
+         if (MHT > MHTcut_medium_)
+            h_mediumMHT_HT_prediction->Fill(HT, double(i), w);
+
+         if (HT > HTcut_high_)
+            h_highHT_MHT_prediction->Fill(MHT, double(i), w);
+         if (HT > HTcut_high_ && MHT > MHTcut_low_)
+            h_highHT_Meff_prediction->Fill(Meff, double(i), w);
+         if (MHT > MHTcut_high_)
+            h_highMHT_HT_prediction->Fill(HT, double(i), w);
+
+         if (HT > HTcut_veryhigh_)
+            h_veryhighHT_MHT_prediction->Fill(MHT, double(i), w);
+         if (HT > HTcut_veryhigh_ && MHT > MHTcut_low_)
+            h_veryhighHT_Meff_prediction->Fill(Meff, double(i), w);
+
+         if (HT > HTcut_extremehigh_)
+            h_extremehighHT_MHT_prediction->Fill(MHT, double(i), w);
+         if (HT > HTcut_extremehigh_ && MHT > MHTcut_low_)
+            h_extremehighHT_Meff_prediction->Fill(Meff, double(i), w);
+
+      }
+
+   }
+
+   return;
+}
+
+//--------------------------------------------------------------------------
+// pt resolution for smearing
+double Factorization_SmearedJets::JetResolutionHist_Pt_Smear(const double& pt, const double& eta, const int& i) {
+   int i_jet;
+   i < 2 ? i_jet = i : i_jet = 2;
+   int i_Pt = GetIndex(pt, &PtBinEdges_);
+   int i_eta = GetIndex(eta, &EtaBinEdges_);
+
+   double res = smearFunc_scaled.at(i_jet).at(i_eta).at(i_Pt)->GetRandom();
+
+   return res;
+}
+
+//--------------------------------------------------------------------------
+void Factorization_SmearedJets::FillPredictionHistos(const std::vector<pat::Jet>& Jets_smeared, const int& i, const double& w) {
+
+   int NJets = calcNJets(Jets_smeared);
+   double HT = calcHT(Jets_smeared);
+   math::PtEtaPhiMLorentzVector vMHT = calcMHT(Jets_smeared);
+   double MHT = vMHT.pt();
+   bool minDeltaPhi = calcMinDeltaPhi(Jets_smeared, vMHT);
+   double Meff = HT + MHT;
+
+   if (NJets >= NJets_) {
+
+      h_presel_MHT_prediction->Fill(MHT, double(i), w);
+      h_presel_HT_prediction->Fill(HT, double(i), w);
+      h_presel_Meff_prediction->Fill(Meff, double(i), w);
+
+      if (HT > HTcut_low_)
+         h_baselineNoDeltaPhi_MHT_prediction->Fill(MHT, double(i), w);
+      if (HT > HTcut_low_ && MHT > MHTcut_low_)
+         h_baselineNoDeltaPhi_Meff_prediction->Fill(Meff, double(i), w);
+      if (MHT > MHTcut_low_)
+         h_baselineNoDeltaPhi_HT_prediction->Fill(HT, double(i), w);
+
+      if (minDeltaPhi) {
+
+         if (HT > HTcut_low_)
+            h_lowHT_MHT_prediction->Fill(MHT, double(i), w);
+         if (HT > HTcut_low_ && MHT > MHTcut_low_)
+            h_lowHT_Meff_prediction->Fill(Meff, double(i), w);
+         if (MHT > MHTcut_low_)
+            h_lowMHT_HT_prediction->Fill(HT, double(i), w);
+
+         if (HT > HTcut_medium_)
+            h_mediumHT_MHT_prediction->Fill(MHT, double(i), w);
+         if (HT > HTcut_medium_ && MHT > MHTcut_low_)
+            h_mediumHT_Meff_prediction->Fill(Meff, double(i), w);
+         if (MHT > MHTcut_medium_)
+            h_mediumMHT_HT_prediction->Fill(HT, double(i), w);
+
+         if (HT > HTcut_high_)
+            h_highHT_MHT_prediction->Fill(MHT, double(i), w);
+         if (HT > HTcut_high_ && MHT > MHTcut_low_)
+            h_highHT_Meff_prediction->Fill(Meff, double(i), w);
+         if (MHT > MHTcut_high_)
+            h_highMHT_HT_prediction->Fill(HT, double(i), w);
+
+         if (HT > HTcut_veryhigh_)
+            h_veryhighHT_MHT_prediction->Fill(MHT, double(i), w);
+         if (HT > HTcut_veryhigh_ && MHT > MHTcut_low_)
+            h_veryhighHT_Meff_prediction->Fill(Meff, double(i), w);
+
+         if (HT > HTcut_extremehigh_)
+            h_extremehighHT_MHT_prediction->Fill(MHT, double(i), w);
+         if (HT > HTcut_extremehigh_ && MHT > MHTcut_low_)
+            h_extremehighHT_Meff_prediction->Fill(Meff, double(i), w);
+
+      }
+
+   }
+
+   return;
+}
+//--------------------------------------------------------------------------
+int Factorization_SmearedJets::GetIndex(const double& x, const std::vector<double>* vec) {
+   int index = -1;
+   // this is a check
+   //int index = 0;
+   for (std::vector<double>::const_iterator it = vec->begin(); it != vec->end(); ++it) {
+      if ((*it) > fabs(x))
+         break;
+      ++index;
+   }
+   if (index < 0)
+      index = 0;
+   if (index > (int) vec->size() - 2)
+      index = vec->size() - 2;
+
+   return index;
+}
+//--------------------------------------------------------------------------
+int Factorization_SmearedJets::calcNJets(const std::vector<pat::Jet>& Jets_smeared) {
+   int NJets = 0;
+   for (vector<pat::Jet>::const_iterator it = Jets_smeared.begin(); it != Jets_smeared.end(); ++it) {
+      if (it->pt() > JetsHTPt_ && std::abs(it->eta()) < JetsHTEta_) {
+         ++NJets;
+      }
+   }
+   return NJets;
+}
+//--------------------------------------------------------------------------
+
+//--------------------------------------------------------------------------
+double Factorization_SmearedJets::calcHT(const std::vector<pat::Jet>& Jets_smeared) {
+   double HT = 0;
+   for (vector<pat::Jet>::const_iterator it = Jets_smeared.begin(); it != Jets_smeared.end(); ++it) {
+      if (it->pt() > JetsHTPt_ && std::abs(it->eta()) < JetsHTEta_) {
+         HT += it->pt();
+      }
+   }
+   return HT;
+}
+//--------------------------------------------------------------------------
+
+//--------------------------------------------------------------------------
+bool Factorization_SmearedJets::calcMinDeltaPhi(const std::vector<pat::Jet>& Jets_smeared, math::PtEtaPhiMLorentzVector& MHT) {
+   bool result = true;
+   unsigned int i = 0;
+   for (vector<pat::Jet>::const_iterator it = Jets_smeared.begin(); it != Jets_smeared.end(); ++it) {
+      if (it->pt() > JetsMHTPt_ && std::abs(it->eta()) < JetsMHTEta_) {
+         if (i < JetDeltaMin_.size()) {
+            if (std::abs(deltaPhi(MHT, *it)) < JetDeltaMin_.at(i))
+               result = false;
+            ++i;
+         } else {
+            break;
+         }
+      }
+   }
+   return result;
+}
+//--------------------------------------------------------------------------
+
+//--------------------------------------------------------------------------
+math::PtEtaPhiMLorentzVector Factorization_SmearedJets::calcMHT(const std::vector<pat::Jet>& Jets_smeared) {
+   math::PtEtaPhiMLorentzVector MHT(0, 0, 0, 0);
+   for (vector<pat::Jet>::const_iterator it = Jets_smeared.begin(); it != Jets_smeared.end(); ++it) {
+      if (it->pt() > JetsMHTPt_ && std::abs(it->eta()) < JetsMHTEta_) {
+         MHT -= it->p4();
+      }
+   }
+   return MHT;
+}
+//--------------------------------------------------------------------------
+
+//--------------------------------------------------------------------------
+int Factorization_SmearedJets::calcNJets_gen(const std::vector<reco::GenJet>& Jets_smeared) {
+   int NJets = 0;
+   for (vector<reco::GenJet>::const_iterator it = Jets_smeared.begin(); it != Jets_smeared.end(); ++it) {
+      if (it->pt() > JetsHTPt_ && std::abs(it->eta()) < JetsHTEta_) {
+         ++NJets;
+      }
+   }
+   return NJets;
+}
+//--------------------------------------------------------------------------
+
+//--------------------------------------------------------------------------
+double Factorization_SmearedJets::calcHT_gen(const std::vector<reco::GenJet>& Jets_smeared) {
+   double HT = 0;
+   for (vector<reco::GenJet>::const_iterator it = Jets_smeared.begin(); it != Jets_smeared.end(); ++it) {
+      if (it->pt() > JetsHTPt_ && std::abs(it->eta()) < JetsHTEta_) {
+         HT += it->pt();
+      }
+   }
+   return HT;
+}
+//--------------------------------------------------------------------------
+
+//--------------------------------------------------------------------------
+bool Factorization_SmearedJets::calcMinDeltaPhi_gen(const std::vector<reco::GenJet>& Jets_smeared, math::PtEtaPhiMLorentzVector& MHT) {
+   bool result = true;
+   unsigned int i = 0;
+   for (vector<reco::GenJet>::const_iterator it = Jets_smeared.begin(); it != Jets_smeared.end(); ++it) {
+      if (it->pt() > JetsMHTPt_ && std::abs(it->eta()) < JetsMHTEta_) {
+         if (i < JetDeltaMin_.size()) {
+            if (std::abs(deltaPhi(MHT, *it)) < JetDeltaMin_.at(i))
+               result = false;
+            ++i;
+         } else {
+            break;
+         }
+      }
+   }
+   return result;
+}
+//--------------------------------------------------------------------------
+
+//--------------------------------------------------------------------------
+math::PtEtaPhiMLorentzVector Factorization_SmearedJets::calcMHT_gen(const std::vector<reco::GenJet>& Jets_smeared) {
+   math::PtEtaPhiMLorentzVector MHT(0, 0, 0, 0);
+   for (vector<reco::GenJet>::const_iterator it = Jets_smeared.begin(); it != Jets_smeared.end(); ++it) {
+      if (it->pt() > JetsMHTPt_ && std::abs(it->eta()) < JetsMHTEta_) {
+         MHT -= it->p4();
+      }
+   }
+   return MHT;
+}
+//--------------------------------------------------------------------------
+// Fold histogram input with gaussian resolution
+void Factorization_SmearedJets::StretchHisto(const TH1& input, TH1& output, const double& f) {
+
+   if (input.Integral() > 0) {
+      double mean = input.GetMean();
+      for (int i = 0; i < 1000000; ++i) {
+         double r = input.GetRandom();
+         double rprime = mean + (r - mean) * f;
+         output.Fill(rprime);
+      }
+      output.Scale(input.Integral() / output.Integral());
+   }
+
+}
+
+//--------------------------------------------------------------------------
+double Factorization_SmearedJets::GetLowerTailScaling(const double& pt, const double& eta) {
+   int i_Pt = GetIndex(pt, &PtBinEdges_scaling_);
+   int i_eta = GetIndex(eta, &EtaBinEdges_scaling_);
+   double result = LowerTailScaling_.at(i_eta * (PtBinEdges_scaling_.size() - 1) + i_Pt) * LowerTailScaling_variation_;
+   return result;
+}
+//--------------------------------------------------------------------------
+
+//--------------------------------------------------------------------------
+double Factorization_SmearedJets::GetUpperTailScaling(const double& pt, const double& eta) {
+   int i_Pt = GetIndex(pt, &PtBinEdges_scaling_);
+   int i_eta = GetIndex(eta, &EtaBinEdges_scaling_);
+   double result = UpperTailScaling_.at(i_eta * (PtBinEdges_scaling_.size() - 1) + i_Pt) * UpperTailScaling_variation_;
+   return result;
+}
+
+//--------------------------------------------------------------------------
+double Factorization_SmearedJets::GetAdditionalSmearing(const double& pt, const double& eta) {
+   int i_Pt = GetIndex(pt, &PtBinEdges_scaling_);
+   int i_eta = GetIndex(eta, &EtaBinEdges_scaling_);
+   double result = AdditionalSmearing_.at(i_eta * (PtBinEdges_scaling_.size() - 1) + i_Pt)
+         * AdditionalSmearing_variation_;
+   //if (result < 1) result = 1;
+   return result;
+}
+
+//--------------------------------------------------------------------------
+// Fold histogram input with gaussian resolution
+void Factorization_SmearedJets::FoldWithGaussian(const TH1& input, TH1& output, const double& sigma) {
+
+   double min = input.GetXaxis()->GetXmin();
+   double max = input.GetXaxis()->GetXmax();
+   for (int i = 0; i < input.GetNbinsX(); ++i) {
+      double weight = input.GetBinContent(i);
+      double mean = input.GetBinCenter(i);
+      TF1 gauss("gauss", "gaus(0)", min, max);
+      gauss.SetParameters(weight * 1 / sigma / sqrt(2 * TMath::Pi()), mean, sigma);
+      for (int j = 0; j < output.GetNbinsX(); ++j) {
+         double xmin = output.GetBinLowEdge(j);
+         double xmax = output.GetBinLowEdge(j) + output.GetBinWidth(j);
+         output.AddBinContent(j, gauss.Integral(xmin, xmax));
+      }
+   }
+
+}
 //define this as a plug-in
 DEFINE_FWK_MODULE(Factorization_SmearedJets);
