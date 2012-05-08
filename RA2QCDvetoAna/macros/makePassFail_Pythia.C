@@ -13,6 +13,7 @@
 #include "TPaveText.h"
 #include <iomanip>
 
+
 using namespace std;
 
 const static float fDATA_LUMI = 4650; //pb-1
@@ -22,6 +23,7 @@ std::vector<float> incMHTBins;
 const static int nMHTbins = 5;
 const static float arrMHTbins[nMHTbins] = {200,350,500,600,7000};
 float CONST_C = 0.0217;
+vector<float> vSmallValErr; //for 1sigma errors in bins with n<20
 
 struct Predictions_t
 {
@@ -38,6 +40,36 @@ struct Predictions_t
 		
 };
 
+/**********************
+ * This is from the paper from Anwar
+ * Use for bins with values <20 to get proper
+ * stastical error
+ ***************************************/
+void GetSmallValErr(vector<float>& vec)
+{
+	vec.clear();
+	vec.push_back(0.0);   //N=0
+	vec.push_back(0.268); //N=1
+	vec.push_back(0.864); //N=2
+	vec.push_back(1.55);  //N=3
+	vec.push_back(2.29);  //N=4
+	vec.push_back(3.06);  //N=5
+	vec.push_back(3.85);  //N=6
+	vec.push_back(4.65);  //N=7
+	vec.push_back(5.47);  //N=8
+	vec.push_back(6.30);  //N=9
+	vec.push_back(7.14);  //N=10
+	vec.push_back(7.14);  //N=11
+	vec.push_back(8.84);  //N=12
+	vec.push_back(8.84);  //N=13
+	vec.push_back(10.6);  //N=14
+	vec.push_back(10.6);  //N=15
+	vec.push_back(12.3);  //N=16
+	vec.push_back(12.3);  //N=17
+	vec.push_back(14.1);  //N=18
+	vec.push_back(14.1);  //N=19
+	vec.push_back(15.8);  //N=20
+}
 
 
 void PrintExclResults(const Predictions_t& res, const float HTmin=0, const float HTmax=0)
@@ -137,7 +169,7 @@ TH1* GetHist(const std::string histname, const float scaleTo=1.0)
 	TFile *files[nBins];
 	TH1 *hists[nBins] = {0,0,0,0,0,0,0,0,0};
 
-	files[0] = new TFile ("qcd1/Merged.root");
+/*	files[0] = new TFile ("qcd1/Merged.root");
 	files[1] = new TFile ("qcd2/Merged.root");
 	files[2] = new TFile ("qcd3/Merged.root");
 	files[3] = new TFile ("qcd4/Merged.root");
@@ -146,6 +178,18 @@ TH1* GetHist(const std::string histname, const float scaleTo=1.0)
 	files[6] = new TFile ("qcd7/Merged.root");
 	files[7] = new TFile ("qcd8/Merged.root");
 	files[8] = new TFile ("qcd9/Merged.root");
+*/
+
+	files[0] = new TFile ("QCD_HTbin1.root");
+	files[1] = new TFile ("QCD_HTbin2.root");
+	files[2] = new TFile ("QCD_HTbin3.root");
+	files[3] = new TFile ("QCD_HTbin4.root");
+	files[4] = new TFile ("QCD_HTbin5.root");
+	files[5] = new TFile ("QCD_HTbin6.root");
+	files[6] = new TFile ("QCD_HTbin7.root");
+	files[7] = new TFile ("QCD_HTbin8.root");
+	files[8] = new TFile ("QCD_HTbin9.root");
+
 
 	TH1 *res_hist = 0;
 
@@ -159,6 +203,11 @@ TH1* GetHist(const std::string histname, const float scaleTo=1.0)
 		{
 
 			hists[i] = dynamic_cast<TH1*> (files[i]->Get(histname.c_str()));
+			if (i<2)
+			{
+				hists[i]->Reset("ICESM");
+			}
+
 			if (hists[i] == 0 )
 			{
 				cout << "hist_pass " << histname << " not found in " << files[i]->GetName() << "!" << endl;
@@ -208,11 +257,13 @@ Predictions_t GetPredictions(const TH1* hist, TF1* f1, const TH1* signalHist)
 	assert(hist != NULL && "GetPredictions:: hist not found!");
 	assert(f1 != NULL && "GetPredictions:: func not found!");
 	assert(signalHist != NULL && "GetPredictions:: signalHist not found!");
-	//new TCanvas(); gPad->SetLogy(); hist->SetStats(1); hist->DrawCopy(); //gPad->Print("control.eps");
+	//new TCanvas(); gPad->SetLogy(); gStyle->SetOptStat(1); hist->DrawCopy(); //gPad->Print("control.eps");
+	//new TCanvas(); gPad->SetLogy(); gStyle->SetOptStat(1); signalHist->DrawCopy(); //gPad->Print("control.eps");
 	
 
 	std::cout << "INITIAL INFO FOR HIST:"; hist->Print();
 	int bin1 = 0;
+	float sigVal = 0, sigErr = 0;
 	for (int bin =0; bin<hist->GetNbinsX(); ++bin) 
 	{ 
 		if (hist->GetBinLowEdge(bin)<incMHTBins.at(0)) continue;
@@ -222,6 +273,8 @@ Predictions_t GetPredictions(const TH1* hist, TF1* f1, const TH1* signalHist)
 	double err =0;
 	double integral = hist->IntegralAndError(bin1, bin2, err);
 	std::cout << "Intergral for MHT> "<< incMHTBins.at(0) << ":" << integral << "+/-" << err << std::endl;
+
+
 /*	double sig_sum = 0;
 	double sig_err2 =0;
 	for (int bin =0; bin<signalHist->GetNbinsX()+1; ++bin) 
@@ -344,6 +397,8 @@ Predictions_t GetPredictions(const TH1* hist, TF1* f1, const TH1* signalHist)
 void makePassFail_Pythia(const int HTbin = 1, const float fitrange_xmin = 50, const float fitrange_xmax = 150) 
 {
 
+	GetSmallValErr(vSmallValErr);
+	
 	incMHTBins.clear();
 	for (int i=0; i<nMHTbins; ++i) incMHTBins.push_back(arrMHTbins[i]);
 	const bool logScale = true;
@@ -354,31 +409,37 @@ void makePassFail_Pythia(const int HTbin = 1, const float fitrange_xmin = 50, co
 	std::string numeHistName("");
 	std::string denoHistName("");
 
+	float HTval = 0;
 	if (HTbin == 1)   //500gev
 	{
 		title +=" : HT>500 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
 		numeHistName += "factorization_ht500/Pass_RA2dphi";
 		denoHistName += "factorization_ht500/Fail_1";
+		HTval = 500;
 	} else if (HTbin == 2)  //600gev
 	{
 		title +=" : HT>600 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
 		numeHistName += "factorization_ht600/Pass_RA2dphi";
 		denoHistName += "factorization_ht600/Fail_1";
+		HTval = 600;
 	} else if (HTbin == 3)  //800gev
 	{
 		title +=" : HT>800 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
 		numeHistName += "factorization_ht800/Pass_RA2dphi";
 		denoHistName += "factorization_ht800/Fail_1";
+		HTval = 800;
 	} else if (HTbin == 4)  //1000gev
 	{
 		title +=" : HT>1000 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
 		numeHistName += "factorization_ht1000/Pass_RA2dphi";
 		denoHistName += "factorization_ht1000/Fail_1";
+		HTval = 1000;
 	} else if (HTbin == 5)  //1200gev
 	{
 		title +=" : HT>1200 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
 		numeHistName += "factorization_ht1200/Pass_RA2dphi";
 		denoHistName += "factorization_ht1200/Fail_1";
+		HTval = 1200;
 	}
 
 	TH1 *Hist_pass = GetHist(numeHistName, scaleTo);
@@ -415,9 +476,9 @@ void makePassFail_Pythia(const int HTbin = 1, const float fitrange_xmin = 50, co
 	//fit range
 	//const float fitrange_xmin = 50, fitrange_xmax = 120;
 	stringstream newtitle;
-	newtitle << "MC Smeared Jets (Fit Range " << fitrange_xmin << "--" << fitrange_xmax << " GeV)";
+	//newtitle << "MC Smeared Jets (Fit Range " << fitrange_xmin << "--" << fitrange_xmax << " GeV)";
 	//<< title;
-	newtitle << ";MHT [GeV];Ratio (r);";
+	newtitle << "HT>" << HTval << " GeV;MHT [GeV];Ratio (r);";
 
 
 	gStyle->SetOptStat(0);
@@ -455,7 +516,7 @@ void makePassFail_Pythia(const int HTbin = 1, const float fitrange_xmin = 50, co
 	expFit2->SetParameter(1,expFit->GetParameter(1));
 	//expFit2->SetParameter(2,expFit->GetParameter(2));
 	expFit2->SetLineColor(kRed);
-	expFit2->SetLineWidth(1);
+	expFit2->SetLineWidth(2);
 	cout << __LINE__ << endl;
 
 
@@ -477,7 +538,7 @@ void makePassFail_Pythia(const int HTbin = 1, const float fitrange_xmin = 50, co
 	gausFit2->SetParameter(1,gausFit->GetParameter(1));
 	gausFit2->SetParameter(2,gausFit->GetParameter(2));
 	gausFit2->SetLineColor(kGreen);
-	gausFit2->SetLineWidth(1);
+	gausFit2->SetLineWidth(2);
 	gausFit2->Draw("same");
 	expFit2->Draw("same");
 
@@ -487,17 +548,17 @@ void makePassFail_Pythia(const int HTbin = 1, const float fitrange_xmin = 50, co
 	leg->AddEntry(expFit2,"Exp Model");
 	leg->Draw();
 
-	const float xmin=0.3, xmax=0.65, ymin=0.7, ymax=0.9;
+	const float xmin=0.2, xmax=0.42, ymin=0.7, ymax=0.9;
 	gaus_stats->SetX1NDC(xmin);
 	gaus_stats->SetX2NDC(xmax);
 	gaus_stats->SetY1NDC(ymin);
 	gaus_stats->SetY2NDC(ymax);
 	gaus_stats->Draw("same");
-	//exp_stats->SetX1NDC(xmax);
-	//exp_stats->SetX2NDC(xmax+0.25);
-	//exp_stats->SetY1NDC(ymin);
-	//exp_stats->SetY2NDC(ymax);
-	//exp_stats->Draw("same");
+	exp_stats->SetX1NDC(xmax);
+	exp_stats->SetX2NDC(xmax+0.22);
+	exp_stats->SetY1NDC(ymin);
+	exp_stats->SetY2NDC(ymax);
+	exp_stats->Draw("same");
 
 
 	//fit quality
@@ -514,16 +575,37 @@ void makePassFail_Pythia(const int HTbin = 1, const float fitrange_xmin = 50, co
 	pt1->AddText(exp_fit_res.str().c_str());
 //	pt1->Draw("same");
 
+
+	cout << Hist_pass->GetBinContent(Hist_pass->GetNbinsX()) << "/" << Hist_pass->GetBinError(Hist_pass->GetNbinsX());
+	
+	/******************************
+	 * Print the canvas
+	 * ***************************/
 	stringstream epsname;
 	epsname << "factorization_HTbin" << HTbin << "_fitrange_" << fitrange_xmin << "to" << fitrange_xmax << ".eps";
 	gPad->Print(epsname.str().c_str());
-	/*return;
+
+	/******************************
+	 * save results to a hist
+	 * ***************************/
+	TFile f("Results.root","UPDATE");
+	Hist_pass->Write();
+	expFit2->Write();
+	gausFit2->Write();
+	//leg->Write();
+	//exp_stats->Write();
+	//gaus_stats->Write();
+	f.Close();
+
+	return;
+	
 
 	 //make a predicion
 	cout << "\n\n >>>>>> HT>500 PREDICTIONS " << endl; 
 	TH1 *sigHist_ht500       = GetHist("factorization_ht500/Signal_HT500MHT200", scaleTo);
 	TH1 *sidebandHist_ht500  = GetHist("factorization_ht500/Fail_lt_point2_HT500", scaleTo);
 	Predictions_t pred_HT500 = GetPredictions(sidebandHist_ht500, gausFit2, sigHist_ht500); 
+	return;
 
 	cout << "\n\n >>>>>> HT>800 PREDICTIONS " << endl; 
 	TH1 *sigHist_ht800       = GetHist("factorization_ht500/Signal_HT800MHT200", scaleTo);
@@ -581,16 +663,6 @@ void makePassFail_Pythia(const int HTbin = 1, const float fitrange_xmin = 50, co
 	cout << "\n\n >>>>>> 1200<HT<1400 PREDICTIONS " << endl; 
 	PrintExclResults(pred_HT1200to1400, 1200, 1400);
 
-*/
-	//save results to a hist
-	TFile f("Results.root","RECREATE");
-	Hist_pass->Write();
-	expFit2->Write();
-	gausFit2->Write();
-	leg->Write();
-	exp_stats->Write();
-	gaus_stats->Write();
-	f.Close();
 
 
 }
