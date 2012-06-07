@@ -10,7 +10,8 @@
 #include <exception>
 #include "DataFormats/VertexReco/interface/Vertex.h"
 #include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h"
-
+#include "TH1D.h"
+#include "PhysicsTools/Utilities/interface/LumiReWeighting.h"
 
 using namespace edm;
 using namespace std;
@@ -30,6 +31,8 @@ class LumiWeightProducer : public edm::EDProducer{
 
     string PUscenario;
 
+	 edm::LumiReWeighting LumiWeights_;
+	 std::vector<float> vMCNvtxDist, vDATANvtxDist;
  	 double sumLumiWeights; //sum of lumi weights for cross checks
 	 //to be added to event
 	 int debug;
@@ -60,17 +63,7 @@ void LumiWeightProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSet
 
 	//cout << "-------------------------------------------" << endl;
 
-	lumiWeight = LumiWeights_.weight( iEvent );
-	edm::Handle<edm::TriggerResults> triggerResults;
-	iEvent.getByLabel(triggerResults_,triggerResults);
-
-	if (! triggerResults.isValid()) 
-	{
-		cout << __FUNCTION__ << ":: No valid triggerResult found!" << endl;
-		assert(false); 
-	}
-
-	bool accept = false;
+	double puWeight = LumiWeights_.weight( iEvent );
 
    auto_ptr<double> pOut(new double(puWeight));
 	iEvent.put(pOut,"puWeight");
