@@ -13,7 +13,7 @@
 //
 // Original Author:  samantha hewamanage
 //         Created:  Tue Jul 26 22:15:44 CDT 2011
-// $Id: RA2bQCDvetoAna.cc,v 1.3 2011/10/17 22:24:27 samantha Exp $
+// $Id: RA2bQCDvetoAna.cc,v 1.4 2011/12/08 23:30:16 samantha Exp $
 //
 //
 
@@ -286,7 +286,8 @@ RA2bQCDvetoAna::RA2bQCDvetoAna(const edm::ParameterSet& iConfig)
 	BookHistograms(fs, Hist[5],170,200); 
 	BookHistograms(fs, Hist[6],200,7000); 
 */
-	const float met_min = 0, met_max=500, met_bins=100;
+	const float met_min = 0;
+	const float met_max=500, met_bins=100;
 	MHT_by_phislice[0] = fs->make<TH1F> ("mht_phislice_lt0.1" ,"MHT (#Delta#Phi_{min}<0.1);MHT [GeV];Events;", met_bins, 0, met_max);
 	MHT_by_phislice[1] = fs->make<TH1F> ("mht_phislice_lt0.2" ,"MHT (0.1<#Delta#Phi_{min}<0.2);MHT [GeV];Events;", met_bins, 0, met_max);
 	MHT_by_phislice[2] = fs->make<TH1F> ("mht_phislice_lt0.3" ,"MHT (0.2<#Delta#Phi_{min}<0.3);MHT [GeV];Events;", met_bins, 0, met_max);
@@ -487,7 +488,6 @@ RA2bQCDvetoAna::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
    using namespace edm;
 	++uProcessed;
-	bool bSaveEvent = false;
 	kRunLumiEvent.run  = iEvent.id().run();
 	kRunLumiEvent.lumi = iEvent.id().luminosityBlock(); 
 	kRunLumiEvent.evt  = iEvent.id().event();
@@ -1161,7 +1161,7 @@ void RA2bQCDvetoAna::DoDelMinStudy(edm::Handle<std::vector<reco::PFMET> >pfMetHa
 	hEff_Denom[0].effVsNVtx->Fill(dNvtx);
 
 
-	unsigned njet = 0; //consider cross product only from lead 3 jets
+	//unsigned njet = 0; //consider cross product only from lead 3 jets
 	TLorentzVector vSumJetPt30Vec(0,0,0,0);
 
 	for (unsigned i = 0 ; i < vLead3JetIndices.size() ; ++i)

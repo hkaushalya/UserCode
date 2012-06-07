@@ -13,7 +13,7 @@
 //
 // Original Author:  samantha hewamanage
 //         Created:  Tue Jul 26 22:15:44 CDT 2011
-// $Id$
+// $Id: RA2QCDvetoAna.cc,v 1.5 2012/02/20 20:51:23 samantha Exp $
 //
 //
 
@@ -387,7 +387,6 @@ RA2QCDvetoAna::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
    using namespace edm;
 	++iProcessed;
-	bool bSaveEvent = false;
 	kRunLumiEvent.run  = iEvent.id().run();
 	kRunLumiEvent.lumi = iEvent.id().luminosityBlock(); 
 	kRunLumiEvent.evt  = iEvent.id().event();
@@ -446,8 +445,8 @@ RA2QCDvetoAna::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 	evtHist_b4.meff->Fill((*mhtHandle)[0].pt() + (*htHandle));
 
 	float mht_phi = (*mhtHandle)[0].phi();	
-	int nvtx = vertexHandle->size();
-	int njets_et50eta25 = pfpt50Eta25JetHandle->size();
+	//int nvtx = vertexHandle->size();
+	//int njets_et50eta25 = pfpt50Eta25JetHandle->size();
 	for (unsigned i = 0 ; i < pfpt50Eta25JetHandle->size() ; ++i)
 	{
 		const TLorentzVector iJetVec((*pfpt50Eta25JetHandle)[i].px(),(*pfpt50Eta25JetHandle)[i].py(),(*pfpt50Eta25JetHandle)[i].pz(),(*pfpt50Eta25JetHandle)[i].energy());
@@ -455,11 +454,6 @@ RA2QCDvetoAna::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 		else if (i==1) FillJetHists(pf50eta25_jet2Hist, iJetVec, mht_phi);
 		else if (i==2) FillJetHists(pf50eta25_jet3Hist, iJetVec, mht_phi);
 	}
-
-	
-
-
-
 
 
 	//basic event selection
@@ -796,7 +790,8 @@ bool RA2QCDvetoAna::hasValidVertex(edm::Handle<reco::VertexCollection> vertexHan
 
 bool RA2QCDvetoAna::hasMinNjetHtMhtFromMyJets(edm::Handle<std::vector<pat::Jet> > jetHandle)
 {
-	unsigned njets = 0, nextrajets=0;
+	unsigned njets = 0;
+	//unsigned nextrajets=0;
 	TLorentzVector vSumJetVecMHt(0,0,0,0);
 	for (unsigned i = 0 ; i < jetHandle->size() ; ++i)
 	{

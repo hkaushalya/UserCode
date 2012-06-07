@@ -220,7 +220,7 @@ void TrigPrescaleWeightProducer::WildCardRemove(vector<string>& newHLTPathsByNam
 
 float TrigPrescaleWeightProducer::GetHTthreshold(const string trigName)
 {
-	int ndigits = 0; //max should be 4
+//	int ndigits = 0; //max should be 4
 	
 	vector<size_t> pos;
 	const size_t p1 = trigName.find_first_of('_');
