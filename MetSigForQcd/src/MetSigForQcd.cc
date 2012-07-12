@@ -13,7 +13,7 @@
 //
 // Original Author:  samantha hewamanage
 //         Created:  Thu Mar 15 13:34:25 CDT 2012
-// $Id: MetSigForQcd.cc,v 1.1 2012/03/16 16:31:51 samantha Exp $
+// $Id: MetSigForQcd.cc,v 1.2 2012/05/02 18:21:10 samantha Exp $
 //
 //
 
@@ -138,7 +138,7 @@ class MetSigForQcd : public edm::EDAnalyzer {
 
 		RunLumiEvt_t kRunLumiEvent;
 		int iVerbose; // control print levels
-		double dMinHT_, dMinMHT_, dMinNjet_, dMinMetSig_;
+		double dMinHT_, dMinMHT_, dMinNjet_, dMaxNjet_, dMinMetSig_;
 		edm::InputTag patJetsPFPt50Eta25InputTag_, patJetsPFPt30Eta50InputTag_;
 		edm::Handle<std::vector<pat::Jet> > pfpt50eta25JetHandle, pfpt30eta50JetHandle;
 		unsigned uFailMinHTCut, uFailMinPFMHTCut, uFailNjetCut, uFailDphiCut, uFailMetSigCut;
@@ -178,9 +178,10 @@ MetSigForQcd::MetSigForQcd(const edm::ParameterSet& iConfig)
 	patJetsPFPt30Eta50InputTag_ = iConfig.getParameter<edm::InputTag>("patJetsPFPt30Eta50InputTag");
 	mhtInputTag_    = iConfig.getParameter<edm::InputTag>("mhtInputTag");
 	htInputTag_     = iConfig.getParameter<edm::InputTag>("htInputTag");
-	dMinNjet_        = iConfig.getUntrackedParameter<double>("dMinNjet",3.0);
-	dMinHT_          = iConfig.getUntrackedParameter<double>("dMinHT",0.0);
-	dMinMHT_         = iConfig.getUntrackedParameter<double>("dMinMHT",0.0);
+	dMinNjet_       = iConfig.getUntrackedParameter<double>("dMinNjet", 3.0);
+	dMaxNjet_       = iConfig.getUntrackedParameter<double>("dMaxNjet", 3.0);
+	dMinHT_         = iConfig.getUntrackedParameter<double>("dMinHT",0.0);
+	dMinMHT_        = iConfig.getUntrackedParameter<double>("dMinMHT",0.0);
 	iVerbose        = iConfig.getUntrackedParameter<int>("verbose",0);
 	doLumiWeighing  = iConfig.getUntrackedParameter<int>("ApplyLumiWeighing",0);
 	doEventWeighing = iConfig.getUntrackedParameter<int>("ApplyEventWeighing",0);
@@ -330,23 +331,40 @@ MetSigForQcd::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 	const float myMht    = (*mhtHandle)[0].pt();
 	const float myMhtPhi = (*mhtHandle)[0].phi();
 	const float myHt     = htTemp;
+	//const float myHt     = (*htHandle)[0];
 	const unsigned myNjet= pfpt50eta25JetHandle->size(); 
 	const float myMetSig = (*pfmet)[0].significance();
 
 	//Check if RA2 dphi cuts are satisfied
-	bool bPassRA2dphiCut = true;
+	//dphi cuts for each of the jets, starting from highest pt jet
+	vector<float> dPhiCut;
+	dPhiCut.push_back(0.5); //1st jet
+	dPhiCut.push_back(0.5); //2nd jet
+	dPhiCut.push_back(0.3); //rest of the jets
 
-	if (myNjet>0) bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[0].phi(), myMhtPhi)) > 0.5);
-	if (myNjet>1) bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[1].phi(), myMhtPhi)) > 0.5);
-	if (myNjet>2) bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[2].phi(), myMhtPhi)) > 0.3);
+	bool bPassDphiCut = true;
+
+	for (unsigned i=0; i < pfpt30eta50JetHandle->size(); ++i) 
+	{ 
+		//this logic will work even in the case of exclusive njets
+		//bcos nminjets == nmaxjets in such cases
+		if ( i < (unsigned) dMinNjet_ )  
+		{
+			float dPhi = 0.3; //for rest of the jets.
+			if (i < dPhiCut.size()) dPhi = dPhiCut.at(i);
+			
+			bPassDphiCut = bPassDphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[i].phi(), myMhtPhi)) > dPhi);
+
+		} else break;
+	}
 
 
-	//APPLY RA2 cuts
+	//APPLY cuts
 
-	if ( bApplyNjetCut && myNjet < (unsigned) dMinNjet_ ) { ++uFailNjetCut;  return; }
+	if ( bApplyNjetCut && (myNjet < (unsigned) dMinNjet_ || myNjet > (unsigned) dMaxNjet_ ) ) { ++uFailNjetCut;  return; }
 	if ( bApplyHtCut   && myHt < dMinHT_                ) { ++uFailMinHTCut; return; }
 	if ( bApplyMhtCut  && myMht < dMinMHT_              ) { ++uFailMinPFMHTCut; return; }
-	if ( bApplyDphiCut && ! bPassRA2dphiCut             ) { ++uFailDphiCut;   return; }
+	if ( bApplyDphiCut && ! bPassDphiCut                ) { ++uFailDphiCut;   return; }
 	if ( myMetSig < dMinMetSig_                         ) { ++uFailMetSigCut; return; }
 
 
@@ -395,6 +413,7 @@ MetSigForQcd::endJob()
 	std::cout <<"MSQ: HT min            = " << dMinHT_ << std::endl;
 	std::cout <<"MSQ: MHT min           = " << dMinMHT_ << std::endl;
 	std::cout <<"MSQ: Njet min          = " << dMinNjet_ << std::endl;
+	std::cout <<"MSQ: Njet max          = " << dMaxNjet_ << std::endl;
 	std::cout <<"MSQ: ApplyNjetCut      = " << bApplyNjetCut << std::endl;
 	std::cout <<"MSQ: ApplyHtCut        = " << bApplyHtCut << std::endl;
 	std::cout <<"MSQ: ApplyMhtCut       = " << bApplyMhtCut << std::endl;
