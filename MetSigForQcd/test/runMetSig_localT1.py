@@ -1,8 +1,20 @@
 runningOnMC = True
-evts2Process = -1
-outputFile="SUSYT1_6JetsInclNoDphi.root"
+outputFile="SUSYT1_5Jets.root"
 
 import FWCore.ParameterSet.Config as cms
+import FWCore.ParameterSet.VarParsing as VarParsing
+import sys
+options = VarParsing.VarParsing ('standard')
+
+options.register('dataset', 0, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int, "dataset selection, default = 0")
+options.register('njetmin', 3, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int, "Minimum Number of jets (default = 3)")
+options.register('dphicut', 0, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int, "Apply dphi cut? yes=1, no=0 (default)")
+options.register('maxevts', -1, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int, "events to process (default = -1)")
+options.parseArguments()
+options._tagOrder =[]
+print options
+
+
 
 process = cms.Process("Demo")
 
@@ -10,6 +22,10 @@ process.load("FWCore.MessageService.MessageLogger_cfi")
 process.options = cms.untracked.PSet(
         wantSummary = cms.untracked.bool(True)
 )
+
+
+
+
 #-- Message Logger ------------------------------------------------------------
 process.MessageLogger.categories.append('PATSummaryTables')
 process.MessageLogger.cerr.PATSummaryTables = cms.untracked.PSet(
@@ -27,22 +43,16 @@ if runningOnMC == False:
 
 print "Using GT ",  process.GlobalTag.globaltag
 
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(options.maxevts) )
 
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(evts2Process) )
+if options.dataset==0:
+	process.load("UserCode.MetSigForQcd.SMS_T1tttt_Mgluino_450to1200_mLSP_50to800_7TeV_Pythia6Z_PU_START42_V11_FSIM_v2_cfi");
+	outputFile = cms.string("SUSY_T1_njetmin"+ `options.njetmin` + "_dphicut" + `options.dphicut` + ".root")
+else: 
+	sys.exit("Invalid dataset!")
 
-process.source = cms.Source("PoolSource",
-    # replace 'myfile.root' with the source file you want to use
-		fileNames = cms.untracked.vstring(
+print "Output file will be:", outputFile
 
-	##########T1->ttttt sample
-	'file:/uscms_data/d3/samantha/SUSYRA2work/CMSSW_4_2_5/src/SandBox/Skims/T1pats/susy_pat1.root'
-	,'file:/uscms_data/d3/samantha/SUSYRA2work/CMSSW_4_2_5/src/SandBox/Skims/T1pats/susy_pat2.root'
-	,'file:/uscms_data/d3/samantha/SUSYRA2work/CMSSW_4_2_5/src/SandBox/Skims/T1pats/susy_pat3.root'
-	,'file:/uscms_data/d3/samantha/SUSYRA2work/CMSSW_4_2_5/src/SandBox/Skims/T1pats/susy_pat4.root'
-	,'file:/uscms_data/d3/samantha/SUSYRA2work/CMSSW_4_2_5/src/SandBox/Skims/T1pats/susy_pat5.root'
-
-		)
-)
 
 process.trigWgtProd = cms.EDProducer('TrigPrescaleWeightProducer',
 	 debug = cms.untracked.int32(0),
@@ -86,206 +96,33 @@ process.mhtPF.JetCollection = cms.InputTag('patJetsAK5PFPt30')
 
 
 process.load("UserCode.MetSigForQcd.metsigall_cfi")
+process.load("UserCode.MetSigForQcd.signifMHTProducer_cfi")
 
 usePrescaleWeight = 0
 applyLumiweighing = 0
 applyEventweighing = 0
 
-print 'runMetSig_localLM5: usePrescaleWeight is set to  = ', usePrescaleWeight
-print 'runMetSig_localLM5: applyLumiweighing is set to  = ', applyLumiweighing
-print 'runMetSig_localLM5: applyEventweighing is set to = ', applyEventweighing
+print '[runMetSig_localT1] usePrescaleWeight is set to  = ', usePrescaleWeight
+print '[runMetSig_localT1] applyLumiweighing is set to  = ', applyLumiweighing
+print '[runMetSig_localT1] applyEventweighing is set to = ', applyEventweighing
 
-njetmin = 6
 #njetmax = 1000 #need to include in the settings 
 verbose = False
 njetCut = 1
-dPhiCut = 0
 
-print 'runMetSig_MCcrab:  njetmin = ', njetmin
 #print 'runMetSig_MCcrab:  njetmax = ', njetmax
-print 'runMetSig_MCcrab:  njetcut = ', njetCut
-print 'runMetSig_MCcrab:  dPhiCut = ', dPhiCut
+print '[runMetSig_localT1] runMetSig_MCcrab:  njetcut = ', njetCut
 
-process.metsignomht.dMinNjet = njetmin
-process.metsigmht25.dMinNjet = njetmin
-process.metsigmht50.dMinNjet = njetmin
-process.metsigmht75.dMinNjet = njetmin
-process.metsigmht100.dMinNjet = njetmin
-process.metsigmht125.dMinNjet = njetmin
-process.metsigmht150.dMinNjet = njetmin
-process.metsigmht175.dMinNjet = njetmin
-process.metsigmht200.dMinNjet = njetmin
-process.metsigmht350.dMinNjet = njetmin
-process.metsigmht500.dMinNjet = njetmin
-
-process.metsignomht.applyDphiCut = dPhiCut
-process.metsigmht25.applyDphiCut = dPhiCut
-process.metsigmht50.applyDphiCut = dPhiCut
-process.metsigmht75.applyDphiCut = dPhiCut
-process.metsigmht100.applyDphiCut = dPhiCut
-process.metsigmht125.applyDphiCut = dPhiCut
-process.metsigmht150.applyDphiCut = dPhiCut
-process.metsigmht175.applyDphiCut = dPhiCut
-process.metsigmht200.applyDphiCut = dPhiCut
-process.metsigmht350.applyDphiCut = dPhiCut
-process.metsigmht500.applyDphiCut = dPhiCut
-
-
-process.metsig25nomht.dMinNjet = njetmin
-process.metsig25mht25.dMinNjet = njetmin
-process.metsig25mht50.dMinNjet = njetmin
-process.metsig25mht75.dMinNjet = njetmin
-process.metsig25mht100.dMinNjet = njetmin
-process.metsig25mht125.dMinNjet = njetmin
-process.metsig25mht150.dMinNjet = njetmin
-process.metsig25mht175.dMinNjet = njetmin
-process.metsig25mht200.dMinNjet = njetmin
-process.metsig25mht350.dMinNjet = njetmin
-process.metsig25mht500.dMinNjet = njetmin
-
-process.metsig25nomht.applyDphiCut = dPhiCut
-process.metsig25mht25.applyDphiCut = dPhiCut
-process.metsig25mht50.applyDphiCut = dPhiCut
-process.metsig25mht75.applyDphiCut = dPhiCut
-process.metsig25mht100.applyDphiCut = dPhiCut
-process.metsig25mht125.applyDphiCut = dPhiCut
-process.metsig25mht150.applyDphiCut = dPhiCut
-process.metsig25mht175.applyDphiCut = dPhiCut
-process.metsig25mht200.applyDphiCut = dPhiCut
-process.metsig25mht350.applyDphiCut = dPhiCut
-process.metsig25mht500.applyDphiCut = dPhiCut
-
-
-process.metsig50nomht.dMinNjet = njetmin
-process.metsig50mht25.dMinNjet = njetmin
-process.metsig50mht50.dMinNjet = njetmin
-process.metsig50mht75.dMinNjet = njetmin
-process.metsig50mht100.dMinNjet = njetmin
-process.metsig50mht125.dMinNjet = njetmin
-process.metsig50mht150.dMinNjet = njetmin
-process.metsig50mht175.dMinNjet = njetmin
-process.metsig50mht200.dMinNjet = njetmin
-process.metsig50mht350.dMinNjet = njetmin
-process.metsig50mht500.dMinNjet = njetmin
-
-process.metsig50nomht.applyDphiCut = dPhiCut
-process.metsig50mht25.applyDphiCut = dPhiCut
-process.metsig50mht50.applyDphiCut = dPhiCut
-process.metsig50mht75.applyDphiCut = dPhiCut
-process.metsig50mht100.applyDphiCut = dPhiCut
-process.metsig50mht125.applyDphiCut = dPhiCut
-process.metsig50mht150.applyDphiCut = dPhiCut
-process.metsig50mht175.applyDphiCut = dPhiCut
-process.metsig50mht200.applyDphiCut = dPhiCut
-process.metsig50mht350.applyDphiCut = dPhiCut
-process.metsig50mht500.applyDphiCut = dPhiCut
-
-
-process.metsig75nomht.dMinNjet = njetmin
-process.metsig75mht25.dMinNjet = njetmin
-process.metsig75mht50.dMinNjet = njetmin
-process.metsig75mht75.dMinNjet = njetmin
-process.metsig75mht100.dMinNjet = njetmin
-process.metsig75mht125.dMinNjet = njetmin
-process.metsig75mht150.dMinNjet = njetmin
-process.metsig75mht175.dMinNjet = njetmin
-process.metsig75mht200.dMinNjet = njetmin
-process.metsig75mht350.dMinNjet = njetmin
-process.metsig75mht500.dMinNjet = njetmin
-
-process.metsig75nomht.applyDphiCut = dPhiCut
-process.metsig75mht25.applyDphiCut = dPhiCut
-process.metsig75mht50.applyDphiCut = dPhiCut
-process.metsig75mht75.applyDphiCut = dPhiCut
-process.metsig75mht100.applyDphiCut = dPhiCut
-process.metsig75mht125.applyDphiCut = dPhiCut
-process.metsig75mht150.applyDphiCut = dPhiCut
-process.metsig75mht175.applyDphiCut = dPhiCut
-process.metsig75mht200.applyDphiCut = dPhiCut
-process.metsig75mht350.applyDphiCut = dPhiCut
-process.metsig75mht500.applyDphiCut = dPhiCut
-
-
-process.metsig100nomht.dMinNjet = njetmin
-process.metsig100mht25.dMinNjet = njetmin
-process.metsig100mht50.dMinNjet = njetmin
-process.metsig100mht75.dMinNjet = njetmin
-process.metsig100mht100.dMinNjet = njetmin
-process.metsig100mht125.dMinNjet = njetmin
-process.metsig100mht150.dMinNjet = njetmin
-process.metsig100mht175.dMinNjet = njetmin
-process.metsig100mht200.dMinNjet = njetmin
-process.metsig100mht350.dMinNjet = njetmin
-process.metsig100mht500.dMinNjet = njetmin
-
-process.metsig100nomht.applyDphiCut = dPhiCut
-process.metsig100mht25.applyDphiCut = dPhiCut
-process.metsig100mht50.applyDphiCut = dPhiCut
-process.metsig100mht75.applyDphiCut = dPhiCut
-process.metsig100mht100.applyDphiCut = dPhiCut
-process.metsig100mht125.applyDphiCut = dPhiCut
-process.metsig100mht150.applyDphiCut = dPhiCut
-process.metsig100mht175.applyDphiCut = dPhiCut
-process.metsig100mht200.applyDphiCut = dPhiCut
-process.metsig100mht350.applyDphiCut = dPhiCut
-process.metsig100mht500.applyDphiCut = dPhiCut
-
-
-process.metsig200nomht.dMinNjet = njetmin
-process.metsig200mht25.dMinNjet = njetmin
-process.metsig200mht50.dMinNjet = njetmin
-process.metsig200mht75.dMinNjet = njetmin
-process.metsig200mht100.dMinNjet = njetmin
-process.metsig200mht125.dMinNjet = njetmin
-process.metsig200mht150.dMinNjet = njetmin
-process.metsig200mht175.dMinNjet = njetmin
-process.metsig200mht200.dMinNjet = njetmin
-process.metsig200mht350.dMinNjet = njetmin
-process.metsig200mht500.dMinNjet = njetmin
-
-process.metsig200nomht.applyDphiCut = dPhiCut
-process.metsig200mht25.applyDphiCut = dPhiCut
-process.metsig200mht50.applyDphiCut = dPhiCut
-process.metsig200mht75.applyDphiCut = dPhiCut
-process.metsig200mht100.applyDphiCut = dPhiCut
-process.metsig200mht125.applyDphiCut = dPhiCut
-process.metsig200mht150.applyDphiCut = dPhiCut
-process.metsig200mht175.applyDphiCut = dPhiCut
-process.metsig200mht200.applyDphiCut = dPhiCut
-process.metsig200mht350.applyDphiCut = dPhiCut
-process.metsig200mht500.applyDphiCut = dPhiCut
-
-
-process.metsig300nomht.dMinNjet = njetmin
-process.metsig300mht25.dMinNjet = njetmin
-process.metsig300mht50.dMinNjet = njetmin
-process.metsig300mht75.dMinNjet = njetmin
-process.metsig300mht100.dMinNjet = njetmin
-process.metsig300mht125.dMinNjet = njetmin
-process.metsig300mht150.dMinNjet = njetmin
-process.metsig300mht175.dMinNjet = njetmin
-process.metsig300mht200.dMinNjet = njetmin
-process.metsig300mht350.dMinNjet = njetmin
-process.metsig300mht500.dMinNjet = njetmin
-
-process.metsig300nomht.applyDphiCut = dPhiCut
-process.metsig300mht25.applyDphiCut = dPhiCut
-process.metsig300mht50.applyDphiCut = dPhiCut
-process.metsig300mht75.applyDphiCut = dPhiCut
-process.metsig300mht100.applyDphiCut = dPhiCut
-process.metsig300mht125.applyDphiCut = dPhiCut
-process.metsig300mht150.applyDphiCut = dPhiCut
-process.metsig300mht175.applyDphiCut = dPhiCut
-process.metsig300mht200.applyDphiCut = dPhiCut
-process.metsig300mht350.applyDphiCut = dPhiCut
-process.metsig300mht500.applyDphiCut = dPhiCut
-
-
-
+process.metsignomht.dMinNjet = options.njetmin
+process.metsigmht25.dMinNjet = options.njetmin
+process.metsigmht50.dMinNjet = options.njetmin
+process.metsignomht.applyDphiCut = options.dphicut
+process.metsigmht25.applyDphiCut = options.dphicut
+process.metsigmht50.applyDphiCut = options.dphicut
 
 process.preseq = cms.Sequence(
 							 #process.postProcessingSeq *	 #only for Seema's datasets
-                      process.ra2StdCleaning * #exclude this when running on Seema's skims
+                      #process.ra2StdCleaning * #exclude this when running on Seema's skims
                       #process.ra2PostCleaning * #exclude this when running on Seema's skims
                      #process.ra2EcalTPFilter *
 #                     process.ra2FullPFSelection *
@@ -293,7 +130,11 @@ process.preseq = cms.Sequence(
 							 ra2PFElectronVeto *
 							 #process.mhtPF *
 							 #process.trigWgtProd * 
-							 process.metsigseq 
+							 #process.metsigseq 
+							 process.mymhtPFforSgnf *
+							 process.metsignomht *
+							 process.metsigmht25 *
+							 process.metsigmht50 
 )
 
 
@@ -301,5 +142,6 @@ process.p = cms.Path(process.preseq)
 
 ##-- Output module configuration ---------------------------------------
 process.TFileService = cms.Service("TFileService",
-                                   fileName = cms.string(outputFile)
+                                   #fileName = cms.string(outputFile)
+                                   fileName = outputFile
 )
