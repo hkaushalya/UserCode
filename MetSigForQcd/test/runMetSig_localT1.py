@@ -1,5 +1,4 @@
 runningOnMC = True
-outputFile="SUSYT1_5Jets.root"
 
 import FWCore.ParameterSet.Config as cms
 import FWCore.ParameterSet.VarParsing as VarParsing
