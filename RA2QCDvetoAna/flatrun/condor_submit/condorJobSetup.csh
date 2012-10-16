@@ -1,7 +1,7 @@
 #! /bin/csh
 
 set curDir = `pwd`
-set mainDir = "/share/store/users/samantha/CMSSW_DEV/525/FlatSmearingCode/optimize/test2/submit"
+set mainDir = "/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/condor_submit/"
 set dirlist = "$mainDir/qcd1 $mainDir/qcd2 $mainDir/qcd3 $mainDir/qcd4 $mainDir/qcd5 $mainDir/qcd6 $mainDir/qcd7"
 set i = 0
 
@@ -21,9 +21,10 @@ foreach dir ( $dirlist )
 			cd $dir
 			set fileList =  `ls -1 *.files`
 			echo "$PWD -> $fileList"
-			./fnalCondorSubmit.csh 20 45 $fileList $i 
+			#./fnalCondorSubmit.csh 20 45 $fileList ${i} 
+			./fnalCondorSubmit.csh 4 4 $fileList ${i} 
 			cd $curDir
-			echo "$PWD"
+			exit
 		else if ( $i == 2 ) then
 			cp ../qcd2.files $dir
 			cd $dir
