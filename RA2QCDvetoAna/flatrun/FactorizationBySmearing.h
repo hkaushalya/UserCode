@@ -11,7 +11,6 @@
 #include "TFile.h"
 #include "TLorentzVector.h"
 #include "TVector3.h"
-#include "TRandom3.h"
 #include "SmearFunction.h"
 #include <sstream>
 #include "IOColors.hh"
@@ -87,7 +86,6 @@ class FactorizationBySmearing : public NtupleSelector{
 
 	private:
 		bool debug;
-		TRandom3 *rand_;
 		SmearFunction *smearFunc_;
 		double smearedJetPt_;
 		std::vector<double> PtBinEdges_scaling_;
@@ -113,6 +111,8 @@ class FactorizationBySmearing : public NtupleSelector{
 		unsigned NJet50_min_, NJet50_max_;
 		std::vector<float> vDphiVariations;
 
+		vector<vector<TH1*> > jerHist; //for each pt/eta bins
+		void BookJerDebugHists();
 
 		void DumpJets(const vector<TLorentzVector>& jets);
 		void GetHist(TDirectory *dir, Hist_t& hist, 
@@ -447,27 +447,6 @@ void FactorizationBySmearing::GetJetHist(vector<JetHist_t>& Hist, const string j
 
 }
 
-unsigned FactorizationBySmearing::GetVectorIndex(const vector<double>& bins, const double& val)
-{
-	for (unsigned bin=0; bin < bins.size() -1; ++bin)
-	{
-		const double min = bins.at(bin);
-		const double max = bins.at(bin+1);
-		if (val>=min && val<max) return bin;
-	}
-
-	cout << "val = " << val << ", bins = ";
-
-	for (unsigned bin=0; bin < bins.size(); ++bin)
-	{
-		cout << bins.at(bin) << "/";
-	}
-	cout << endl;
-	
-	cout << __FUNCTION__ << ":" << __LINE__<< ": value out of the given bins ranges!! exiting.." << endl;
-	assert(false);
-	return 999;
-}
 
 
 #endif

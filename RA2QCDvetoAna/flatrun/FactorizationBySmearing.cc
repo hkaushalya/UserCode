@@ -26,7 +26,7 @@ static bool sort_using_less_than(double u, double v)
 int main(int argc, char* argv[])
 {
 
-	if (argc < 3) {
+	if (argc <= 3) {
 		cerr <<"Please give 5 arguments " << "runList " << " " << "outputFileName" << " " << "# of evts  nJet50Min  nJet50Max" << endl;
 		cerr <<" Valid configurations are " << std::endl;
 		cerr << " ./optimize runlist_ttjets.txt isoplots.root qcd.files 100 2 5" << std::endl;
@@ -36,17 +36,21 @@ int main(int argc, char* argv[])
 	const char *inputFileList = argv[1];
 	const char *outFileName   = argv[2];
 	const char *arg3          = argv[3];
-	const char *arg4          = argv[4];
-	const char *arg5          = argv[5];
+	//const char *arg4          = argv[4];
+	//const char *arg5          = argv[5];
 	int evts    = -1;
 
 	if (isdigit(arg3[0]))
 	{
-		evts = atoi(argv[3]);
+		int num = atoi(argv[3]);
+		//evts = 500;
+		//if (num>1) evts = num;
+		cout << __FUNCTION__ << ": evts = " << evts << endl;
 	} else 
 	{
 		cout << "argument 3 is not a number. using default value for evts = " << evts << endl;
 	}
+	
 
 	//FactorizationBySmearing optimize(inputFileList, outFileName, data);
 	FactorizationBySmearing smear(inputFileList, outFileName);
@@ -153,13 +157,11 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	vDphiVariations.push_back(0.35);
 	vDphiVariations.push_back(0.40);
 
-
-
 	Long64_t nentries = fChain->GetEntriesFast();
-	//cout << "nentries " << nentries << endl;
+	cout << "nentries " << nentries << endl;
 	if (evts2Process>0 && evts2Process < nentries) 
 	{	
-	//	nentries = evts2Process;
+		nentries = evts2Process;
 		cout << "Requested events to process = " << nentries << endl;
 	}
 
@@ -207,6 +209,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	debug = false;
 	
    smearFunc_ = new SmearFunction();
+	BookJerDebugHists();
 	if (debug) cout << __FUNCTION__ << ":" << __LINE__ << endl;
 
 	//nentries = 50;
@@ -248,6 +251,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 
 		//do smart sampling
 		unsigned nTries_ = 1000; //default
+		//unsigned nTries_ = 1; //default
 		/*if (debug) nTries_ = 1;
 		else
 		{
@@ -379,11 +383,37 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	gPad->Print("samples.eps]");
 
 
+	vector<double> ptBins = smearFunc_->GetPtBinEdges();
+	vector<double> etaBins = smearFunc_->GetEtaBinEdges();
+	TCanvas *c1 = new TCanvas("c1");
+	gStyle->SetOptStat(11111);
+	gPad->Print("JERs.eps[");
+
+	for (unsigned ptbin=0; ptbin < ptBins.size() -1; ++ptbin)
+	{
+		for (unsigned etabin=0; etabin < etaBins.size() -1; ++etabin)
+		{
+			jerHist.at(ptbin).at(etabin)->Draw();
+			gPad->Print("JERs.eps");
+		}
+	}
+	gPad->Print("JERs.eps]");
+
 	//end job summary
 	cout << ">>>>>>> " << __FILE__ << ":" << __FUNCTION__ << ": End Job " << endl;
 	cout << "nTries[mht>500/400/300/200/150/80 = " << n500 
 					<< "/" << n400 << "/" << n200 << "/" << n150 << "/" << n80 << endl; 
 	cout << "Entries found/processed = " << nentries << " / " << nProcessed << endl;
+	cout << "---------- Settings --------------- " << endl;
+	cout << "smearedJetPt_      = " << smearedJetPt_ << endl;
+	cout << "MHTcut_low_        = " << MHTcut_low_  << endl;
+	cout << "MHTcut_medium_     = " << MHTcut_medium_  << endl;
+	cout << "MHTcut_high_       = " << MHTcut_high_  << endl;
+	cout << "HTcut_low_         = " << HTcut_low_  << endl;
+	cout << "HTcut_medium_      = " << HTcut_medium_  << endl;
+	cout << "HTcut_high_        = " << HTcut_high_  << endl;
+	cout << "HTcut_veryhigh_    = " << HTcut_veryhigh_  << endl;
+	cout << "HTcut_extremehigh_ = " << HTcut_extremehigh_  << endl;
 
 }
 
@@ -467,12 +497,18 @@ void FactorizationBySmearing::SmearingGenJets(const vector<TLorentzVector>& jets
 	for (vector<TLorentzVector>::const_iterator it = jets_gen.begin(); it != jets_gen.end(); ++it) {
 
 		if (it->Pt() > smearedJetPt_) {
-			double newPt = 0;
-			newPt = it->Pt() * JetResolutionHist_Pt_Smear(it->Pt(), it->Eta(), i_jet); //what is this i_jet purpose???
+			const double scale = JetResolutionHist_Pt_Smear(it->Pt(), it->Eta(), i_jet); //what is this i_jet purpose??? jet id index
+
+			const double newPt = it->Pt() * scale;
+			const double newEta = it->Eta();
+			const double newPhi = it->Phi();
+			const double newM   = it->M();
 			if (debug) cout << "old/new pt = " << it->Pt() << "/" << newPt << endl; 
-			double newEta = it->Eta();
-			double newPhi = it->Phi();
-			double newM   = it->M();
+
+			//for JER reconstruction for debugging
+			int i_Pt = GetIndex(it->Pt(), &PtBinEdges_);
+			int i_eta = GetIndex(it->Eta(), &EtaBinEdges_);
+			jerHist.at(i_Pt).at(i_eta)->Fill(scale);
 
           //pat::Jet::PolarLorentzVector newP4(newPt, newEta, newPhi, it->mass());
 			 //typedef math::PtEtaPhiMLorentzVector PolarLorentzVector;
@@ -509,6 +545,7 @@ double FactorizationBySmearing::JetResolutionHist_Pt_Smear(const double& pt, con
    int i_eta = GetIndex(eta, &EtaBinEdges_);
 
 	const double res = smearFunc_->getSmearFunc(1,i_jet,i_eta,i_Pt)->GetRandom();
+	//const double res = smearFunc_->getSmearFunc(0,i_jet,i_eta,i_Pt)->GetRandom();
 	if (debug) cout << __FUNCTION__ << ":" << __LINE__ << ": res = " << res << endl;
 	if (debug) cout << __FUNCTION__ << ":" << __LINE__ << endl;
 
@@ -784,4 +821,64 @@ bool FactorizationBySmearing::PassRA2dphiCut(const vector<TLorentzVector>& jets,
 	if (jets.size() >=3) bPassRA2dphiCut = bPassRA2dphiCut && (std::fabs(jets.at(2).DeltaPhi(mht)) > 0.3);
 	
 	return bPassRA2dphiCut;
+}
+
+void FactorizationBySmearing::BookJerDebugHists()
+{
+	vector<double> ptBins = smearFunc_->GetPtBinEdges();
+	vector<double> etaBins = smearFunc_->GetEtaBinEdges();
+	
+	TDirectory *dir = (TDirectory*) oFile->FindObject("Hist");
+	if (dir == NULL)
+	{
+		cout << __FUNCTION__ << ": dir named Hist not found!" << endl;
+		assert(false);
+	}
+	TDirectory *subdir = dir->mkdir("JERS");
+	subdir->cd();
+	
+	for (unsigned ptbin=0; ptbin < ptBins.size() -1; ++ptbin)
+	{
+		vector<TH1*> h;
+		for (unsigned etabin=0; etabin < etaBins.size() -1; ++etabin)
+		{
+			const float ptmin = ptBins.at(ptbin);
+			const float ptmax = ptBins.at(ptbin+1);
+			const float etamin = etaBins.at(etabin);
+			const float etamax = etaBins.at(etabin+1);
+			stringstream name, title;
+			name << "jer_pt" << ptmin << "to" << ptmax << "_eta" << etamin << "to" << etamax;  
+			title << "Pt" << ptbin << "_Eta"<< etabin 
+				<< ":[" <<  ptmin << "<PT<" << ptmax << ", " 
+				<< etamin << "< #eta <" << etamax << "]";  
+			TH1* hist = new TH1F(name.str().c_str(), title.str().c_str(), 100,0,2); 
+			//hist->Sumw2();
+			h.push_back(hist);
+		}
+		jerHist.push_back(h);
+	}
+
+}
+
+unsigned FactorizationBySmearing::GetVectorIndex(const vector<double>& binEdges, const double& val)
+{
+	for (unsigned bin=0; bin < binEdges.size() -1; ++bin)
+	{
+		const double min = binEdges.at(bin);
+		const double max = binEdges.at(bin+1);
+		if (val>=min && val<max) return bin;
+	}
+
+	cout << __FUNCTION__ << ": FATAL ERROR OCCURED!" << endl;
+	cout << "val = " << val << " is out of bin ranges[ ";
+
+	for (unsigned bin=0; bin < binEdges.size(); ++bin)
+	{
+		cout << binEdges.at(bin) << "/";
+	}
+	cout << "]" << endl;
+	
+	cout << "bin size = " << binEdges.size() << endl;
+	cout << "Assigning the last bin for this extreme value!" << endl;
+	return (binEdges.size() - 2);
 }

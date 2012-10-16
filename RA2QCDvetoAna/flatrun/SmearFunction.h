@@ -29,6 +29,8 @@ public:
    TF1* getSigmaPtForRebalancing(int i_jet, int i_eta) const;
    TF1* getSigmaPtScaledForRebalancing(int i_jet, int i_eta) const;
    TH1F* getSmearFunc(int i_flav, int i_jet, int i_eta, int i_Pt) const;
+	vector<double> GetPtBinEdges() { return PtBinEdges_; }
+	vector<double> GetEtaBinEdges() { return EtaBinEdges_; }
   
 private:
    typedef std::vector<std::string>::const_iterator StrIter;
