@@ -26,24 +26,27 @@ foreach dir ( $argv )
 		set filesToProcess = `cat $fileList | wc -l`
 		echo "SRC files to be processed = $filesToProcess ($fileList)"
 		set SRCtobeProc =  `grep "root" *.stdout| grep "dcap" | wc -l`
-		#echo "SRC files given     = $SRCtobeProc"
-		#grep "root" *.stdout| grep "dcap" | wc -l
-		#set SRCprocessed = `grep "Successfully opened" *.stderr | wc -l`
-		#echo "Processed SRC files = $SRCprocessed"
-		 
-		#if ( $filesToProcess != $SRCtobeProc ) then
-		#	echo "\033[1;31m WARNING>> SRC tobe processed does not match to the given\!\!\! \033[0m"
-		#else 
-		#	echo "\033[1;32m >>SRC tobe processed match to the given. \033[0m"
-		#endif
 
-		#if ( $filesToProcess != $SRCprocessed ) then
-		#	echo "\033[1;31m WARNNING>> SRC tobe processed does not match to the processed\!\!\! \033[0m"
-		#	exit
-		#else 
-		#	echo "\033[1;32m >>SRC tobe processed match to the processed. \033[0m"
-		#endif
+		echo -n ">>> Testing events processed "
+		set outfiles = `ls -1 *.stdout`
 
+		set sucess = 1
+		echo $outfiles
+		foreach out ( $outfiles )
+			#echo "processing $out"
+			set p1 = `cat $out | grep 'Entries found' | cut -d ' ' -f4` 
+			set p2 = `cat $out | grep 'Entries found' | cut -d ' ' -f6` 
+			#echo "$p1 / $p2 "
+			if ( $p1 != $p2 ) then
+				echo "\033[31m entries found /processed mismathc: $p1 / $p2 in job file $out \033[0m"
+				@ sucess = 0
+				exit
+			endif
+		end
+		if ( $sucess == 1 ) then
+			echo "\033[32m All events present are processed. \033[0m"
+		endif
+	
 
 		echo "Merging any Available root files."
 		
