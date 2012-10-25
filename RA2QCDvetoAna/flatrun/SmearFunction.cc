@@ -3,12 +3,17 @@
 #include <TCanvas.h>
 #include <TStyle.h>
 #include <TPostScript.h>
+#include "TRandom.h"
+#include <cstdlib>
 
 using namespace std;
 
 SmearFunction::SmearFunction() 
 {
-	//cout << __FUNCTION__ << ":" << __LINE__ << endl;
+	cout << __FUNCTION__ << ":" << __LINE__ << endl;
+	gRandom->SetSeed();
+	cout << "First rand#" << gRandom->Rndm() << endl;
+
    // get parameters from config
    LowerTailScaling_variation_ = 1; 
    UpperTailScaling_variation_ = 1; 
@@ -718,6 +723,7 @@ void SmearFunction::ResizeSmearFunctions() {
             char hname[100];
             sprintf(hname, "SigmaPtHist_JetFlavor%i_Eta%i_Jet%i", i_flav, i_eta, i_jet + 1);
             SigmaPtHist.at(i_flav).at(i_jet).at(i_eta) = new TH1F(hname, hname, PtBinEdges_.size() - 1, &(PtBinEdges_.at(0)));
+				SigmaPtHist.at(i_flav).at(i_jet).at(i_eta)->SetDirectory(0);
             SigmaPtHist.at(i_flav).at(i_jet).at(i_eta)->Sumw2();
          }
       }
