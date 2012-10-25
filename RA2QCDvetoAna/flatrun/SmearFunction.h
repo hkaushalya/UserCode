@@ -29,15 +29,14 @@ public:
    TF1* getSigmaPtForRebalancing(int i_jet, int i_eta) const;
    TF1* getSigmaPtScaledForRebalancing(int i_jet, int i_eta) const;
    TH1F* getSmearFunc(int i_flav, int i_jet, int i_eta, int i_Pt) const;
-	vector<double> GetPtBinEdges() { return PtBinEdges_; }
-	vector<double> GetEtaBinEdges() { return EtaBinEdges_; }
-  
+
 private:
    typedef std::vector<std::string>::const_iterator StrIter;
 
    void FillSigmaHistsForRebalancing();
    void ResizeSmearFunctions();
    void CalculateSmearFunctions();
+
    double GetAdditionalSmearing(const double&, const double&);
    double GetLowerTailScaling(const double&, const double&);
    double GetUpperTailScaling(const double&, const double&);
@@ -91,6 +90,17 @@ private:
    std::vector<std::vector<TF1*> > SigmaPt_total;
    std::vector<std::vector<TH1F*> > SigmaPtHist_scaled_total;
    std::vector<std::vector<TF1*> > SigmaPt_scaled_total;
+
+
+public:
+	vector<double> GetPtBinEdges() { return PtBinEdges_; }
+	vector<double> GetEtaBinEdges() { return EtaBinEdges_; }
+
+	//setters (override default settings)
+	void SetPtBinEdges(const vector<double> ptBins);
+	void SetEtaBinEdges(const vector<double> etaBins);
+
+	void SetAbsoluteTailScaling(const bool b) { absoluteTailScaling_ = b; }
 };
 
 #endif
