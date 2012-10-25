@@ -2,6 +2,7 @@
 
 export configSpecStr=$1
 export dataset=$2
+export totevts=-1
 
 export filetail="_"$configSpecStr
 
@@ -42,7 +43,7 @@ initialdir = ${outputDir}
 Output = ${logDir}_${configSpecStr}_\$(Cluster)_\$(Process).stdout
 Error = ${logDir}_${configSpecStr}_\$(Cluster)_\$(Process).stderr
 Log = ${logDir}_${configSpecStr}_\$(Cluster)_\$(Process).log
-Arguments = $inputlist \$(Cluster).root ${dataset}
+Arguments = $inputlist \$(Cluster).root ${totevts} 
 
 Queue 
 
