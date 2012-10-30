@@ -20,6 +20,11 @@
 
 using namespace std;
 
+/***************************************************************
+ * See cc file for class description.
+ * Sam Hewamanage, Florida International University
+ **************************************************************/
+
 class SmearFunction {
 
 public:
@@ -101,6 +106,7 @@ public:
 	void SetEtaBinEdges(const vector<double> etaBins);
 
 	void SetAbsoluteTailScaling(const bool b) { absoluteTailScaling_ = b; }
+	bool GetAbsoluteTailScaling() const { return absoluteTailScaling_; }
 };
 
 #endif
