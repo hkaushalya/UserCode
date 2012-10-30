@@ -16,6 +16,11 @@
 #include "IOColors.hh"
 #include "TDirectory.h"
 
+/***************************************************************
+ * See cc file for class description.
+ * Sam Hewamanage, Florida International University
+ **************************************************************/
+
 class FactorizationBySmearing : public NtupleSelector{
 
 	public:
@@ -127,6 +132,7 @@ class FactorizationBySmearing : public NtupleSelector{
 					const TLorentzVector& mhtVec);
 		bool PassRA2dphiCut(const vector<TLorentzVector>& jets, const TLorentzVector& mht);
 		double GetLumiWgt(const string& datasetname, const double& dataLumi);
+		void DivideByBinWidth(TH1* h);
 };
 #endif
 
@@ -147,15 +153,15 @@ FactorizationBySmearing::FactorizationBySmearing(const TString &inputFileList, c
 	Init(tree);
 
 	HtBins_.push_back(0);
-	//HtBins_.push_back(500);
-	//HtBins_.push_back(900);
-	//HtBins_.push_back(1300);
+	HtBins_.push_back(500);
+	HtBins_.push_back(900);
+	HtBins_.push_back(1300);
 	HtBins_.push_back(7000);
 
 	MhtBins_.push_back(0);
-//	MhtBins_.push_back(200);
-//	MhtBins_.push_back(350);
-//	MhtBins_.push_back(500);
+	MhtBins_.push_back(200);
+	MhtBins_.push_back(350);
+	MhtBins_.push_back(500);
 	MhtBins_.push_back(7000);
 
 	BookHistogram(outFileName);
