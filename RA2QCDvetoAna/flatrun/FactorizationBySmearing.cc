@@ -19,6 +19,18 @@
 
 using namespace std;
 
+
+/***************************************************************
+ * This class is created for Factorization to utilize gen-jet
+ * smearing to better quantify constant 'c'. This works only 
+ * flat ntuples created using a modifed version of
+ * lostLeptonTree.
+ * Author: Sam Hewamanage
+ * Institution: Florida Internationa University, USA.
+ **************************************************************/
+
+
+
 static bool sort_using_less_than(double u, double v)
 {
 	   return u < v;
@@ -61,7 +73,8 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2Process) {
+void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2Process)
+{
 	if (fChain == 0) return;
 
 	//settings for the day
@@ -74,7 +87,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	/*****************************************************
 	 * Smearing function constants and variables
 	 ******************************************************/
-	absoluteTailScaling_ = false;
+	absoluteTailScaling_ = true;  //false for systematics
 	smearedJetPt_        = 13.0;
 	MHTcut_low_          = 200.;
 	MHTcut_medium_       = 350.;
@@ -144,9 +157,10 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	const double dDATA_LUMI = 10000.0; // 10 fb-1
 	const double lumiWgt = GetLumiWgt(datasetname, dDATA_LUMI); 
 	//const double lumiWgt = 1; 
-	NJet50_min_          = 3;
+	//jet bins: 2, 3-5, 6-7,>=8
+	NJet50_min_          = 8;
 	NJet50_max_          = 1000;
-	unsigned nTries_     = 500; //number of pseudo experiments per event
+	unsigned nTries_     = 1000; //number of pseudo experiments per event
 	if (bDEBUG) nTries_  = 1;
 	const double smearingWgt = 1.0/(double)nTries_;
 
@@ -191,8 +205,8 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 		CreateGenJetVec(genJets);
 		const int njet50_reco = CountJets(recoJets, 50, 2.5);
 		const int njet50_gen = CountJets(genJets, 50, 2.5);
-		if (njet50_reco>= NJet50_min_ && njet50_reco< NJet50_max_) FillHistogram(recoJets,0, lumiWgt);
-		if (njet50_gen >= NJet50_min_ && njet50_gen < NJet50_max_) FillHistogram(genJets,1, lumiWgt);
+		if (njet50_reco>= NJet50_min_ && njet50_reco<= NJet50_max_) FillHistogram(recoJets,0, lumiWgt);
+		if (njet50_gen >= NJet50_min_ && njet50_gen <= NJet50_max_) FillHistogram(genJets,1, lumiWgt);
 		const double recoHT = HT(recoJets);
 		const double genHT  = HT(genJets);
 		const double recoMHT= (MHT(recoJets)).Pt();
@@ -215,7 +229,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 			}
 
 			const int njet50_smeared = CountJets(smearedGenJets, 50.0, 2.5);
-			if (njet50_smeared>= NJet50_min_ && njet50_smeared< NJet50_max_) 
+			if (njet50_smeared>= NJet50_min_ && njet50_smeared<= NJet50_max_) 
 			{
 				FillHistogram(smearedGenJets,2, smearingWgt * lumiWgt);
 			}
@@ -226,6 +240,37 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 
 	} // event loop
 
+
+	/***** NORMALIZE VARIABLE BINNED HIST BY BIN WIDTH *****/
+
+	TCanvas *pf = new TCanvas("pf");
+	gPad->Print("passfail.eps[");
+	for (unsigned htbin=0; htbin < HtBins_.size() -1 ; ++htbin)
+	{
+		for (unsigned mhtbin=0; mhtbin < MhtBins_.size() -1 ; ++mhtbin)
+		{
+			for (int i=0; i<6; ++i)
+			{
+				DivideByBinWidth(Hist.at(htbin).at(mhtbin).hv_SmearedEvt.pass[i]);
+				DivideByBinWidth(Hist.at(htbin).at(mhtbin).hv_SmearedEvt.fail[i]);
+					
+				Hist.at(htbin).at(mhtbin).hv_SmearedEvt.pass[i]->Draw();
+				gPad->Print("passfail.eps");
+				Hist.at(htbin).at(mhtbin).hv_SmearedEvt.fail[i]->Draw();
+				gPad->Print("passfail.eps");
+			}
+		}
+	}
+
+	gPad->Print("passfail.eps]");
+	delete pf;
+
+
+
+
+	/****************************************************************************
+	 * FOR QUICK DEBUGGING ONLY
+	 ***************************************************************************/
    //if (smearFunc_) delete smearFunc_;
 	TCanvas *c = new TCanvas();
 	gStyle->SetOptStat(0);
@@ -378,18 +423,19 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	if (bDEBUG) cout << red << " ------ DEBUG MODE ---------- " << clearatt << endl;
 	cout << "Entries found/processed = " << nentries << " / " << nProcessed << endl;
 	cout << "---------- Settings --------------- " << endl;
-	cout << "Lumi wgt           = " << lumiWgt << endl;
-	cout << "Smear wgt          = " << smearingWgt << endl;
-	cout << "nTries_            = " << nTries_ << endl;
-	cout << "smearedJetPt_      = " << smearedJetPt_ << endl;
-	cout << "MHTcut_low_        = " << MHTcut_low_  << endl;
-	cout << "MHTcut_medium_     = " << MHTcut_medium_  << endl;
-	cout << "MHTcut_high_       = " << MHTcut_high_  << endl;
-	cout << "HTcut_low_         = " << HTcut_low_  << endl;
-	cout << "HTcut_medium_      = " << HTcut_medium_  << endl;
-	cout << "HTcut_high_        = " << HTcut_high_  << endl;
-	cout << "HTcut_veryhigh_    = " << HTcut_veryhigh_  << endl;
-	cout << "HTcut_extremehigh_ = " << HTcut_extremehigh_  << endl;
+	cout << "Lumi wgt             = " << lumiWgt << endl;
+	cout << "Smear wgt            = " << smearingWgt << endl;
+	cout << "nTries_              = " << nTries_ << endl;
+	cout << "smearedJetPt_        = " << smearedJetPt_ << endl;
+	cout << "absoluteTailScaling_ = " << smearFunc_->GetAbsoluteTailScaling() << endl;
+	cout << "MHTcut_low_          = " << MHTcut_low_  << endl;
+	cout << "MHTcut_medium_       = " << MHTcut_medium_  << endl;
+	cout << "MHTcut_high_         = " << MHTcut_high_  << endl;
+	cout << "HTcut_low_           = " << HTcut_low_  << endl;
+	cout << "HTcut_medium_        = " << HTcut_medium_  << endl;
+	cout << "HTcut_high_          = " << HTcut_high_  << endl;
+	cout << "HTcut_veryhigh_      = " << HTcut_veryhigh_  << endl;
+	cout << "HTcut_extremehigh_   = " << HTcut_extremehigh_  << endl;
 
 }
 
@@ -1185,4 +1231,22 @@ void FactorizationBySmearing::GetJetHist(vector<JetHist_t>& Hist, const string j
 
 }
 
+void FactorizationBySmearing::DivideByBinWidth(TH1* h)
+{
+	if (h == NULL)
+	{
+		cout << __FUNCTION__ << ": null pointer passed! retuning!." << endl; 
+		return;
+	}
+	for (int bin=1; bin<=h->GetNbinsX(); ++bin)
+	{
+		const double v = h->GetBinContent(bin);
+		const double e = h->GetBinError(bin);
+		const double w = h->GetBinWidth(bin);
+		const double nv = v/w;
+		const double ne = e/w;
+		h->SetBinContent(bin, nv);
+	}
+
+}
 
