@@ -8,6 +8,13 @@
 
 using namespace std;
 
+/***************************************************************
+ * This is ported from CMSSW SmearFunction.cc to work with
+ * flat ntuples for the Factorization method.
+ * Author: Sam Hewamanage
+ * Institution: Florida Internationa University, USA.
+ **************************************************************/
+
 SmearFunction::SmearFunction() 
 {
 	cout << __FUNCTION__ << ":" << __LINE__ << endl;
@@ -18,8 +25,8 @@ SmearFunction::SmearFunction()
    LowerTailScaling_variation_ = 1; 
    UpperTailScaling_variation_ = 1; 
    AdditionalSmearing_variation_ = 1; 
+	absoluteTailScaling_ = true;  //false for systematics
    NRebin_ = 1; 
-   uncertaintyName_ = ""; 
    /*inputhist1HF_ = "hResponse1_HF";
    inputhist2HF_ = "hResponse2_HF";
    inputhist3pHF_ = "hResponse3p_HF";
@@ -27,7 +34,6 @@ SmearFunction::SmearFunction()
    inputhist2NoHF_ = "hResponse2_NoHF";
    inputhist3pNoHF_ =  "hResponse3p_NoHF";
 */   //bprobabilityfile_ = "bprobfile.root";
-   outputfile_ = "SmearedAndScaledResponse";
    	
 		//some inputs have changes from 2011
 		inputhist1HF_ = "h_tot_JetAll_ResponsePt";
@@ -310,7 +316,7 @@ void SmearFunction::CalculateSmearFunctions() {
       }
    }
 
-	cout << __FUNCTION__ << ":" << __LINE__ << endl;
+	//cout << __FUNCTION__ << ":" << __LINE__ << endl;
    //// Fit gaussian sigma as function of pt
    for (unsigned int i_flav = 0; i_flav < 2; ++i_flav) {
       for (unsigned int i_jet = 0; i_jet < 3; ++i_jet) {
@@ -385,6 +391,7 @@ void SmearFunction::CalculateSmearFunctions() {
                   double LowerTailScale = GetLowerTailScaling(PtBinEdges_.at(i_Pt), EtaBinEdges_.at(i_eta));
                   double UpperTailScale = GetUpperTailScaling(PtBinEdges_.at(i_Pt), EtaBinEdges_.at(i_eta));
                   //cout << "absolute scaling factor: " << TailScale << endl;
+						//cout << __FUNCTION__ << ":" << __LINE__ << ": absoluteTailScaling_ = " << absoluteTailScaling_ << endl;
                   if (absoluteTailScaling_) {
                      double RMS = smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetRMS();
                      //cout << "Integral from " << 1-A1RMS_*RMS << " to " << 1-A0RMS_*RMS << endl;
