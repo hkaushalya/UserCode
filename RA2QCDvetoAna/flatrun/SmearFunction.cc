@@ -23,6 +23,7 @@ SmearFunction::SmearFunction()
 
    // get parameters from config
    LowerTailScaling_variation_ = 1; 
+   //LowerTailScaling_variation_ = 0.5; 
    UpperTailScaling_variation_ = 1; 
    AdditionalSmearing_variation_ = 1; 
 	absoluteTailScaling_ = true;  //false for systematics
@@ -35,15 +36,22 @@ SmearFunction::SmearFunction()
    inputhist3pNoHF_ =  "hResponse3p_NoHF";
 */   //bprobabilityfile_ = "bprobfile.root";
    	
-		//some inputs have changes from 2011
-		inputhist1HF_ = "h_tot_JetAll_ResponsePt";
-		inputhist2HF_ = "h_tot_JetAll_ResponsePt";
-		inputhist3pHF_ = "h_tot_JetAll_ResponsePt";
-		inputhist1NoHF_ = "h_tot_JetAll_ResponsePt";
-		inputhist2NoHF_ = "h_tot_JetAll_ResponsePt";
-		inputhist3pNoHF_ = "h_tot_JetAll_ResponsePt";
+	//some inputs have changes from 2011
+	inputhist1HF_ = "h_tot_JetAll_ResponsePt";
+	inputhist2HF_ = "h_tot_JetAll_ResponsePt";
+	inputhist3pHF_ = "h_tot_JetAll_ResponsePt";
+	inputhist1NoHF_ = "h_tot_JetAll_ResponsePt";
+	inputhist2NoHF_ = "h_tot_JetAll_ResponsePt";
+	inputhist3pNoHF_ = "h_tot_JetAll_ResponsePt";
 
-
+	//jet ranked-based resolution fucntions
+	/*inputhist1HF_    = "h_tot_Jet1_ResponsePt";
+	inputhist2HF_    = "h_tot_Jet2_ResponsePt";
+	inputhist3pHF_   = "h_tot_Jet3_ResponsePt";
+	inputhist1NoHF_  = "h_tot_Jet1_ResponsePt";
+	inputhist2NoHF_  = "h_tot_Jet2_ResponsePt";
+	inputhist3pNoHF_ = "h_tot_Jet3_ResponsePt";
+*/
 
 	
 	//not in pyc
@@ -89,6 +97,7 @@ SmearFunction::SmearFunction()
 
    //smearingfile_ = "SmearingFile";
    smearingfile_ = "/share/store/users/samantha/CMSSW_DEV/525/FlatSmearingCode/optimize/test2/submit/MCJetResolution_Summer12_QCD_Pt_15to3000_TuneZ2_Flat_8TeV_pythia6_withCHS_withoutPUReweighting.root";
+   //smearingfile_ = "/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/MCJetResolution_Summer12_QCD_Pt_15to3000_TuneZ2_Flat_8TeV_pythia6_withCHS_withPUReweighting_fineLowPtBins_pixelcorr.root";
    //PtBinEdges_scaling_ = NumStringToVec("0., 7000.");
    //EtaBinEdges_scaling_ = NumStringToVec("0.0, 5.0");
    //EtaBinEdges_scaling_ = NumStringToVec("0.0, 5.0");

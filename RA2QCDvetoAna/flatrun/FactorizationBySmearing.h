@@ -24,7 +24,9 @@
 class FactorizationBySmearing : public NtupleSelector{
 
 	public:
-		FactorizationBySmearing(const TString &inputFileList="foo.txt", const char *outFileName="histo.root"); 
+		FactorizationBySmearing(const TString &inputFileList="foo.txt", 
+								const char *outFileName="histo.root",
+								const int njet50min=3, const int njet50max=1000); 
 		~FactorizationBySmearing();
 		Bool_t   FillChain(TChain *chain, const TString &inputFileList);
 		Long64_t LoadTree(Long64_t entry);
@@ -49,6 +51,8 @@ class FactorizationBySmearing : public NtupleSelector{
 		void UpperTailScaling(const string s);
 		void PtBinEdges(const string s);
 		void EtaBinEdges(const string s);
+		bool PassCuts(const vector<TLorentzVector>& jets);
+		vector<TLorentzVector> GetPt50Eta2p5Jets(const vector<TLorentzVector>& jets);
 
 		TFile *oFile;
 			
@@ -99,6 +103,7 @@ class FactorizationBySmearing : public NtupleSelector{
 		double LowerTailScaling_variation_;
 		double UpperTailScaling_variation_;
 		bool absoluteTailScaling_;
+		bool applyDphiCut_; 
 
 		double MHTcut_low_;
 		double MHTcut_medium_;
@@ -112,6 +117,7 @@ class FactorizationBySmearing : public NtupleSelector{
 		vector<vector<Hist_t> > Hist; //for each HT/MHT bins
 		unsigned NJet50_min_, NJet50_max_;
 		std::vector<float> vDphiVariations;
+		double nRecoJetEvts, nGenJetEvts, nSmearedJetEvts;
 
 		vector<vector<TH1*> > jerHist; //for each pt/eta bins
 		void BookJerDebugHists();
@@ -133,12 +139,18 @@ class FactorizationBySmearing : public NtupleSelector{
 		bool PassRA2dphiCut(const vector<TLorentzVector>& jets, const TLorentzVector& mht);
 		double GetLumiWgt(const string& datasetname, const double& dataLumi);
 		void DivideByBinWidth(TH1* h);
+		bool PassCleaning();
 };
 #endif
 
 #ifdef FactorizationBySmearing_cxx
 
-FactorizationBySmearing::FactorizationBySmearing(const TString &inputFileList, const char *outFileName) {
+FactorizationBySmearing::FactorizationBySmearing(
+				const TString &inputFileList, 
+				const char *outFileName,
+				const int njet50min,
+				const int njet50max
+				) {
 
 	//isItMC = true;
 	//isItZ  = false;
@@ -154,18 +166,26 @@ FactorizationBySmearing::FactorizationBySmearing(const TString &inputFileList, c
 
 	HtBins_.push_back(0);
 	HtBins_.push_back(500);
-	HtBins_.push_back(900);
-	HtBins_.push_back(1300);
-	HtBins_.push_back(7000);
+	HtBins_.push_back(750);
+	HtBins_.push_back(1000);
+	HtBins_.push_back(1250);
+	HtBins_.push_back(1500);
+	HtBins_.push_back(8000);
 
 	MhtBins_.push_back(0);
-	MhtBins_.push_back(200);
-	MhtBins_.push_back(350);
-	MhtBins_.push_back(500);
-	MhtBins_.push_back(7000);
+	//MhtBins_.push_back(200);
+	//MhtBins_.push_back(350);
+	//MhtBins_.push_back(500);
+	MhtBins_.push_back(8000);
+
+	//jet bins: 2, 3-5, 6-7,>=8
+	NJet50_min_  = njet50min;
+	NJet50_max_  = njet50max;
+	nRecoJetEvts = 0;
+	nGenJetEvts  = 0;
+	nSmearedJetEvts = 0;
 
 	BookHistogram(outFileName);
-
 }
 
 Bool_t FactorizationBySmearing::FillChain(TChain *chain, const TString &inputFileList) {

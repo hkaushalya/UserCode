@@ -31,6 +31,9 @@ public :
    UInt_t          t_EvtEvent;
    Int_t           t_NVertices;
    Double_t        t_PUWeight;
+   Double_t        t_PUWeightAB;
+   Double_t        t_PUWeightABC;
+   Double_t        t_EvtWeight;
    Double_t        t_PFMetPx;
    Double_t        t_PFMetPy;
    vector<double>  *t_PFJetPt;
@@ -47,6 +50,15 @@ public :
    vector<double>  *t_genJetEta;
    vector<double>  *t_genJetPhi;
    vector<double>  *t_genJetE;
+   Int_t           t_beamHaloFilter;
+   Int_t           t_eeBadScFilter;
+   Int_t           t_eeNoiseFilter;
+   Int_t           t_greedyMuons;
+   Int_t           t_hcalLaserEventFilter;
+   Int_t           t_inconsistentMuons;
+   Int_t           t_ra2EcalBEFilter;
+   Int_t           t_ra2EcalTPFilter;
+   Int_t           t_trackingFailureFilter;
 
    // List of branches
    TBranch        *b_t_EvtRun;   //!
@@ -54,6 +66,9 @@ public :
    TBranch        *b_t_EvtEvent;   //!
    TBranch        *b_t_NVertices;   //!
    TBranch        *b_t_PUWeight;   //!
+   TBranch        *b_t_PUWeightAB;   //!
+   TBranch        *b_t_PUWeightABC;   //!
+   TBranch        *b_t_EvtWeight;   //!
    TBranch        *b_t_PFMetPx;   //!
    TBranch        *b_t_PFMetPy;   //!
    TBranch        *b_t_PFJetPt;   //!
@@ -70,6 +85,15 @@ public :
    TBranch        *b_t_genJetEta;   //!
    TBranch        *b_t_genJetPhi;   //!
    TBranch        *b_t_genJetE;   //!
+   TBranch        *b_t_beamHaloFilter;   //!
+   TBranch        *b_t_eeBadScFilter;   //!
+   TBranch        *b_t_eeNoiseFilter;   //!
+   TBranch        *b_t_greedyMuons;   //!
+   TBranch        *b_t_hcalLaserEventFilter;   //!
+   TBranch        *b_t_inconsistentMuons;   //!
+   TBranch        *b_t_ra2EcalBEFilter;   //!
+   TBranch        *b_t_ra2EcalTPFilter;   //!
+   TBranch        *b_t_trackingFailureFilter;   //!
 
    NtupleSelector(TTree * /*tree*/ =0) { }
    virtual ~NtupleSelector() { }
@@ -122,6 +146,9 @@ void NtupleSelector::Init(TTree *tree)
    fChain->SetBranchAddress("t_EvtEvent", &t_EvtEvent, &b_t_EvtEvent);
    fChain->SetBranchAddress("t_NVertices", &t_NVertices, &b_t_NVertices);
    fChain->SetBranchAddress("t_PUWeight", &t_PUWeight, &b_t_PUWeight);
+   fChain->SetBranchAddress("t_PUWeightAB", &t_PUWeightAB, &b_t_PUWeightAB);
+   fChain->SetBranchAddress("t_PUWeightABC", &t_PUWeightABC, &b_t_PUWeightABC);
+   fChain->SetBranchAddress("t_EvtWeight", &t_EvtWeight, &b_t_EvtWeight);
    fChain->SetBranchAddress("t_PFMetPx", &t_PFMetPx, &b_t_PFMetPx);
    fChain->SetBranchAddress("t_PFMetPy", &t_PFMetPy, &b_t_PFMetPy);
    fChain->SetBranchAddress("t_PFJetPt", &t_PFJetPt, &b_t_PFJetPt);
@@ -138,6 +165,15 @@ void NtupleSelector::Init(TTree *tree)
    fChain->SetBranchAddress("t_genJetEta", &t_genJetEta, &b_t_genJetEta);
    fChain->SetBranchAddress("t_genJetPhi", &t_genJetPhi, &b_t_genJetPhi);
    fChain->SetBranchAddress("t_genJetE", &t_genJetE, &b_t_genJetE);
+   fChain->SetBranchAddress("t_beamHaloFilter", &t_beamHaloFilter, &b_t_beamHaloFilter);
+   fChain->SetBranchAddress("t_eeBadScFilter", &t_eeBadScFilter, &b_t_eeBadScFilter);
+   fChain->SetBranchAddress("t_eeNoiseFilter", &t_eeNoiseFilter, &b_t_eeNoiseFilter);
+   fChain->SetBranchAddress("t_greedyMuons", &t_greedyMuons, &b_t_greedyMuons);
+   fChain->SetBranchAddress("t_hcalLaserEventFilter", &t_hcalLaserEventFilter, &b_t_hcalLaserEventFilter);
+   fChain->SetBranchAddress("t_inconsistentMuons", &t_inconsistentMuons, &b_t_inconsistentMuons);
+   fChain->SetBranchAddress("t_ra2EcalBEFilter", &t_ra2EcalBEFilter, &b_t_ra2EcalBEFilter);
+   fChain->SetBranchAddress("t_ra2EcalTPFilter", &t_ra2EcalTPFilter, &b_t_ra2EcalTPFilter);
+   fChain->SetBranchAddress("t_trackingFailureFilter", &t_trackingFailureFilter, &b_t_trackingFailureFilter);
 }
 
 Bool_t NtupleSelector::Notify()
