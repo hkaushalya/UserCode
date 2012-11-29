@@ -11,6 +11,7 @@
 <use name="SimDataFormats/PileupSummaryInfo"/>
 <use name="HLTrigger/HLTcore"/>
 <use name="L1Trigger/GlobalTriggerAnalyzer"/>
+<use name="RecoMET/METAlgorithms"/>
 <flags EDM_PLUGIN="1"/>
 <export>
    <lib name="1"/>
