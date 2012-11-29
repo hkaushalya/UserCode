@@ -13,7 +13,7 @@
 //
 // Original Author:  samantha hewamanage
 //         Created:  Thu Mar 15 13:34:25 CDT 2012
-// $Id: MetSigForQcd.cc,v 1.3 2012/07/12 22:19:45 samantha Exp $
+// $Id: MetSigForQcd.cc,v 1.4 2012/07/25 19:53:07 samantha Exp $
 //
 //
 
@@ -90,6 +90,12 @@ class MetSigForQcd : public edm::EDAnalyzer {
 //			TH1F* metsigerr;
 			TH1F* prescaleWeights;
 			TH1F* eventWeights;
+			TProfile* mhtsigVsMHT_prof;
+			TProfile* metsigVsMET_prof;
+			TProfile* mhtsigVsNjet50_prof;
+			TProfile* mhtsigVsNjet30_prof;
+			TProfile* metsigVsNjet50_prof;
+			TProfile* metsigVsNjet30_prof;
 		};
 
 		struct JetHist_t{
@@ -104,6 +110,7 @@ class MetSigForQcd : public edm::EDAnalyzer {
 			TH1F* significance;
 			TH1F* njet30;
 			TH1F* njet50;
+			TH1F* dphimin;
 		};
 
 		struct Hist_t {  //hists for each inclusive jet category
@@ -156,9 +163,13 @@ class MetSigForQcd : public edm::EDAnalyzer {
 						const float& significance,
 						const unsigned& njet30,
 						const unsigned& njet50,
+						const float& dphimin,
 						MSigHist_t& hist,
 						const float Weight
 						);
+
+		float DelPhiMin(edm::Handle<std::vector<pat::Jet> > jetHandle
+				, edm::Handle<edm::View<reco::MET> > mhtHandle);
 				// ----------member data ---------------------------
 		//jet collections
 		edm::InputTag mhtInputTag_, htInputTag_;
@@ -191,6 +202,12 @@ class MetSigForQcd : public edm::EDAnalyzer {
 		TH1F* processed;
 		TH1F* passed;
 };
+
+
+static bool sort_using_less_than(double u, double v)
+{
+	   return u < v;
+}
 
 //
 // constants, enums and typedefs
@@ -387,24 +404,31 @@ MetSigForQcd::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 	bool bPassDphiCut = true;
 	if (bApplyDphiCut)
 	{
-		vector<float> dPhiCut;
-		dPhiCut.push_back(0.5); //1st jet
-		dPhiCut.push_back(0.5); //2nd jet
-		dPhiCut.push_back(0.3); //rest of the jets
+//		vector<float> dPhiCut;
+//		dPhiCut.push_back(0.5); //1st jet
+//		dPhiCut.push_back(0.5); //2nd jet
+//		dPhiCut.push_back(0.3); //rest of the jets
+//
+//		for (unsigned i=0; i < pfpt30eta50JetHandle->size(); ++i) 
+//		{ 
+//			//this logic will work even in the case of exclusive njets
+//			//bcos nminjets == nmaxjets in such cases
+//			if ( i < (unsigned) dMinNjet_ )  
+//			{
+//				float dPhi = 0.3; //for rest of the jets.
+//				if (i < dPhiCut.size()) dPhi = dPhiCut.at(i);
+//
+//				bPassDphiCut = bPassDphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[i].phi(), myMhtPhi)) > dPhi);
+//
+//			} else break;
+//		}
+		
+		//apply dphi cut only to first 3 jets.
+				
+		if (pfpt30eta50JetHandle->size()>0) bPassDphiCut = bPassDphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[0].phi(), myMhtPhi)) > 0.5);
+		if (pfpt30eta50JetHandle->size()>1) bPassDphiCut = bPassDphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[1].phi(), myMhtPhi)) > 0.5);
+		if (pfpt30eta50JetHandle->size()>2) bPassDphiCut = bPassDphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[2].phi(), myMhtPhi)) > 0.3);
 
-		for (unsigned i=0; i < pfpt30eta50JetHandle->size(); ++i) 
-		{ 
-			//this logic will work even in the case of exclusive njets
-			//bcos nminjets == nmaxjets in such cases
-			if ( i < (unsigned) dMinNjet_ )  
-			{
-				float dPhi = 0.3; //for rest of the jets.
-				if (i < dPhiCut.size()) dPhi = dPhiCut.at(i);
-
-				bPassDphiCut = bPassDphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[i].phi(), myMhtPhi)) > dPhi);
-
-			} else break;
-		}
 	}
 
 
@@ -428,6 +452,7 @@ MetSigForQcd::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 //	const float ms_njets    = (*pfmetHandle)[0].getNumberOfJets();
 //	const float ms_neles    = (*pfmetHandle)[0].getNumberOfElectrons();
 //	const float ms_nmuons   = (*pfmetHandle)[0].getNumberOfMuons();
+	const float dPhiMin = DelPhiMin(pfpt30eta50JetHandle,	mhtHandle);
 
 	//calculate various METsig defnitions	
 	const float metSig_alt1 = pfMet/sqrt(myHt);
@@ -460,22 +485,22 @@ MetSigForQcd::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 			{
 				if (pfMetSig > msigBins_.at(j)) 
 				{
-					FillMSHistograms(pfMet, pfMetSig, myNjet30, myNjet50, vHist.at(i).metsig[j], Weight);
+					FillMSHistograms(pfMet, pfMetSig, myNjet30, myNjet50, dPhiMin, vHist.at(i).metsig[j], Weight);
 				}
 				if (mhtSig > msigBins_.at(j)) 
 				{
-					FillMSHistograms(myMht, mhtSig, myNjet30, myNjet50, vHist.at(i).mhtsig[j], Weight);
+					FillMSHistograms(myMht, mhtSig, myNjet30, myNjet50, dPhiMin, vHist.at(i).mhtsig[j], Weight);
 				}
 			}
 			for (unsigned j =0; j < (msigAltBins_.size()-1); ++j)
 			{
 				if (metSig_alt1 > msigAltBins_.at(j)) 
 				{
-					FillMSHistograms(pfMet, metSig_alt1, myNjet30, myNjet50, vHist.at(i).metsig_alt[j], Weight);
+					FillMSHistograms(pfMet, metSig_alt1, myNjet30, myNjet50, dPhiMin, vHist.at(i).metsig_alt[j], Weight);
 				}
 				if (mhtSig_alt1 > msigAltBins_.at(j)) 
 				{
-					FillMSHistograms(myMht, mhtSig_alt1, myNjet30, myNjet50, vHist.at(i).mhtsig_alt[j], Weight);
+					FillMSHistograms(myMht, mhtSig_alt1, myNjet30, myNjet50, dPhiMin, vHist.at(i).mhtsig_alt[j], Weight);
 				}
 			}
 
@@ -485,7 +510,7 @@ MetSigForQcd::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 				{
 					//put 5.5 inplace for MetSig to avoid any misunderstanding when looking
 					//at significane for MHT cut when there is none
-					FillMSHistograms(myMht,5.5, myNjet30, myNjet50, vHist.at(i).mhtcut[j], Weight);
+					FillMSHistograms(myMht,5.5, myNjet30, myNjet50, dPhiMin, vHist.at(i).mhtcut[j], Weight);
 				}
 			}
 
@@ -672,94 +697,90 @@ void MetSigForQcd::BookCommonHistograms(TFileDirectory& dir, const float htMin,
 	hist.evt.metSig_alt1 = dir.make<TH1F> ("metSig_alt1","METsig;METsig (MET/ #sqrt{HT});Events;", 100,0,100); 
 	hist.evt.mhtSig_alt1 = dir.make<TH1F> ("mhtSig_alt1","MHTsig;MHTsig (MHT/ #sqrt{HT});Events;", 100,0,100); 
 
+	hist.evt.mhtsigVsMHT_prof     = dir.make<TProfile> ("mhtsigVsMHT_prof",";MHT;MhtSig;", evt_mht_bins, 0, evt_mht_max, 0, 500);
+	hist.evt.metsigVsMET_prof     = dir.make<TProfile> ("mhtsigVsMET_prof",";MET;MetSig;", evt_mht_bins, 0, evt_mht_max, 0, 500);
+	hist.evt.mhtsigVsNjet50_prof  = dir.make<TProfile> ("mhtsig_njet50_prof",";Njets [p_{T}>50 GeV, | #eta |<2.5];MHTSig;", 30, 0, 30, 0, 500);
+	hist.evt.mhtsigVsNjet30_prof  = dir.make<TProfile> ("mhtsig_njet30_prof",";Njets [p_{T}>30 GeV, | #eta |<5.0];MHTSig;", 30, 0, 30, 0, 500);
+	hist.evt.metsigVsNjet50_prof  = dir.make<TProfile> ("metsig_njet50_prof",";Njets [p_{T}>50 GeV, | #eta |<2.5];METSig;", 30, 0, 30, 0, 500);
+	hist.evt.metsigVsNjet30_prof  = dir.make<TProfile> ("metsig_njet30_prof",";Njets [p_{T}>30 GeV, | #eta |<5.0];METSig;", 30, 0, 30, 0, 500);
 }
 
 void MetSigForQcd::BookMSigHistograms(TFileDirectory& dir, const float& mxtsig, 
 								MSigHist_t& hist, const int& metsigtype)
 {
 	//metormht, 0==met , 1==mht
-	stringstream name, title, signame, sigtitle;
-	stringstream nj30name, nj30title, nj50name, nj50title;
+	stringstream name, title, signame, sigtitle, dphimintitle;
+	stringstream nj30name, nj30title, nj50name, nj50title, dphiminname;
 	int ms_max = 800, ms_bins = 400; 
 
 	name << "met_msigmin_" << mxtsig;
 	nj30name << "njet30_msigmin_" << mxtsig;
 	nj50name << "njet50_msigmin_" << mxtsig;
 	signame << "metsig_msigmin_" << mxtsig;
+	dphiminname << "dphimin_msigmin_" << mxtsig;
 
 	if (metsigtype == 1) 
 	{ 
-		//name << "met_msigmin_" << mxtsig;
 		title << "METSig>" << mxtsig << ";MET [GeV];Events;" << mxtsig;
-		//signame << "metsig_msigmin_" << mxtsig;
 		sigtitle << "METSig>" << mxtsig << ";MET-Significance;Events;";
-		//nj30name << "njet30_msigmin_" << mxtsig;
 		nj30title << "METSig>" << mxtsig << ";Njets [E_{T}>30 GeV];Events;";
-		//nj50name << "njet50_msigmin_" << mxtsig;
 		nj50title << "METSig>" << mxtsig << ";Njets [E_{T}>50 GeV];Events;";
+		dphimintitle << "METSig>" << mxtsig << ";#Delta #Phi _{min};Events;";
 
 	} else if (metsigtype == 2)
 	{
-		//name << "mht_msigmin_" << mxtsig;
 		title << "MHTSig>" << mxtsig << ";MHT [GeV];Events;";
-		//signame << "mhtsig_msigmin_" << mxtsig;
 		sigtitle << "MHTSig>" << mxtsig << ";MHT-Significance;Events;";
-		//nj30name << "njet30_msigmin_" << mxtsig;
 		nj30title << "MHTSig>" << mxtsig << ";Njets [E_{T}>30 GeV];Events;";
-		//nj50name << "njet50_msigmin_" << mxtsig;
 		nj50title << "MHTSig>" << mxtsig << ";Njets [E_{T}>50 GeV];Events;";
+		dphimintitle << "MHTSig>" << mxtsig << ";#Delta #Phi _{min};Events;";
 	} else if (metsigtype == 3)
 	{
 		ms_max = 100;
 		ms_bins = 100; 
 		const string def("MetSig= MET/#sqrt{pfHT}");
-		//name << "met_msigmin_" << mxtsig;
 		title << def << " >" << mxtsig << ";MET [GeV];Events;";
-		//signame << "metsig_msigmin_" << mxtsig;
 		sigtitle << def << " >" << mxtsig << ";MET-Significance;Events;";
-		//nj30name << "njet30_msigmin_" << mxtsig;
 		nj30title << def << " >" << mxtsig << ";Njets [E_{T}>30 GeV];Events;";
-		//nj50name << "njet50_msigmin_" << mxtsig;
 		nj50title << def << " >" << mxtsig << ";Njets [E_{T}>50 GeV];Events;";
+		dphimintitle << def << " >" << mxtsig << ";#Delta #Phi _{min};Events;";
 
 	} else if (metsigtype == 4)
 	{
 		ms_max = 100;
 		ms_bins = 100; 
 		const string def("MhtSig= MHT/#sqrt{HT}");
-		//name << "mht_msigmin_" << mxtsig;
 		title << def << " >" << mxtsig << ";MHT [GeV];Events;";
-		//signame << "mhtsig_msigmin_" << mxtsig;
 		sigtitle << def << " >" << mxtsig << ";MHT-Significance;Events;";
-		//nj30name << "njet30_msigmin_" << mxtsig;
 		nj30title << def << " >" << mxtsig << ";Njets [E_{T}>30 GeV];Events;";
-		//nj50name << "njet50_msigmin_" << mxtsig;
 		nj50title << def << " >" << mxtsig << ";Njets [E_{T}>50 GeV];Events;";
+		dphimintitle << def << " >" << mxtsig << ";#Delta #Phi _{min};Events;";
 	} else if (metsigtype == 5)
 	{
 		ms_max = 1000;
 		ms_bins = 200; 
 		const string def("MHT Cut");
-		//name << "mht_msigmin_" << mxtsig;
 		title << def << " >" << mxtsig << ";MHT [GeV];Events;";
-		//signame << "mhtcut_msigmin_" << mxtsig;
 		sigtitle << "This had no meaning! Just to get event count! :" << def << " >" << mxtsig << ";MHT Cut;Events;";
-		//nj30name << "njet30_msigmin_" << mxtsig;
 		nj30title << def << " >" << mxtsig << ";Njets [E_{T}>30 GeV];Events;";
-		//nj50name << "njet50_msigmin_" << mxtsig;
 		nj50title << def << " >" << mxtsig << ";Njets [E_{T}>50 GeV];Events;";
-
+		dphimintitle << def << " >" << mxtsig << ";#Delta #Phi _{min};Events;";
 	}
+
 	const double evt_mht_max = 1500, evt_mht_bins = 750;
 	hist.mhtormet     = dir.make<TH1F> (name.str().c_str(), title.str().c_str(), evt_mht_bins, 0, evt_mht_max);
 	hist.significance = dir.make<TH1F> (signame.str().c_str(), sigtitle.str().c_str(), ms_bins, 0, ms_max);
 	hist.njet30       = dir.make<TH1F> (nj30name.str().c_str(), nj30title.str().c_str(), 20, 0, 20);
 	hist.njet50       = dir.make<TH1F> (nj50name.str().c_str(), nj50title.str().c_str(), 20, 0, 20);
+	hist.dphimin      = dir.make<TH1F> (dphiminname.str().c_str(), dphimintitle.str().c_str(), 125, 0, 2.5);
 
 	hist.mhtormet->Sumw2();
 	hist.significance->Sumw2();
 	hist.njet30->Sumw2();
 	hist.njet50->Sumw2();
+	hist.dphimin->Sumw2();
+
+
 }
 
 void MetSigForQcd::FillHistograms(
@@ -818,6 +839,14 @@ void MetSigForQcd::FillHistograms(
 
 	hist.evt.mhtSig_alt1->Fill(mhtSig_alt1, Weight);
 	hist.evt.metSig_alt1->Fill(metSig_alt1, Weight);
+
+	hist.evt.mhtsigVsMHT_prof->Fill(mht, mhtsig, Weight);
+	hist.evt.metsigVsMET_prof->Fill(pfmet, metsig, Weight);
+	hist.evt.mhtsigVsNjet50_prof->Fill(pfpt50eta25JetHandle->size(), mhtsig);
+	hist.evt.mhtsigVsNjet30_prof->Fill(pfpt30eta50JetHandle->size(), mhtsig);
+	hist.evt.metsigVsNjet50_prof->Fill(pfpt50eta25JetHandle->size(), metsig);
+	hist.evt.metsigVsNjet30_prof->Fill(pfpt30eta50JetHandle->size(), metsig);
+
 }
 
 
@@ -826,6 +855,7 @@ void MetSigForQcd::FillMSHistograms(
 	  	      const float& significance,
 				const unsigned& njet30,
 				const unsigned& njet50,
+				const float& dphimin,
 				MSigHist_t& hist,
 				const float Weight
 				)
@@ -834,6 +864,7 @@ void MetSigForQcd::FillMSHistograms(
 	hist.significance->Fill(significance, Weight);
 	hist.njet30->Fill(njet30, Weight);
 	hist.njet50->Fill(njet50, Weight);
+	hist.dphimin->Fill(dphimin, Weight);
 
 }
 void MetSigForQcd::PrintHeader()
@@ -845,6 +876,29 @@ void MetSigForQcd::PrintHeader()
 }
 
 
+float MetSigForQcd::DelPhiMin(edm::Handle<std::vector<pat::Jet> > jetHandle, 
+					edm::Handle<edm::View<reco::MET> > mhtHandle
+				)
+{
+	//PrintHeader();
+	std::vector<float> vDelPhi_jetmht;
+	const float mht = (*mhtHandle)[0].pt();
+
+	for (unsigned i = 0 ; i < jetHandle->size() ; ++i)
+	{
+		if (i>2) break; //use only three leading jets
+		const float delphi_jetmht = fabs(TVector2::Phi_mpi_pi((*jetHandle)[i].phi() - (*mhtHandle)[0].phi()));
+		vDelPhi_jetmht.push_back(delphi_jetmht);
+	}
+
+	std::sort(vDelPhi_jetmht.begin(), vDelPhi_jetmht.end(), sort_using_less_than);	
+
+	assert (vDelPhi_jetmht.size() == 3 && "ERROR: More than 3 dPhiMin calculations found!");
+	//std::cout << "vDelPhi_jetmht size = " << vDelPhi_jetmht.size() << std::endl;
+	
+	const float dPhiMin = vDelPhi_jetmht.at(0);
+	return dPhiMin;
+}
 
 //define this as a plug-in
 DEFINE_FWK_MODULE(MetSigForQcd);
