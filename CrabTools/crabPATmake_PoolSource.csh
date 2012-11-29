@@ -77,6 +77,8 @@ foreach file ($argv)
 		set py_prefix = `echo ${DATASET} | sed "s/\//_/g" | sed "s/\//_/" | sed "s/^_//" | sed "s/-/_/g"`
 		echo "prefix = ${py_prefix}"
 		set py_file = "${py_prefix}_cfi.py"
+		set dcap_file = "${py_prefix}.list"
+
 		if ( -e ${py_file} ) then
 			echo "File ${py_file} already exists! exiting!"
 			exit
@@ -84,6 +86,14 @@ foreach file ($argv)
 			echo "Creating python source file ${py_file}"
 		endif
 	
+		if ( -e ${dcap_file} ) then
+			echo "File ${dcap_file} already exists! exiting!"
+			exit
+		else 
+			echo "Creating python source file ${dcap_file}"
+		endif
+
+
 		########################
 		# Write the stuff to the file.
 		########################
@@ -98,11 +108,15 @@ foreach file ($argv)
 		set files = `ls -1 ${ABSDIR}/*.root`
 		set i = 1
 		foreach file ( $files )
+			echo "${OUTDIR}"
+			echo "${file}"
 			if ( $i == 1) then
 				echo "'${OUTDIR}/${file}'" >> ${py_file}
 			else
 				echo ",'${OUTDIR}/${file}'" >> ${py_file}
 			endif
+
+			echo "dcap:/${file}" >> ${dcap_file}
 			@ i+=1
 		end
 

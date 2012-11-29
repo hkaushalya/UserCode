@@ -1,7 +1,7 @@
 #! /bin/csh
 
 set curDir = `pwd`
-set mainDir = "Results/CondorJobs/6JetsInclWithDphi/QCD/"
+set mainDir = "Results/CondorJobs/5JetsInclWithDphi/QCD/"
 #set mainDir = "Results/CondorJobs/testMyFiles_3JetAndDphi/MC/QCD/"
 #set mainDir = "Results/CondorJobs/2JetOnly/MC/QCD/"
 set dirlist = "$mainDir/qcd1 $mainDir/qcd2 $mainDir/qcd3 $mainDir/qcd4 $mainDir/qcd5 $mainDir/qcd6 $mainDir/qcd7 $mainDir/qcd8 $mainDir/qcd9"

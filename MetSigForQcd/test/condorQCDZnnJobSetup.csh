@@ -1,7 +1,7 @@
 #! /bin/csh
 
 set curDir  = `pwd`
-set mainDir = "Results/CondorJobs/6JetsIncl"
+set mainDir = "Results/CondorJobs/3JetsIncl_DphiMinAfterMScut"
 set dirlist = "$mainDir/QCD/qcd1 $mainDir/QCD/qcd2 $mainDir/QCD/qcd3 $mainDir/QCD/qcd4 $mainDir/QCD/qcd5 $mainDir/QCD/qcd6 $mainDir/QCD/qcd7 $mainDir/QCD/qcd8 $mainDir/QCD/qcd9"
 set i = 0
 #set dirlist = "$mainDir/qcd1 $mainDir/qcd2 $mainDir/qcd3 $mainDir/qcd4"
@@ -170,6 +170,8 @@ foreach dir ( $dirlist )
 	endif 
 
 end
+
+exit
 
 #now submit Znn condor jobs
 echo ">>>>>>>> Submitting Znn jobs "
