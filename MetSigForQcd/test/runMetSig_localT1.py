@@ -47,6 +47,15 @@ process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(options.maxe
 if options.dataset==0:
 	process.load("UserCode.MetSigForQcd.SMS_T1tttt_Mgluino_450to1200_mLSP_50to800_7TeV_Pythia6Z_PU_START42_V11_FSIM_v2_cfi");
 	outputFile = cms.string("SUSY_T1_njetmin"+ `options.njetmin` + "_dphicut" + `options.dphicut` + ".root")
+elif options.dataset==5: #test sample
+	process.source = cms.Source("PoolSource",
+    # replace 'myfile.root' with the source file you want to use
+		fileNames = cms.untracked.vstring(
+		'dcap://pnfs/cms/WAX/11/store/user/bhatti/SUSYPAT42C/ZJetsToNuNu_200_HT_inf_7TeV-madgraph/Summer11-PU_S4_START42_V11-v1/AODSIM//susypat_103_1_LIZ.root'
+	
+			)
+	)
+	outputFile = cms.string("test.root")
 else: 
 	sys.exit("Invalid dataset!")
 
@@ -96,6 +105,10 @@ process.mhtPF.JetCollection = cms.InputTag('patJetsAK5PFPt30')
 
 process.load("UserCode.MetSigForQcd.metsigall_cfi")
 process.load("UserCode.MetSigForQcd.signifMHTProducer_cfi")
+
+process.mymhtPFforSgnf.JetCollection = cms.InputTag("patJetsAK5PF")
+process.mymhtPFforSgnf.MinJetPt      = cms.double(15)
+
 
 usePrescaleWeight = 0
 applyLumiweighing = 0

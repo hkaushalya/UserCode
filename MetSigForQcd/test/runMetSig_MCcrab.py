@@ -39,6 +39,10 @@ from SandBox.Skims.RA2Leptons_cff import *
 process.load("UserCode.MetSigForQcd.metsigall_cfi")
 process.load("UserCode.MetSigForQcd.signifMHTProducer_cfi")
 
+process.mymhtPFforSgnf.JetCollection = cms.InputTag("patJetsAK5PF")
+process.mymhtPFforSgnf.MinJetPt      = cms.double(15)
+
+
 usePrescaleWeight = 0
 applyLumiweighing = 0
 applyEventweighing = 0
@@ -51,7 +55,7 @@ njetmin = 3
 #njetmax = 1000
 verbose = False
 njetCut = 1
-dPhiCut = 1
+dPhiCut = 0
 
 print 'runMetSig_MCcrab:  njetmin = ', njetmin
 #print 'runMetSig_MCcrab:  njetmax = ', njetmax
