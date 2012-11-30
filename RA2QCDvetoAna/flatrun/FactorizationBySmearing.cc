@@ -179,8 +179,8 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	const double lumiWgt = GetLumiWgt(datasetname, dDATA_LUMI); 
 	//const double lumiWgt = 1; 
 	applyDphiCut_        = 0;
-	//unsigned nTries_     = 1000 * NJet50_min_ ; //number of pseudo experiments per event
-	unsigned nTries_     = 500; //number of pseudo experiments per event
+	unsigned nTries_     = (unsigned) max((double)1000 * NJet50_min_ * 2 , 5000.0) ; //number of pseudo experiments per event
+	//unsigned nTries_     = 500; //number of pseudo experiments per event
 	if (bDEBUG) nTries_  = 1;
 	const double smearingWgt = 1.0/(double)nTries_;
 
@@ -290,7 +290,6 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	/****************************************************************************
 	 * FOR QUICK DEBUGGING ONLY
 	 ***************************************************************************/
-   //if (smearFunc_) delete smearFunc_;
 	TCanvas *c = new TCanvas();
 	gStyle->SetOptStat(0);
 	gPad->Print("samples.eps[");

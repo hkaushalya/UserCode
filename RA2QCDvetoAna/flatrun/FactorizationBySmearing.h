@@ -231,6 +231,7 @@ FactorizationBySmearing::~FactorizationBySmearing() {
 	oFile->Write();
 	oFile->Close();
 
+   if (smearFunc_) delete smearFunc_;
 }
 
 double FactorizationBySmearing::DeltaPhi(double phi1, double phi2) {
