@@ -96,6 +96,8 @@ private:
    std::vector<std::vector<TH1F*> > SigmaPtHist_scaled_total;
    std::vector<std::vector<TF1*> > SigmaPt_scaled_total;
 
+	unsigned uResFuncCollType_; //default=0 (JetAll), jet Ranked=1
+
 public:
 	vector<double> GetPtBinEdges() { return PtBinEdges_; }
 	vector<double> GetEtaBinEdges() { return EtaBinEdges_; }
@@ -107,10 +109,12 @@ public:
 	void SetAbsoluteTailScaling(const bool b) { absoluteTailScaling_ = b; }
 	bool GetAbsoluteTailScaling() const { return absoluteTailScaling_; }
 	string SmearingFile() const { return smearingfile_; }
+	void SetResFuncColl(const unsigned i);
 
    double GetAdditionalSmearingVariation() const { return AdditionalSmearing_variation_; }
    double GetLowerTailScalingVariation() const { return LowerTailScaling_variation_; }
    double GetUpperTailScalingVariation() const { return UpperTailScaling_variation_; }
+	unsigned GetResFuncCollType() const { return uResFuncCollType_; }
 };
 
 #endif
