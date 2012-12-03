@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/csh
 mv -v qcd1/Merged.root QCD_HT300to470.root
 mv -v qcd2/Merged.root QCD_HT470to600.root
 mv -v qcd3/Merged.root QCD_HT600to800.root
