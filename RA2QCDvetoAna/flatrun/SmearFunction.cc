@@ -17,70 +17,49 @@ using namespace std;
 
 SmearFunction::SmearFunction() 
 {
-	cout << __FUNCTION__ << ":" << __LINE__ << endl;
+	cout << __FUNCTION__ << ": Setting Random Seed..." << endl;
 	gRandom->SetSeed();
-	cout << "First rand#" << gRandom->Rndm() << endl;
+	cout << __FUNCTION__ << ": First rand#" << gRandom->Rndm() << endl;
 
    // get parameters from config
-   LowerTailScaling_variation_ = 1; 
-   //LowerTailScaling_variation_ = 0.5; 
-   UpperTailScaling_variation_ = 1; 
+   LowerTailScaling_variation_   = 1; 
+   UpperTailScaling_variation_   = 1; 
    AdditionalSmearing_variation_ = 1; 
-	absoluteTailScaling_ = true;  //false for systematics
-   NRebin_ = 1; 
-   /*inputhist1HF_ = "hResponse1_HF";
-   inputhist2HF_ = "hResponse2_HF";
-   inputhist3pHF_ = "hResponse3p_HF";
-   inputhist1NoHF_ = "hResponse1_NoHF";
-   inputhist2NoHF_ = "hResponse2_NoHF";
-   inputhist3pNoHF_ =  "hResponse3p_NoHF";
-*/   //bprobabilityfile_ = "bprobfile.root";
+	absoluteTailScaling_          = true;  //false for systematics
+   NRebin_                       = 1; 
+
+   //bprobabilityfile_ = "bprobfile.root";
    	
 	//some inputs have changes from 2011
-	inputhist1HF_ = "h_tot_JetAll_ResponsePt";
-	inputhist2HF_ = "h_tot_JetAll_ResponsePt";
-	inputhist3pHF_ = "h_tot_JetAll_ResponsePt";
-	inputhist1NoHF_ = "h_tot_JetAll_ResponsePt";
-	inputhist2NoHF_ = "h_tot_JetAll_ResponsePt";
-	inputhist3pNoHF_ = "h_tot_JetAll_ResponsePt";
+	//Default Resolution Function Type
+	SetResFuncColl(0);
 
-	//jet ranked-based resolution fucntions
-	/*inputhist1HF_    = "h_tot_Jet1_ResponsePt";
-	inputhist2HF_    = "h_tot_Jet2_ResponsePt";
-	inputhist3pHF_   = "h_tot_Jet3_ResponsePt";
-	inputhist1NoHF_  = "h_tot_Jet1_ResponsePt";
-	inputhist2NoHF_  = "h_tot_Jet2_ResponsePt";
-	inputhist3pNoHF_ = "h_tot_Jet3_ResponsePt";
-*/
-
-	
-	//not in pyc
+	//not in py
 	A0RMS_ = 2.5;
    A1RMS_ = 10.0;
    probExtreme_ = 0;  
-   //PtBinEdges_ = NumStringToVec("0, 20, 30, 50, 80, 120, 170, 230, 300, 380, 470, 570, 680, 800, 1000, 1300, 1700, 2200, 2800, 3500");
-			PtBinEdges_.push_back(0);
-			PtBinEdges_.push_back(20);
-			PtBinEdges_.push_back(30);
-			PtBinEdges_.push_back(50);
-			PtBinEdges_.push_back(80);
-			PtBinEdges_.push_back(120);
-			PtBinEdges_.push_back(170);
-			PtBinEdges_.push_back(230);
-			PtBinEdges_.push_back(300);
-			PtBinEdges_.push_back(380);
-			PtBinEdges_.push_back(470);
-			PtBinEdges_.push_back(570);
-			PtBinEdges_.push_back(680);
-			PtBinEdges_.push_back(800);
-			PtBinEdges_.push_back(1000);
-			PtBinEdges_.push_back(1300);
-			PtBinEdges_.push_back(1700);
-			PtBinEdges_.push_back(2200);
-			PtBinEdges_.push_back(2800);
-			PtBinEdges_.push_back(3500);
 
-   //EtaBinEdges_ = NumStringToVec("0, 0.3, 0.5, 0.8, 1.1, 1.4, 1.7, 2.0, 2.3, 2.8, 3.2, 4.1, 5.0");
+	PtBinEdges_.push_back(0);
+	PtBinEdges_.push_back(20);
+	PtBinEdges_.push_back(30);
+	PtBinEdges_.push_back(50);
+	PtBinEdges_.push_back(80);
+	PtBinEdges_.push_back(120);
+	PtBinEdges_.push_back(170);
+	PtBinEdges_.push_back(230);
+	PtBinEdges_.push_back(300);
+	PtBinEdges_.push_back(380);
+	PtBinEdges_.push_back(470);
+	PtBinEdges_.push_back(570);
+	PtBinEdges_.push_back(680);
+	PtBinEdges_.push_back(800);
+	PtBinEdges_.push_back(1000);
+	PtBinEdges_.push_back(1300);
+	PtBinEdges_.push_back(1700);
+	PtBinEdges_.push_back(2200);
+	PtBinEdges_.push_back(2800);
+	PtBinEdges_.push_back(3500);
+
 	EtaBinEdges_.push_back(0); 
 	EtaBinEdges_.push_back(0.3); 
 	EtaBinEdges_.push_back(0.5); 
@@ -95,18 +74,10 @@ SmearFunction::SmearFunction()
 	EtaBinEdges_.push_back(4.1); 
 	EtaBinEdges_.push_back(5.0);
 
-   //smearingfile_ = "SmearingFile";
    smearingfile_ = "/share/store/users/samantha/CMSSW_DEV/525/FlatSmearingCode/optimize/test2/submit/MCJetResolution_Summer12_QCD_Pt_15to3000_TuneZ2_Flat_8TeV_pythia6_withCHS_withoutPUReweighting.root";
-   //smearingfile_ = "/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/MCJetResolution_Summer12_QCD_Pt_15to3000_TuneZ2_Flat_8TeV_pythia6_withCHS_withPUReweighting_fineLowPtBins_pixelcorr.root";
-   //PtBinEdges_scaling_ = NumStringToVec("0., 7000.");
-   //EtaBinEdges_scaling_ = NumStringToVec("0.0, 5.0");
-   //EtaBinEdges_scaling_ = NumStringToVec("0.0, 5.0");
-   //EtaBinEdges_scaling_ = NumStringToVec("0.0, 5.0");
-   //AdditionalSmearing_ = NumStringToVec("0.1");
-   //LowerTailScaling_ = NumStringToVec("1.0");
-   //UpperTailScaling_ = NumStringToVec("1.0");
+   //smearingfile_        = "/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/MCJetResolution_Summer12_QCD_Pt_15to3000_TuneZ2_Flat_8TeV_pythia6_withCHS_withPUReweighting_fineLowPtBins_pixelcorr.root";
 
-	PtBinEdges_scaling_.push_back(0); PtBinEdges_scaling_.push_back(7000);
+	PtBinEdges_scaling_.push_back(0);    PtBinEdges_scaling_.push_back(7000);
    EtaBinEdges_scaling_.push_back(0.0); EtaBinEdges_scaling_.push_back(5.0);
    AdditionalSmearing_.push_back(1.0);
    LowerTailScaling_.push_back(1.0);
@@ -126,13 +97,7 @@ SmearFunction::SmearFunction()
 
 //--------------------------------------------------------------------------
 TH1F* SmearFunction::getSmearFunc(int i_flav, int i_jet, int i_eta, int i_Pt) const {
-/*	cout << __FUNCTION__ << ":" << __LINE__ << endl;
-	cout << "iflav//ijet/ieta/ipt=" << i_flav << "/" << i_jet << "/" << i_eta << "/" << i_Pt << endl;
-	cout << __LINE__ << ":: size = " << smearFunc_scaled.size() << endl;
-	cout << __LINE__ << ":: size = " << smearFunc_scaled.at(i_flav).size() << endl;
-	cout << __LINE__ << ":: size = " << smearFunc_scaled.at(i_flav).at(i_jet).size() << endl;
-	cout << __LINE__ << ":: size = " << smearFunc_scaled.at(i_flav).at(i_jet).at(i_eta).size() << endl;
-	cout << __FUNCTION__ << ":" << __LINE__ << endl;
+/*	
 	if (smearFunc_scaled.at(i_flav).at(i_jet).at(i_eta).at(i_Pt) == NULL)
 	{
 	cout << __FUNCTION__ << ":" << __LINE__ << ": NULL object"<< endl;
@@ -152,14 +117,12 @@ TF1* SmearFunction::getSigmaPtScaledForRebalancing(int i_jet, int i_eta) const {
 //--------------------------------------------------------------------------
 void SmearFunction::CalculateSmearFunctions() {
 
-	//cout << __FUNCTION__ << ":" << __LINE__ << endl;
    //// open root file/tree and create SmearingFunction histo
    TFile *f1 = new TFile(smearingfile_.c_str(), "READ", "", 0);
   
    //// Fetch histos and fit gaussian core
    for (unsigned int i_Pt = 0; i_Pt < PtBinEdges_.size() - 1; ++i_Pt) {
       for (unsigned int i_eta = 0; i_eta < EtaBinEdges_.size() - 1; ++i_eta) {
-	//cout << __FUNCTION__ << ":" << __LINE__  << ":: i_eta=" << i_eta << endl;
          //// Get the histos
          char hname[100];
          // get no heavy flavor hists
@@ -168,7 +131,7 @@ void SmearFunction::CalculateSmearFunctions() {
 			temp = (TH1F*) f1->FindObjectAny(hname);
 			if (temp == 0 )
 			{
-				//cout << __FUNCTION__ << ":" << __LINE__ << ":" << hname << " not found!" << endl;
+				cout << __FUNCTION__ << "inputHist with name " << hname << " not found!" << endl;
 				assert (false);
 			}
          smearFunc.at(0).at(0).at(i_eta).at(i_Pt) = (TH1F*) f1->FindObjectAny(hname);
@@ -295,7 +258,6 @@ void SmearFunction::CalculateSmearFunctions() {
       }
    }
 
-//	cout << __FUNCTION__ << ":" << __LINE__ << endl;
    //// Fit scaled gaussian sigma as function of pt
    for (unsigned int i_flav = 0; i_flav < 2; ++i_flav) {
       for (unsigned int i_jet = 0; i_jet < 3; ++i_jet) {
@@ -325,7 +287,6 @@ void SmearFunction::CalculateSmearFunctions() {
       }
    }
 
-	//cout << __FUNCTION__ << ":" << __LINE__ << endl;
    //// Fit gaussian sigma as function of pt
    for (unsigned int i_flav = 0; i_flav < 2; ++i_flav) {
       for (unsigned int i_jet = 0; i_jet < 3; ++i_jet) {
@@ -354,7 +315,6 @@ void SmearFunction::CalculateSmearFunctions() {
       }
    }
 
-//	cout << __FUNCTION__ << ":" << __LINE__ << endl;
 	
    //// Book and fill histograms for smeared and scaled response functions
    for (unsigned int i_flav = 0; i_flav < 2; ++i_flav) {
@@ -400,7 +360,6 @@ void SmearFunction::CalculateSmearFunctions() {
                   double LowerTailScale = GetLowerTailScaling(PtBinEdges_.at(i_Pt), EtaBinEdges_.at(i_eta));
                   double UpperTailScale = GetUpperTailScaling(PtBinEdges_.at(i_Pt), EtaBinEdges_.at(i_eta));
                   //cout << "absolute scaling factor: " << TailScale << endl;
-						//cout << __FUNCTION__ << ":" << __LINE__ << ": absoluteTailScaling_ = " << absoluteTailScaling_ << endl;
                   if (absoluteTailScaling_) {
                      double RMS = smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetRMS();
                      //cout << "Integral from " << 1-A1RMS_*RMS << " to " << 1-A0RMS_*RMS << endl;
@@ -421,7 +380,6 @@ void SmearFunction::CalculateSmearFunctions() {
                         UpperTailScale = (UpperTailScale * (RUpperTail + Rcore) - Rcore) / RUpperTail;
 
                   }
-                  //cout << "tail scaling factor: " << TailScale << endl;
                   smearFunc_scaled.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->Add(&smearFunc_Core_tmp);
                   smearFunc_scaled.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->Add(&smearFunc_LowerTail_tmp, LowerTailScale);
                   smearFunc_scaled.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->Add(&smearFunc_UpperTail_tmp, UpperTailScale);
@@ -447,8 +405,6 @@ void SmearFunction::CalculateSmearFunctions() {
          }
       }
    }
-	
-//	cout << __FUNCTION__ << ":" << __LINE__ << endl;
 
 }
 //--------------------------------------------------------------------------
@@ -827,4 +783,30 @@ SmearFunction::~SmearFunction() {
 }
 //-------------------------------------------------------------------------- 
 
+void SmearFunction::SetResFuncColl(const unsigned i)
+{
+	uResFuncCollType_ = i;
 
+	if (uResFuncCollType_ == 0)
+	{
+		inputhist1HF_.assign("h_tot_JetAll_ResponsePt");
+		inputhist2HF_.assign("h_tot_JetAll_ResponsePt");
+		inputhist3pHF_.assign("h_tot_JetAll_ResponsePt");
+		inputhist1NoHF_.assign("h_tot_JetAll_ResponsePt");
+		inputhist2NoHF_.assign("h_tot_JetAll_ResponsePt");
+		inputhist3pNoHF_.assign("h_tot_JetAll_ResponsePt");
+	} else if (uResFuncCollType_ == 1)
+	{
+		//jet ranked-based resolution functions
+		inputhist1HF_.assign("h_tot_Jet1_ResponsePt");
+		inputhist2HF_.assign("h_tot_Jet2_ResponsePt");
+		inputhist3pHF_.assign("h_tot_Jet3_ResponsePt");
+		inputhist1NoHF_.assign("h_tot_Jet1_ResponsePt");
+		inputhist2NoHF_.assign("h_tot_Jet2_ResponsePt");
+		inputhist3pNoHF_.assign("h_tot_Jet3_ResponsePt");
+	} else
+	{
+		cout << __FUNCTION__ << ": Unknown Resolution Func. Collection requested.!!!" << endl;
+		assert (false);
+	}
+}
