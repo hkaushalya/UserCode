@@ -12,7 +12,7 @@
 */
 //
 // Original Author:  Samantha Hewamanage
-// $Id$
+// $Id: LostLeptonTree.cc,v 1.1 2012/11/21 23:35:31 samantha Exp $
 //
 //
 
@@ -45,6 +45,7 @@
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 #include "TTree.h"
+#include "SimDataFormats/GeneratorProducts/interface/GenEventInfoProduct.h"
 
 
 class LostLeptonTree : public edm::EDAnalyzer {
@@ -62,10 +63,11 @@ class LostLeptonTree : public edm::EDAnalyzer {
   void BookHistograms();
   void clearTreeVectors();  
 
-  bool          debug_;
-  edm::InputTag vtxSrc_;
-  bool          doPUReWeight_;
-  edm::InputTag puWeigthSrc_;
+  bool debug_;
+  edm::InputTag vtxSrc_, HBHENoiseFiltSrc_;
+  bool doPUReWeight_;
+  int doEventWeighing_;
+  edm::InputTag puWeigthSrc_, puWeigthABSrc_, puWeigthABCSrc_;
   edm::InputTag pfMetSrc_;
   edm::InputTag jetAllsrc_, genjetAllsrc_;
   edm::InputTag mhtSrc_, htSrc_;
@@ -75,8 +77,8 @@ class LostLeptonTree : public edm::EDAnalyzer {
   TTree* tree;
   unsigned int         t_EvtRun, t_EvtLS, t_EvtEvent;
   int                  t_NVertices;
-  double               t_PUWeight;
-  //double               t_EvtWeight; //for flat sample weighing
+  double               t_PUWeight, t_PUWeightAB, t_PUWeightABC;
+  double               t_EvtWeight; //for flat sample weighing
   double               t_PFMetPx, t_PFMetPy;
   std::vector<double> *t_PFJetPt,  *t_PFJetEta,  *t_PFJetPhi,  *t_PFJetE,  *t_PFJetBTag;
   double               t_PFht, t_PFmht;
@@ -96,7 +98,10 @@ LostLeptonTree::LostLeptonTree(const edm::ParameterSet & iConfig) {
   debug_       = iConfig.getParameter<bool>("Debug");
   vtxSrc_      = iConfig.getParameter<edm::InputTag>("VertexSource");
   doPUReWeight_= iConfig.getParameter<bool>("DoPUReweight");
+  doEventWeighing_ = iConfig.getUntrackedParameter<int>("ApplyEventWeighing",0);
   puWeigthSrc_ = iConfig.getParameter<edm::InputTag>("PUWeigthSource");
+  puWeigthABSrc_ = iConfig.getParameter<edm::InputTag>("PUWeigthABSource");
+  puWeigthABCSrc_ = iConfig.getParameter<edm::InputTag>("PUWeigthABCSource");
   pfMetSrc_    = iConfig.getParameter<edm::InputTag>("PFMetSource");
   jetAllsrc_   = iConfig.getParameter<edm::InputTag>("JetAllSource");
   genjetAllsrc_   = iConfig.getParameter<edm::InputTag>("genJetAllSource");
@@ -104,7 +109,7 @@ LostLeptonTree::LostLeptonTree(const edm::ParameterSet & iConfig) {
   htSrc_       = iConfig.getParameter<edm::InputTag>("HTSource");
   minPFJetPt_   = iConfig.getUntrackedParameter<double>("MinPFJetPt",0.0);
   minGENJetPt_   = iConfig.getUntrackedParameter<double>("MinGENJetPt",0.0);
-
+  HBHENoiseFiltSrc_ = iConfig.getParameter<edm::InputTag>("HBHENoiseFiltSrc");
 }
 
 LostLeptonTree::~LostLeptonTree() {
@@ -132,14 +137,38 @@ void LostLeptonTree::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
   
   // save pileup weight
   double pu_event_wt = 1.0;
+  double pu_event_wtAB = 1.0;
+  double pu_event_wtABC = 1.0;
   edm::Handle<double> puweight;
+  edm::Handle<double> puweightAB;
+  edm::Handle<double> puweightABC;
   if( doPUReWeight_ ) {
     iEvent.getByLabel(puWeigthSrc_, puweight);
     pu_event_wt = *puweight;
+    iEvent.getByLabel(puWeigthABSrc_, puweightAB);
+    pu_event_wtAB = *puweightAB;
+    iEvent.getByLabel(puWeigthABCSrc_, puweightABC);
+    pu_event_wtABC = *puweightABC;
   }
   t_PUWeight = pu_event_wt;
+  t_PUWeightAB = pu_event_wtAB;
+  t_PUWeightABC = pu_event_wtABC;
 
   if(debug_)std::cout << "t_NVertices " << t_NVertices << "  t_PUWeight " << t_PUWeight << std::endl;
+
+
+	//event weights for flat QCD samples
+	double storedWeight = 1;
+	t_EvtWeight = storedWeight;
+	if ( doEventWeighing_ )
+	{
+		edm::Handle<GenEventInfoProduct> genEvtInfoHandle;
+		iEvent.getByLabel("generator", genEvtInfoHandle);
+		storedWeight = genEvtInfoHandle->weight();
+		//std::cout << "storedWeight = " << storedWeight << std::endl;
+	}
+	t_EvtWeight = storedWeight;
+
 
   // save missing transverse energy
   edm::Handle < std::vector<pat::MET> > met;
@@ -227,7 +256,7 @@ void LostLeptonTree::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
   iEvent.getByLabel("ra2EcalTPFilter", ra2EcalTPVal);
   iEvent.getByLabel("trackingFailureFilter", trackFailureVal);
   //this is not found in 52X skims
-  //iEvent.getByLabel("HBHENoiseFilterRA2", HBHENoiseVal);
+  //iEvent.getByLabel(HBHENoiseFiltSrc_, HBHENoiseVal);
 
   t_beamHaloFilter  = *beamHaloVal;
   t_eeBadScFilter   = *eeBadVal;
@@ -238,7 +267,7 @@ void LostLeptonTree::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
   t_ra2EcalBEFilter   = *ra2EcalBEVal;
   t_ra2EcalTPFilter   = *ra2EcalTPVal;
   t_trackingFailureFilter = *trackFailureVal; 
-//  t_HBHENoiseFilterRA2 = *HBHENoiseVal;
+  //t_HBHENoiseFilterRA2 = *HBHENoiseVal;
 
   tree->Fill();
 }
@@ -266,6 +295,9 @@ void LostLeptonTree::BookHistograms() {
   tree->Branch("t_EvtEvent",  &t_EvtEvent, "t_EvtEvent/i");
   tree->Branch("t_NVertices", &t_NVertices,"t_NVertices/I");
   tree->Branch("t_PUWeight",  &t_PUWeight, "t_PUWeight/D");
+  tree->Branch("t_PUWeightAB",  &t_PUWeightAB, "t_PUWeightAB/D");
+  tree->Branch("t_PUWeightABC",  &t_PUWeightABC, "t_PUWeightABC/D");
+  tree->Branch("t_EvtWeight",  &t_EvtWeight, "t_EvtWeight/D");
   tree->Branch("t_PFMetPx",   &t_PFMetPx,  "t_PFMetPx/D");
   tree->Branch("t_PFMetPy",   &t_PFMetPy,  "t_PFMetPy/D");
 
