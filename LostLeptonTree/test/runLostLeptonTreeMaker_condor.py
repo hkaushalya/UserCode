@@ -13,17 +13,31 @@ for line in infile.readlines():
        fileNameContainer.append (line)
 
 print fileNameContainer
+
+
+runningOnMC = False
+
 process = cms.Process("treemaker")
 process.load("FWCore.MessageLogger.MessageLogger_cfi")
 process.options = cms.untracked.PSet(
         wantSummary = cms.untracked.bool(True)
 )
 
-process.load("Configuration.StandardSequences.Geometry_cff")
+process.load("Configuration.Geometry.GeometryIdeal_cff")
 process.load("Configuration.StandardSequences.MagneticField_cff")
 process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
-process.GlobalTag.globaltag = "START52_V11C::All"
-print 'USING GT for 523 : ', process.GlobalTag.globaltag 
+#GT to use from RA2 2012 page
+#2012A+B (Jul13 rereco, 53X) 	FT_53_V6_AN2::All
+#2012A (Aug06 rereco, 53X) 	FT_53_V6C_AN2::All
+#2012Cv1 (Aug24 rereco, 53X) 	FT_53_V10_AN2::All
+#2012Cv2 (prompt reco, 53X) 	GR_P_V41_AN2::All
+#Summer12_DR53X 53X 	START53_V7F::All
+
+if runningOnMC:
+	process.GlobalTag.globaltag = "START52_V11C::All"
+else:
+	process.GlobalTag.globaltag = "FT_53_V6_AN2::All"
+print 'USING GT : ', process.GlobalTag.globaltag 
 
 #-- Message Logger ------------------------------------------------------------
 process.MessageLogger.categories.append('PATSummaryTables')
@@ -44,9 +58,15 @@ process.source = cms.Source("PoolSource",
    )
 )
 
-from UserCode.RA2QCDvetoAna.lostleptontree_cfi import *
+from UserCode.LostLeptonTree.lostleptontree_cfi import *
 process.treeMaker = demo.clone(
+	no_beamHaloFilter = cms.bool(True),
+	no_HBHENoiseFilter = cms.bool(True)
+
 )
+process.treeMaker.MCflag = runningOnMC
+process.treeMaker.DoPUReweight = False
+process.treeMaker.ApplyEventWeighing = False  #for flat sample 
 
 
 process.preseq = cms.Sequence(
