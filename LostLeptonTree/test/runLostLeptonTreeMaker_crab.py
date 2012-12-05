@@ -10,7 +10,7 @@ process.options = cms.untracked.PSet(
         wantSummary = cms.untracked.bool(True)
 )
 
-process.load("Configuration.StandardSequences.Geometry_cff")
+process.load("Configuration.Geometry.GeometryIdeal_cff")
 process.load("Configuration.StandardSequences.MagneticField_cff")
 process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
 
@@ -50,12 +50,17 @@ process.source = cms.Source("PoolSource", fileNames = cms.untracked.vstring(
 
 #process.load("UserCode.RA2QCDvetoAna.T1tttt_mG800_mLSP200_NOCUTS_09Aug2012V1_lacroix_cfi")
 
-from UserCode.RA2QCDvetoAna.lostleptontree_cfi import *
+from UserCode.LostLeptonTree.lostleptontree_cfi import *
 process.treeMaker = demo.clone(
+	no_beamHaloFilter = cms.bool(True),
+	no_HBHENoiseFilter = cms.bool(True)
+
 )
-process.treeMaker.MCflag = False 
+process.treeMaker.MCflag = runningOnMC
 process.treeMaker.DoPUReweight = False
-process.treeMaker.ApplyEventWeighing = True  #for flat sample 
+process.treeMaker.ApplyEventWeighing = False  #for flat sample 
+
+
 
 from SandBox.Skims.mhtProducer_cfi import *
 
