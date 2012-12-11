@@ -3,6 +3,8 @@
 //#include "Tokenizer.h"
 #include<vector>
 #include<string>
+#include <iomanip>
+#include "assert.h"
 /*hide boost header files from CINT */
 /*#ifndef __CINT__
 include <boost/foreach.hpp>
@@ -44,3 +46,30 @@ bool PtAComparator(const TLorentzVector& a,const TLorentzVector& b)
 	return res;
 }
 */
+void DumpHist(const TH1* h)
+{
+	if (h == NULL)
+	{
+		cout << __FUNCTION__ << ": Nul pointer received! " << endl;
+		assert(false);
+	}
+	if (h->GetDimension() != 1)
+	{
+		cout << __FUNCTION__ << ": Historam dimenstion is not 1! returning." << endl;
+		return;
+	}
+
+	cout << __FUNCTION__ << ":: Bin contents for " << h->GetName()  << " with Nbins = " << h->GetNbinsX() << endl;
+
+	cout << setw(25) << " bin " << setw(15) << "val" << setw(15) << "err" << endl;	
+	for (int bin=0; bin <= h->GetNbinsX()+1; ++bin)
+	{
+		const double lox = h->GetBinLowEdge(bin);
+		const double hix = h->GetXaxis()->GetBinUpEdge(bin);
+		const double w   = h->GetBinWidth(bin);
+		const double val = h->GetBinContent(bin);
+		const double err = h->GetBinError(bin);
+		cout << bin << "[" << lox << "-" << hix << "] = " << setw(15) << val << setw(15) << err << endl;  
+	}
+
+}
