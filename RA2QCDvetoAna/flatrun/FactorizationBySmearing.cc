@@ -155,15 +155,6 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	EtaBinEdges_.push_back(5.0);
 
 
-	//difference variation of the dPhiMin selections.
-	//make sure the book the correct number of histograms 
-	//when these are changed!!!
-	vDphiVariations.push_back(0.15);
-	vDphiVariations.push_back(0.20);
-	vDphiVariations.push_back(0.25);
-	vDphiVariations.push_back(0.30);
-	vDphiVariations.push_back(0.35);
-	vDphiVariations.push_back(0.40);
 
 	/**** events ti process ***********************/
 	Long64_t nentries = fChain->GetEntriesFast();
@@ -182,7 +173,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	//const double lumiWgt = 1; 
 	applyDphiCut_        = 0;
 	//unsigned nTries_     = (unsigned) max((double)1000 * NJet50_min_ * 2 , 5000.0) ; //number of pseudo experiments per event
-	unsigned nTries_     = 10000; //number of pseudo experiments per event
+	unsigned nTries_     = 5000; //number of pseudo experiments per event
 	if (bDEBUG) nTries_  = 1;
 	const double smearingWgt = 1.0/(double)nTries_;
 
@@ -200,6 +191,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	BookJerDebugHists();
 
 	unsigned nProcessed = 0, nCleaningFailed = 0;
+	nSmearedJetEvts = 0.0; nRecoJetEvts = 0.0; nGenJetEvts = 0.0;
 
 
 	for (Long64_t jentry=0; jentry<nentries;jentry++) {
@@ -218,44 +210,40 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 		nb = fChain->GetEntry(jentry);   nbytes += nb;
 		++nProcessed;
 
-		if (bDEBUG) cout << red << "run/ls/evt= " << t_EvtRun << " / " 
+		if (bDEBUG) 
+			cout << red << "run/ls/evt= " << t_EvtRun << " / " 
 				<<  t_EvtLS << " / " <<  t_EvtEvent << clearatt  << endl;
-		//cout << red << "run/ls/evt= " << t_EvtRun << " / " 
-		//		<<  t_EvtLS << " / " <<  t_EvtEvent << clearatt  << endl;
 
 		if (! PassCleaning()) 
 		{
 			++nCleaningFailed;
-			//cout << "Failed cleaning." << endl;;
+			if (bDEBUG) cout << "Failed cleaning." << endl;;
 			continue;
 		} 
 		const double evtWeight = t_EvtWeight; //==1 except for Flat QCD sample
-
 		
 		CreateRecoJetVec(recoJets);
-		const TLorentzVector recomhtvec(MHT(recoJets));
-		//cout << "reco mht/pfmht = " << recomhtvec.Pt() << "/" << t_PFmht << endl;
+		const bool accept_reco_evt = FillHistogram(recoJets,0, lumiWgt * evtWeight);
+		if (accept_reco_evt) 
+		{
+			nRecoJetEvts += lumiWgt * evtWeight;
+		}
 
 		CreateGenJetVec(genJets);
-
-		if (PassCuts(recoJets)) 
-		{
-			++nRecoJetEvts;
-			FillHistogram(recoJets,0, lumiWgt * evtWeight);
-		}
-		if (PassCuts(genJets))
-		{
-			++nGenJetEvts;
-			FillHistogram(genJets,1, lumiWgt * evtWeight);
-		}
+		++nGenJetEvts;
+		FillHistogram(genJets,1, lumiWgt * evtWeight);
 
 		for (unsigned n = 0; n < nTries_; ++n)
 		{
 			SmearingGenJets(genJets, smearedGenJets);
-			if (PassCuts(smearedGenJets)) 
+			const double totWeight = smearingWgt * lumiWgt * evtWeight;
+			const bool accept_smear_evt = FillHistogram(smearedGenJets,2, totWeight);
+			if (accept_smear_evt) {
+				nSmearedJetEvts += totWeight;
+			}
+			if (accept_reco_evt && !accept_reco_evt)
 			{
-				nSmearedJetEvts += smearingWgt;
-				FillHistogram(smearedGenJets,2, smearingWgt * lumiWgt * evtWeight);
+				cout << red << __LINE__ << ": Smeared event thrown out at ntries= " << n << clearatt <<endl;
 			}
 		}
 
@@ -272,16 +260,52 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 		{
 			for (unsigned mhtbin=0; mhtbin < MhtBins_.size() -1 ; ++mhtbin)
 			{
-				for (int i=0; i<6; ++i)
-				{
-					DivideByBinWidth(Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.pass[i]);
-					DivideByBinWidth(Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.fail[i]);
+				DivideByBinWidth(Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.signal);
+				Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.signal->SetMarkerStyle(20);
+				Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.signal->SetMarkerColor(kRed);
+				TLegend *leg = new TLegend(0.6,0.6,0.9,0.9);
+				leg->AddEntry(Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.signal,"Pass RA2 #Delta #Phi cuts");
+				TCanvas *c1 = new TCanvas("c1");
+				gPad->SetLogy();
+				Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.signal->Draw();
+				TCanvas *c2 = new TCanvas("c2");
+				gPad->SetLogy();
 
-					Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.pass[i]->Draw();
-					gPad->Print("passfail.eps");
-					Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.fail[i]->Draw();
-					gPad->Print("passfail.eps");
+				for (int i=0; i< vDphiVariations.size(); ++i)
+				{
+					DivideByBinWidth(Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.pass.at(i));
+					DivideByBinWidth(Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.fail.at(i));
+					string drawOption("");
+					if (i!=0) drawOption +="same";
+					c1->cd();
+					Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.fail.at(i)->SetMarkerStyle(22+i);
+					Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.fail.at(i)->SetMarkerColor(13+i);
+					Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.fail.at(i)->Draw("same");
+					stringstream fail_leg_text;
+					fail_leg_text << "#Delta #Phi_{min}<" << vDphiVariations.at(i);
+					leg->AddEntry(Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.fail.at(i), fail_leg_text.str().c_str());
+
+					c2->cd();
+					TH1* temp = dynamic_cast<TH1*> (Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.signal->Clone("copy"));
+					temp->SetDirectory(0);
+					temp->SetTitle("Signal Region/ Control Region");
+					temp->Divide(Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.fail.at(i));
+					temp->SetMarkerStyle(22+i);
+					temp->SetMarkerColor(13+i);
+					temp->DrawCopy(drawOption.c_str());
+
 				}
+
+				c1->cd();
+				leg->Draw();
+				gPad->Print("passfail.eps");
+				c2->cd();
+				leg->Draw();
+				gPad->Print("passfail.eps");
+				delete leg;
+				delete c1;
+				delete c2;
+
 			}
 		}
 	}
@@ -347,8 +371,8 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 				reconjet50leg << "reco (" << sum_reconj << ")";
 				smnjet50leg << "smeared (" << sum_smearnj << ")";
 
-				cout << red << "mht reco/smear  = " << sum_recomht << " / " << sum_smearmht << endl; 
-				cout << "nj50 reco/smear = " << sum_reconj << " / " << sum_smearnj  << clearatt << endl; 
+				//cout << red << "mht reco/smear  = " << sum_recomht << " / " << sum_smearmht << endl; 
+				//cout << "nj50 reco/smear = " << sum_reconj << " / " << sum_smearnj  << clearatt << endl; 
 
 				hreconjet50->SetLineWidth(2);
 				hsmearnjet50->SetLineWidth(2);
@@ -451,8 +475,8 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	cout << "Jetbins                = "; for (int bin=0; bin < JetBins_.size(); ++bin) { cout << JetBins_.at(bin).first << "-" << JetBins_.at(bin).second << ", "; }; cout << endl; 
 	cout << "Htbins                 = "; for (int bin=0; bin < HtBins_.size(); ++bin) { cout << HtBins_.at(bin) << ", "; }; cout << endl; 
 	cout << "Mhtbins                = "; for (int bin=0; bin < MhtBins_.size(); ++bin) { cout << MhtBins_.at(bin) << ", "; }; cout << endl; 
-	cout << "nReco/nGen/nSm Evts    = " << nRecoJetEvts << "/" << nGenJetEvts << "/" << nSmearedJetEvts << endl;
 	cout << "smearedJetPt_          = " << smearedJetPt_ << endl;
+	cout << "nReco/nGen/nSm Evts    = " << nRecoJetEvts << "/" << nGenJetEvts << "/" << nSmearedJetEvts << endl;
 	cout << "---- Smearing Function Settings ----" << endl;
 	cout << "Smearing file          = " << smearFunc_->SmearingFile() << endl;
 	cout << "absoluteTailScaling_   = " << smearFunc_->GetAbsoluteTailScaling() << endl;
@@ -468,6 +492,35 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	cout << "HTcut_high_            = " << HTcut_high_  << endl;
 	cout << "HTcut_veryhigh_        = " << HTcut_veryhigh_  << endl;
 	cout << "HTcut_extremehigh_     = " << HTcut_extremehigh_  << endl;
+	cout << "---- Actual Event Counts in Reco (Smeared) MHT hist ---- " << endl;
+	cout << setw(8) << "jet bin" << setw(12) << "ht bin" << setw(12) << "mht bin" << setw(10) << "Reco" << setw(10) << "Smear"  << setw(15) << "Smear/Reco" << endl; 
+	for (unsigned jetbin=0; jetbin < JetBins_.size(); ++jetbin)
+	{
+		stringstream jetbin_range;
+		jetbin_range << JetBins_.at(jetbin).first << "-" << JetBins_.at(jetbin).second;
+		for (unsigned htbin=0; htbin < HtBins_.size() -1 ; ++htbin)
+		{
+			stringstream htbin_range;
+			htbin_range << HtBins_.at(htbin) << "-" << setw(6) << HtBins_.at(htbin+1); 
+			for (unsigned mhtbin=0; mhtbin < MhtBins_.size() -1 ; ++mhtbin)
+			{
+				stringstream mhtbin_range;
+				mhtbin_range << setw(6) << MhtBins_.at(mhtbin) << "-" << setw(6) << MhtBins_.at(mhtbin+1); 
+				const double int_smear = (Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.h_Mht)->Integral();
+				const double int_reco = (Hist.at(jetbin).at(htbin).at(mhtbin).hv_RecoEvt.h_Mht)->Integral();
+				const double ratio = int_reco>0 ? int_smear/int_reco : 0 ;
+				
+				cout << setprecision(1);
+				cout << fixed << setw(8) << jetbin_range.str() << setw(12) << htbin_range.str() 
+						<< setw(12) << mhtbin_range.str() << setw(10) << int_reco << setw(10) << int_smear  << setw(15) << ratio << endl; 
+			}
+		}
+	}
+	if (nVectorInexWarnings)
+	{
+		cout << "---- ERROR/WARNING SUMMARY ---------" << endl;
+		cout << "Values out of range errors = " << nVectorInexWarnings << endl;
+	}
 
 }
 
@@ -495,7 +548,6 @@ TLorentzVector FactorizationBySmearing::MHT(const std::vector<TLorentzVector>& v
 	TLorentzVector mht(0.0, 0.0, 0.0, 0.0);
 	for ( unsigned int ijet=0; ijet<vjets.size(); ijet++) {    
 		if ( vjets[ijet].Pt()>30.0 && std::fabs(vjets[ijet].Eta())<5.0 ) 
-		//if( vjets[ijet].Pt()>30.0 && std::abs(vjets[ijet].Eta())<2.5 ) 
 		{
 			mht -= vjets[ijet];
 		}
@@ -710,7 +762,7 @@ void FactorizationBySmearing::DumpJets(const vector<TLorentzVector>& jets)
 }
 
 
-void FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
+bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
 				const int jetcoll, const double& wgt)
 {
 	//0=reco
@@ -728,29 +780,30 @@ void FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets,
 	const unsigned i_MhtBin = GetVectorIndex(MhtBins_, mht);
 
 	bool discard = false;
-	if ( i_JetBin > JetBins_.size() ) { discard = discard || true; cout << "iJetBin = " << i_JetBin << " is out of range. Discarding event! " << endl; } 
-	if ( i_HtBin  > HtBins_.size()  ) { discard = discard || true; cout << "iHtBin = " << i_HtBin << " is out of range. Discarding event! " << endl; } 
-	if ( i_MhtBin > MhtBins_.size() ) { discard = discard || true; cout << "iMhtBin = " << i_MhtBin << " is out of range. Discarding event! " << endl; } 
-	if (discard) return;
+	if ( i_JetBin > JetBins_.size() ) { discard = discard || true; if ((unsigned) nVectorInexWarnings % 500 == 0) cout << "iJetBin = " << i_JetBin << " is out of range. Discarding event! " << endl; } 
+	if ( i_HtBin  > HtBins_.size()  ) { discard = discard || true; if ((unsigned) nVectorInexWarnings % 500 == 0)  cout << "iHtBin = " << i_HtBin << " is out of range. Discarding event! " << endl; } 
+	if ( i_MhtBin > MhtBins_.size() ) { discard = discard || true; if ((unsigned) nVectorInexWarnings % 500 == 0)  cout << "iMhtBin = " << i_MhtBin << " is out of range. Discarding event! " << endl; } 
+	if (discard) return discard;
+
+	const bool bPassRA2dphiCut = PassDphiCut(jets, mhtvec, JetBins_.at(i_JetBin).first, 0.5, 0.5, 0.3);
+
+	/*******************************************************************
+	 * to get all plots passing RA2 cuts.
+	 * disable this (applyDphiCut_==false) to do factorization 
+	 * ratio determination and closure tests 
+	 ******************************************************************/
+	if (applyDphiCut_ && !bPassRA2dphiCut) return false;
 
 	const float dPhiMin = DelPhiMin(jets,	mhtvec, JetBins_.at(i_JetBin).first);
-	const vector<TLorentzVector> jets50 = GetPt50Eta2p5Jets(jets);
-	const bool bPassRA2dphiCut  = PassRA2dphiCut(jets50, mhtvec);
-	const bool bPassRA2dphiCut2 = PassDphiCut(jets50, mhtvec, JetBins_.at(i_JetBin).first, 0.5, 0.5, 0.3);
 
-	if ( (! bPassRA2dphiCut && bPassRA2dphiCut2) &&
-		  ( bPassRA2dphiCut && ! bPassRA2dphiCut2))
-	{
-		cout << "fatal errror: outcome mismatch! " << bPassRA2dphiCut << " / " << bPassRA2dphiCut2 << endl;
-		assert (false);
-	}
-
-	/**************************************************/
-	//                 for systematics
-	/**************************************************/
-	const bool bSidebandSyst1 = PassDphiCut(jets50, mhtvec, JetBins_.at(i_JetBin).first, 0.5, 0.5, 0.1);
-	const bool bSidebandSyst2 = PassDphiCut(jets50, mhtvec, JetBins_.at(i_JetBin).first, 0.4, 0.4, 0.2);
-
+	/*****************************************************************
+	*                 for systematics
+	*  Try dphi cuts slightly different from RA2
+	*  to probe how the control region would change
+	*  with such selections.
+	****************************************************************/
+	const bool bPassDphiSystVariation_1 = PassDphiCut(jets, mhtvec, JetBins_.at(i_JetBin).first, 0.5, 0.5, 0.1);
+	const bool bPassDphiSystVariation_2 = PassDphiCut(jets, mhtvec, JetBins_.at(i_JetBin).first, 0.4, 0.4, 0.2);
 
 	if (bDEBUG) 
 	{
@@ -759,6 +812,8 @@ void FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets,
 				//<< "/" << mymht 
 				<< endl;
 	}
+
+	const vector<TLorentzVector> jets50 = GetPt50Eta2p5Jets(jets);
 
 	if (jetcoll == 0) //reco hists
 	{ 
@@ -780,6 +835,38 @@ void FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets,
 					<< " [" << mht_name << "|" << j1_name
 					<< endl;
 					*/
+
+		if (bPassRA2dphiCut) 
+		{
+			Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.signal->Fill(mht,wgt);
+			Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.signalFineBin->Fill(mht,wgt);
+		}
+
+		for (unsigned i=0; i < vDphiVariations.size(); ++i)
+		{
+			if (dPhiMin > vDphiVariations.at(i)) 
+			{
+				Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.pass.at(i)->Fill(mht, wgt);
+				Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.passFineBin.at(i)->Fill(mht, wgt);
+			} else 
+			{
+				Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.fail.at(i)->Fill(mht, wgt);
+				Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.failFineBin.at(i)->Fill(mht, wgt);
+			}
+		}
+
+		if (! bPassDphiSystVariation_1) //we want the denominator (or failed events)
+		{
+			Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.sidebandSyst[0]->Fill(mht, wgt);
+			Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.sidebandSystFineBin[0]->Fill(mht, wgt);
+		}
+		if (! bPassDphiSystVariation_2)
+		{
+			Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.sidebandSyst[1]->Fill(mht, wgt);
+			Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.sidebandSystFineBin[1]->Fill(mht, wgt);
+		}
+
+
 	} else if (jetcoll == 1)  //gen hists
 	{
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_Mht->Fill(mht, wgt);
@@ -810,22 +897,22 @@ void FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets,
 		{
 			if (dPhiMin > vDphiVariations.at(i)) 
 			{
-				Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.pass[i]->Fill(mht, wgt);
-				Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.passFineBin[i]->Fill(mht, wgt);
+				Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.pass.at(i)->Fill(mht, wgt);
+				Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.passFineBin.at(i)->Fill(mht, wgt);
 			} else 
 			{
-				Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.fail[i]->Fill(mht, wgt);
-				Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.failFineBin[i]->Fill(mht, wgt);
+				Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.fail.at(i)->Fill(mht, wgt);
+				Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.failFineBin.at(i)->Fill(mht, wgt);
 			}
 		}
 
 
-		if (! bSidebandSyst1) //we want the denominator (or failed events)
+		if (! bPassDphiSystVariation_1) //we want the denominator (or failed events)
 		{
 			Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.sidebandSyst[0]->Fill(mht, wgt);
 			Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.sidebandSystFineBin[0]->Fill(mht, wgt);
 		}
-		if (! bSidebandSyst2)
+		if (! bPassDphiSystVariation_2)
 		{
 			Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.sidebandSyst[1]->Fill(mht, wgt);
 			Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.sidebandSystFineBin[1]->Fill(mht, wgt);
@@ -836,6 +923,7 @@ void FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets,
 		assert (false);
 	}
 	
+	return true;
 }
 void FactorizationBySmearing::FillJetHistogram(const vector<TLorentzVector>& jets, 
 				vector<JetHist_t> hist, const int jetcoll, const TLorentzVector& mhtvec, 
@@ -897,33 +985,11 @@ float FactorizationBySmearing::DelPhiMin(const vector<TLorentzVector>& jets,
 	std::sort(vDelPhi_jetmht.begin(), vDelPhi_jetmht.end(), sort_using_less_than);	
 
 	//assert (vDelPhi_jetmht.size() == 3 && "ERROR: More than 3 dPhiMin calculations found!");
-	//std::cout << "vDelPhi_jetmht size = " << vDelPhi_jetmht.size() << std::endl;
+//	std::cout << "vDelPhi_jetmht size = " << vDelPhi_jetmht.size() << std::endl;
 	
 	const float dPhiMin = vDelPhi_jetmht.at(0);
-	//cout << __FUNCTION__ << ": delphimin = " <<  dPhiMin << endl;
+//	cout << __FUNCTION__ << ": delphimin = " <<  dPhiMin << endl;
 	return dPhiMin;
-}
-bool FactorizationBySmearing::PassRA2dphiCut(const vector<TLorentzVector>& jets, 
-					const TLorentzVector& mht)
-{
-	//Check if RA2 dphi cuts are satisfied
-	//dphi cuts is applied to the 3 leading jets with
-	//Pt>50 and |eta|<2.5
-	bool bPassRA2dphiCut = true;
-	if (jets.size() >=1) bPassRA2dphiCut = bPassRA2dphiCut && (std::fabs(jets.at(0).DeltaPhi(mht)) > 0.5);
-	if (jets.size() >=2) bPassRA2dphiCut = bPassRA2dphiCut && (std::fabs(jets.at(1).DeltaPhi(mht)) > 0.5);
-	if (jets.size() >=3) bPassRA2dphiCut = bPassRA2dphiCut && (std::fabs(jets.at(2).DeltaPhi(mht)) > 0.3);
-
-	for (int i=0; i<jets.size(); ++i)
-	{
-		if (i==3) break;
-		const float pt   = jets.at(i).Pt();
-		const float eta  = jets.at(i).Eta();
-		const float phi  = jets.at(i).Phi();
-		const float dphi = fabs(jets.at(i).DeltaPhi(mht));
-	}
-	
-	return bPassRA2dphiCut;
 }
 
 bool FactorizationBySmearing::PassDphiCut(const vector<TLorentzVector>& jets, 
@@ -933,9 +999,9 @@ bool FactorizationBySmearing::PassDphiCut(const vector<TLorentzVector>& jets,
 	bool pass = true;
 	//use only three leading jets or in the case >=2 min jets, use only 2 jets
 	const unsigned upTo = std::min(3, (int) nJet50min); 
-	if (jets.size() >=1 && upTo>=1) pass = pass && (std::fabs(jets.at(0).DeltaPhi(mht)) > cut1);
-	if (jets.size() >=2 && upTo>=2) pass = pass && (std::fabs(jets.at(1).DeltaPhi(mht)) > cut2);
-	if (jets.size() >=3 && upTo>=3) pass = pass && (std::fabs(jets.at(2).DeltaPhi(mht)) > cut3);
+	if (jets.size() >=1 && upTo>=1) { pass = pass && (fabs(jets.at(0).DeltaPhi(mht)) > cut1); }
+	if (jets.size() >=2 && upTo>=2) { pass = pass && (fabs(jets.at(1).DeltaPhi(mht)) > cut2); }
+	if (jets.size() >=3 && upTo>=3) { pass = pass && (fabs(jets.at(2).DeltaPhi(mht)) > cut3); }
 	return pass;
 }
 void FactorizationBySmearing::BookJerDebugHists()
@@ -983,15 +1049,18 @@ unsigned FactorizationBySmearing::GetVectorIndex(const vector<double>& binEdges,
 		if (val>=min && val<max) return bin;
 	}
 
-	cout << __FUNCTION__ << ": WARNNING! val = " << val << " is out of bin ranges[ ";
+	++nVectorInexWarnings;
+	stringstream msg;
+	msg << __FUNCTION__ << ": WARNNING! val = " << val << " is out of bin ranges[ ";
 
 	for (unsigned bin=0; bin < binEdges.size(); ++bin)
 	{
-		cout << binEdges.at(bin);
-		if (bin< (binEdges.size()-1)) cout << ", ";
+		msg << binEdges.at(bin);
+		if (bin< (binEdges.size()-1)) msg << ", ";
 	}
-	cout << "]" << endl;
-	cout << "   Assigning extreme value!" << endl;
+	msg << "]" << endl;
+	msg << "   Assigning extreme value!" << endl;
+	if ( (unsigned)nVectorInexWarnings % 500  == 0) cout << msg.str();
 	return 99999;
 }
 unsigned FactorizationBySmearing::GetVectorIndex(const vector< pair<unsigned, unsigned> >& binEdges, const unsigned& val)
@@ -1003,16 +1072,18 @@ unsigned FactorizationBySmearing::GetVectorIndex(const vector< pair<unsigned, un
 		if (val>=min && val<=max) return bin;
 	}
 
-	cout << __FUNCTION__ << ": WARNNING! val = " << val << " is out of bin ranges[ ";
+	++nVectorInexWarnings;
+	stringstream msg;
+	msg << __FUNCTION__ << ": WARNNING! val = " << val << " is out of bin ranges[ ";
 
 	for (unsigned bin=0; bin < binEdges.size(); ++bin)
 	{
-		cout << binEdges.at(bin).first << "-" << binEdges.at(bin).second;
-		if (bin< (binEdges.size()-1)) cout << ", ";
+	 	msg  << binEdges.at(bin).first << "-" << binEdges.at(bin).second;
+		if (bin< (binEdges.size()-1)) msg << ", ";
 	}
-	cout << "]" << endl;
-	
-	cout << "   Assigning extreme value!" << endl;
+	msg << "]" << endl;
+	msg << "   Assigning extreme value!" << endl;
+	if ( (unsigned) nVectorInexWarnings % 500 ==0 ) cout << msg.str();
 	return 99999;
 }
 
@@ -1159,6 +1230,12 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 
 	const int nBins_mht = 200; const double min_mht =0, max_mht=1000;
 	const int nBins_ht = 140; const double min_ht =0, max_ht=3500;
+	//for ratio plot
+	const double evt_mht_max = 1500, evt_mht_bins = 750;
+	const double evt_ht_max = 4000, evt_ht_bins = 800;
+	const float npassFailHistBins = 14;
+	const float passFailHistBins[] = {50,60,70,80,90,100,110,120,140,160,200,350,500,800,1000};
+
 
 	for (unsigned i = 0;i < jetcoll.size(); ++i)
 	{
@@ -1197,12 +1274,59 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 			hist.hv_RecoEvt.h_DphiMin->Sumw2();
 			hist.hv_RecoEvt.h_DphiMinVsMht->Sumw2();
 
-//			dir->Add(hist.hv_RecoEvt.h_Njet50eta2p5);
-//			dir->Add(hist.hv_RecoEvt.h_Njet30eta5p0);
-//			dir->Add(hist.hv_RecoEvt.h_Mht);
-//			dir->Add(hist.hv_RecoEvt.h_Ht);
-//			dir->Add(hist.hv_RecoEvt.h_DphiMin);
-//			dir->Add(hist.hv_RecoEvt.h_DphiMinVsMht);
+			GetJetHist(hist.hv_RecoJets,jetcoll.at(i), htmhtrange.str());
+
+
+			//pass variations
+			//
+			for (unsigned j=0; j < vDphiVariations.size(); ++j)
+			{
+				const float dphival = vDphiVariations.at(j); 
+
+				stringstream pass_name, fail_name, passFineBin_name, failFineBin_name;
+				stringstream pass_title, fail_title, passFineBin_title, failFineBin_title;
+
+				pass_name << jetcoll.at(i) << "_pass" << j;
+				fail_name << jetcoll.at(i) << "_fail" << j;
+				passFineBin_name << jetcoll.at(i) << "_passFineBin" << j;
+				failFineBin_name << jetcoll.at(i) << "_failFineBin" << j;
+				pass_title <<"Events with #Delta#Phi_{min}>" << dphival << ";MHT;Events;";
+				fail_title <<"Events with #Delta#Phi_{min}<" << dphival << ";MHT;Events;";
+				passFineBin_title <<"Events with #Delta#Phi_{min}>" << dphival << ";MHT;Events;";
+				failFineBin_title <<"Events with #Delta#Phi_{min}<" << dphival << ";MHT;Events;";
+
+				hist.hv_RecoEvt.pass.push_back( new TH1D(pass_name.str().c_str(), pass_title.str().c_str(), npassFailHistBins, passFailHistBins) ); 
+				hist.hv_RecoEvt.fail.push_back( new TH1D(fail_name.str().c_str(), fail_title.str().c_str(), npassFailHistBins, passFailHistBins) );
+				hist.hv_RecoEvt.passFineBin.push_back( new TH1D(passFineBin_name.str().c_str(), passFineBin_title.str().c_str(), evt_mht_bins, 0, evt_mht_max) ); 
+				hist.hv_RecoEvt.failFineBin.push_back( new TH1D(failFineBin_name.str().c_str(), failFineBin_title.str().c_str(), evt_mht_bins, 0, evt_mht_max) );
+
+				hist.hv_RecoEvt.pass.at(j)->Sumw2(); 
+				hist.hv_RecoEvt.fail.at(j)->Sumw2(); 
+				hist.hv_RecoEvt.passFineBin.at(j)->Sumw2(); 
+				hist.hv_RecoEvt.failFineBin.at(j)->Sumw2(); 
+			}
+
+			hist.hv_RecoEvt.sidebandSyst[0] = new TH1D("reco_sidebandSyst1","Reco Events: Sideband Syst1: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
+			hist.hv_RecoEvt.sidebandSyst[1] = new TH1D("reco_sidebandSyst2","Reco Events: Sideband Syst2: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
+			hist.hv_RecoEvt.sidebandSystFineBin[0] = new TH1D("reco_sidebandSyst1_fineBin","Reco Events: Sideband Syst1 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", 1500, 0, 1500);
+			hist.hv_RecoEvt.sidebandSystFineBin[1] = new TH1D("reco_sidebandSyst2_fineBin","Reco Events: Sideband Syst2 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", 1500, 0, 1500);
+
+			hist.hv_RecoEvt.signal = new TH1D("reco_signal" ,"Reco Events: Signal Region", npassFailHistBins, passFailHistBins);
+			hist.hv_RecoEvt.signalFineBin = new TH1D("reco_signalFineBin" ," Reco Events: Signal Region", 1500, 0, 1500);
+
+			hist.hv_RecoEvt.sidebandSyst[0]->Sumw2();
+			hist.hv_RecoEvt.sidebandSyst[1]->Sumw2();
+			hist.hv_RecoEvt.sidebandSystFineBin[0]->Sumw2();
+			hist.hv_RecoEvt.sidebandSystFineBin[1]->Sumw2();
+
+			hist.hv_RecoEvt.signal->Sumw2();
+			hist.hv_RecoEvt.signalFineBin->Sumw2();
+			//			dir->Add(hist.hv_RecoEvt.h_Njet50eta2p5);
+			//			dir->Add(hist.hv_RecoEvt.h_Njet30eta5p0);
+			//			dir->Add(hist.hv_RecoEvt.h_Mht);
+			//			dir->Add(hist.hv_RecoEvt.h_Ht);
+			//			dir->Add(hist.hv_RecoEvt.h_DphiMin);
+			//			dir->Add(hist.hv_RecoEvt.h_DphiMinVsMht);
 
 		} else if (i==1)
 		{
@@ -1218,6 +1342,8 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 			hist.hv_GenEvt.h_Ht->Sumw2();
 			hist.hv_GenEvt.h_DphiMin->Sumw2();
 			hist.hv_GenEvt.h_DphiMinVsMht->Sumw2();
+			
+			GetJetHist(hist.hv_GenJets,jetcoll.at(i), htmhtrange.str());
 
 //			dir->Add(hist.hv_GenEvt.h_Njet50eta2p5);
 //			dir->Add(hist.hv_GenEvt.h_Njet30eta5p0);
@@ -1240,6 +1366,54 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 			hist.hv_SmearedEvt.h_DphiMin->Sumw2();
 			hist.hv_SmearedEvt.h_DphiMinVsMht->Sumw2();
 
+			GetJetHist(hist.hv_SmearedJets, jetcoll.at(i), htmhtrange.str());
+
+			//pass variations
+			//
+			for (unsigned j=0; j < vDphiVariations.size(); ++j)
+			{
+				const float dphival = vDphiVariations.at(j); 
+
+				stringstream pass_name, fail_name, passFineBin_name, failFineBin_name;
+				stringstream pass_title, fail_title, passFineBin_title, failFineBin_title;
+
+				pass_name << jetcoll.at(i) << "_pass" << j;
+				fail_name << jetcoll.at(i) << "_fail" << j;
+				passFineBin_name << jetcoll.at(i) << "_passFineBin" << j;
+				failFineBin_name << jetcoll.at(i) << "_failFineBin" << j;
+				pass_title <<"Smeared events with #Delta#Phi_{min}>" << dphival << ";MHT;Events;";
+				fail_title <<"Smeared events with #Delta#Phi_{min}<" << dphival << ";MHT;Events;";
+				passFineBin_title <<"Smeared events with #Delta#Phi_{min}>" << dphival << ";MHT;Events;";
+				failFineBin_title <<"Smeared events with #Delta#Phi_{min}<" << dphival << ";MHT;Events;";
+
+				hist.hv_SmearedEvt.pass.push_back( new TH1D(pass_name.str().c_str(), pass_title.str().c_str(), npassFailHistBins, passFailHistBins) ); 
+				hist.hv_SmearedEvt.fail.push_back( new TH1D(fail_name.str().c_str(), fail_title.str().c_str(), npassFailHistBins, passFailHistBins) );
+				hist.hv_SmearedEvt.passFineBin.push_back( new TH1D(passFineBin_name.str().c_str(), passFineBin_title.str().c_str(), evt_mht_bins, 0, evt_mht_max) ); 
+				hist.hv_SmearedEvt.failFineBin.push_back( new TH1D(failFineBin_name.str().c_str(), failFineBin_title.str().c_str(), evt_mht_bins, 0, evt_mht_max) );
+
+				hist.hv_SmearedEvt.pass.at(j)->Sumw2(); 
+				hist.hv_SmearedEvt.fail.at(j)->Sumw2(); 
+				hist.hv_SmearedEvt.passFineBin.at(j)->Sumw2(); 
+				hist.hv_SmearedEvt.failFineBin.at(j)->Sumw2(); 
+			}
+
+			hist.hv_SmearedEvt.sidebandSyst[0] = new TH1D("smear_sidebandSyst1"," Smeared Events: Sideband Syst1: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
+			hist.hv_SmearedEvt.sidebandSyst[1] = new TH1D("smear_sidebandSyst2"," Smeared Events: Sideband Syst2: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
+			hist.hv_SmearedEvt.sidebandSystFineBin[0] = new TH1D("smear_sidebandSyst1_fineBin"," Smeared Events:Sideband Syst1 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", 1500, 0, 1500);
+			hist.hv_SmearedEvt.sidebandSystFineBin[1] = new TH1D("smear_sidebandSyst2_fineBin"," Smeared Events:Sideband Syst2 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", 1500, 0, 1500);
+
+			hist.hv_SmearedEvt.signal = new TH1D("smear_signal", " Smeared Events:Signal Region", npassFailHistBins, passFailHistBins);
+			hist.hv_SmearedEvt.signalFineBin = new TH1D("smear_signalFineBin", " Smeared Events:Signal Region", 1500, 0, 1500);
+
+			hist.hv_SmearedEvt.sidebandSyst[0]->Sumw2();
+			hist.hv_SmearedEvt.sidebandSyst[1]->Sumw2();
+			hist.hv_SmearedEvt.sidebandSystFineBin[0]->Sumw2();
+			hist.hv_SmearedEvt.sidebandSystFineBin[1]->Sumw2();
+
+			hist.hv_SmearedEvt.signal->Sumw2();
+			hist.hv_SmearedEvt.signalFineBin->Sumw2();
+
+
 //			dir->Add(hist.hv_SmearedEvt.h_Njet50eta2p5);
 //			dir->Add(hist.hv_SmearedEvt.h_Njet30eta5p0);
 //			dir->Add(hist.hv_SmearedEvt.h_Mht);
@@ -1249,65 +1423,7 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 		}
 	}
 
-	GetJetHist(hist.hv_RecoJets,"reco", htmhtrange.str());
-	GetJetHist(hist.hv_GenJets,"gen", htmhtrange.str());
-	GetJetHist(hist.hv_SmearedJets,"smeared", htmhtrange.str());
 
-	//for ratio plot
-	const double evt_mht_max = 1500, evt_mht_bins = 750;
-	const double evt_ht_max = 4000, evt_ht_bins = 800;
-	const float npassFailHistBins = 14;
-	const float passFailHistBins[] = {50,60,70,80,90,100,110,120,140,160,200,350,500,800,1000};
-	//pass variations
-	hist.hv_SmearedEvt.pass[0] = new TH1D("pass0","PASS from #Delta#Phi_{min} cut >0.15", npassFailHistBins, passFailHistBins); 
-	hist.hv_SmearedEvt.pass[1] = new TH1D("pass1","PASS from #Delta#Phi_{min} cut >0.20", npassFailHistBins, passFailHistBins); 
-	hist.hv_SmearedEvt.pass[2] = new TH1D("pass2","PASS from #Delta#Phi_{min} cut >0.25", npassFailHistBins, passFailHistBins); 
-	hist.hv_SmearedEvt.pass[3] = new TH1D("pass3","PASS from #Delta#Phi_{min} cut >0.30", npassFailHistBins, passFailHistBins); 
-	hist.hv_SmearedEvt.pass[4] = new TH1D("pass4","PASS from #Delta#Phi_{min} cut >0.35", npassFailHistBins, passFailHistBins); 
-	hist.hv_SmearedEvt.pass[5] = new TH1D("pass5","PASS from #Delta#Phi_{min} cut >0.40", npassFailHistBins, passFailHistBins); 
-
-	hist.hv_SmearedEvt.fail[0] = new TH1D("fail0","FAIL from #Delta#Phi_{min} cut <0.15", npassFailHistBins, passFailHistBins);
-	hist.hv_SmearedEvt.fail[1] = new TH1D("fail1","FAIL from #Delta#Phi_{min} cut <0.20", npassFailHistBins, passFailHistBins);
-	hist.hv_SmearedEvt.fail[2] = new TH1D("fail2","FAIL from #Delta#Phi_{min} cut <0.25", npassFailHistBins, passFailHistBins);
-	hist.hv_SmearedEvt.fail[3] = new TH1D("fail3","FAIL from #Delta#Phi_{min} cut <0.30", npassFailHistBins, passFailHistBins);
-	hist.hv_SmearedEvt.fail[4] = new TH1D("fail4","FAIL from #Delta#Phi_{min} cut <0.35", npassFailHistBins, passFailHistBins);
-	hist.hv_SmearedEvt.fail[5] = new TH1D("fail5","FAIL from #Delta#Phi_{min} cut <0.40", npassFailHistBins, passFailHistBins);
-
-	hist.hv_SmearedEvt.passFineBin[0] = new TH1D("passFineBin0","PASS from #Delta#Phi_{min} cut >0.15", evt_mht_bins, 0, evt_mht_max); 
-	hist.hv_SmearedEvt.passFineBin[1] = new TH1D("passFineBin1","PASS from #Delta#Phi_{min} cut >0.20", evt_mht_bins, 0, evt_mht_max); 
-	hist.hv_SmearedEvt.passFineBin[2] = new TH1D("passFineBin2","PASS from #Delta#Phi_{min} cut >0.25", evt_mht_bins, 0, evt_mht_max); 
-	hist.hv_SmearedEvt.passFineBin[3] = new TH1D("passFineBin3","PASS from #Delta#Phi_{min} cut >0.30", evt_mht_bins, 0, evt_mht_max); 
-	hist.hv_SmearedEvt.passFineBin[4] = new TH1D("passFineBin4","PASS from #Delta#Phi_{min} cut >0.35", evt_mht_bins, 0, evt_mht_max); 
-	hist.hv_SmearedEvt.passFineBin[5] = new TH1D("passFineBin5","PASS from #Delta#Phi_{min} cut >0.40", evt_mht_bins, 0, evt_mht_max); 
-
-	hist.hv_SmearedEvt.failFineBin[0] = new TH1D("failFineBin0","FAIL from #Delta#Phi_{min} cut <0.15", evt_mht_bins, 0, evt_mht_max);
-	hist.hv_SmearedEvt.failFineBin[1] = new TH1D("failFineBin1","FAIL from #Delta#Phi_{min} cut <0.20", evt_mht_bins, 0, evt_mht_max);
-	hist.hv_SmearedEvt.failFineBin[2] = new TH1D("failFineBin2","FAIL from #Delta#Phi_{min} cut <0.25", evt_mht_bins, 0, evt_mht_max);
-	hist.hv_SmearedEvt.failFineBin[3] = new TH1D("failFineBin3","FAIL from #Delta#Phi_{min} cut <0.30", evt_mht_bins, 0, evt_mht_max);
-	hist.hv_SmearedEvt.failFineBin[4] = new TH1D("failFineBin4","FAIL from #Delta#Phi_{min} cut <0.35", evt_mht_bins, 0, evt_mht_max);
-	hist.hv_SmearedEvt.failFineBin[5] = new TH1D("failFineBin5","FAIL from #Delta#Phi_{min} cut <0.40", evt_mht_bins, 0, evt_mht_max);
-
-	for (int i=0; i<6; ++i) 
-	{ 
-		hist.hv_SmearedEvt.pass[i]->Sumw2(); hist.hv_SmearedEvt.fail[i]->Sumw2(); 
-		hist.hv_SmearedEvt.passFineBin[i]->Sumw2(); hist.hv_SmearedEvt.failFineBin[i]->Sumw2(); 
-	}
-
-	hist.hv_SmearedEvt.sidebandSyst[0] = new TH1D("sidebandSyst1"," Sideband Syst1: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
-	hist.hv_SmearedEvt.sidebandSyst[1] = new TH1D("sidebandSyst2"," Sideband Syst2: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
-	hist.hv_SmearedEvt.sidebandSystFineBin[0] = new TH1D("sidebandSyst1_fineBin","Sideband Syst1 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", 1500, 0, 1500);
-	hist.hv_SmearedEvt.sidebandSystFineBin[1] = new TH1D("sidebandSyst2_fineBin","Sideband Syst2 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", 1500, 0, 1500);
-
-	hist.hv_SmearedEvt.signal = new TH1D("signal" ,"Signal Region", npassFailHistBins, passFailHistBins);
-	hist.hv_SmearedEvt.signalFineBin = new TH1D("signalFineBin" ,"Signal Region", 1500, 0, 1500);
-
-	hist.hv_SmearedEvt.sidebandSyst[0]->Sumw2();
-	hist.hv_SmearedEvt.sidebandSyst[1]->Sumw2();
-	hist.hv_SmearedEvt.sidebandSystFineBin[0]->Sumw2();
-	hist.hv_SmearedEvt.sidebandSystFineBin[1]->Sumw2();
-
-	hist.hv_SmearedEvt.signal->Sumw2();
-	hist.hv_SmearedEvt.signalFineBin->Sumw2();
 }
 
 void FactorizationBySmearing::GetJetHist(vector<JetHist_t>& Hist, const string jetcoll,
@@ -1350,7 +1466,11 @@ void FactorizationBySmearing::DivideByBinWidth(TH1* h)
 		cout << __FUNCTION__ << ": null pointer passed! retuning!." << endl; 
 		return;
 	}
-	for (int bin=1; bin<=h->GetNbinsX(); ++bin)
+	
+	//normalization of underflow and overflow bins
+	//does not seem accurate as the bin width seems undefined
+	//for these two bins.
+	for (int bin=0; bin<=h->GetNbinsX(); ++bin)
 	{
 		const double v = h->GetBinContent(bin);
 		const double e = h->GetBinError(bin);
@@ -1358,24 +1478,8 @@ void FactorizationBySmearing::DivideByBinWidth(TH1* h)
 		const double nv = v/w;
 		const double ne = e/w;
 		h->SetBinContent(bin, nv);
+		h->SetBinError(bin, ne);
 	}
-}
-/**************************************************
- * All RA2 cuts
- **************************************************/
-bool FactorizationBySmearing::PassCuts(const vector<TLorentzVector>& jets)
-{
-	//const int njet50 = CountJets(jets, 50, 2.5);
-	bool pass = true;
-	//pass = pass && (njet50>= NJet50_min_ && njet50<= NJet50_max_);
-
-	if (applyDphiCut_)
-	{
-		const TLorentzVector mhtvec(MHT(jets)); 
-		const vector<TLorentzVector> jets50 = GetPt50Eta2p5Jets(jets);
-		pass = pass && PassRA2dphiCut(jets50, mhtvec);
-	}
-	return pass;
 }
 vector<TLorentzVector> FactorizationBySmearing::GetPt50Eta2p5Jets(const vector<TLorentzVector>& jets)
 {
