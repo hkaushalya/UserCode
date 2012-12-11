@@ -70,10 +70,10 @@ class FactorizationBySmearing : public NtupleSelector{
  			TH1D *h_Ht;
 			TH1D *h_DphiMin;
 			TH2D *h_DphiMinVsMht;
-			TH1D* pass[6];
-			TH1D* passFineBin[6];
-			TH1D* fail[6];
-			TH1D* failFineBin[6];
+			vector<TH1D*> pass;
+			vector<TH1D*> passFineBin;
+			vector<TH1D*> fail;
+			vector<TH1D*> failFineBin;
 			TH1D* signal;
 			TH1D* signalFineBin;
 			TH1D* sidebandSyst[2];
@@ -117,9 +117,8 @@ class FactorizationBySmearing : public NtupleSelector{
 		std::vector<double> PtBinEdges_, EtaBinEdges_, HtBins_, MhtBins_;
 		vector < pair<unsigned, unsigned> >JetBins_;
 		vector<vector<vector<Hist_t> > > Hist; //for each njet/HT/MHT bins
-		//unsigned NJet50_min_, NJet50_max_;
 		std::vector<float> vDphiVariations;
-		double nRecoJetEvts, nGenJetEvts, nSmearedJetEvts;
+		double nRecoJetEvts, nGenJetEvts, nSmearedJetEvts, nVectorInexWarnings;
 
 		vector<vector<TH1*> > jerHist; //for each pt/eta bins
 		void BookJerDebugHists();
@@ -133,14 +132,13 @@ class FactorizationBySmearing : public NtupleSelector{
 							, const string htmhtrangelabel	);
 		unsigned GetVectorIndex(const vector<double>& bins, const double& val);
 		unsigned GetVectorIndex(const vector< pair<unsigned, unsigned> >& binEdges, const unsigned& val);
-		void FillHistogram(const vector<TLorentzVector>& jets, const int jetcoll, const double& wgt=1.0);
+		bool FillHistogram(const vector<TLorentzVector>& jets, const int jetcoll, const double& wgt=1.0);
 		int CountJets(const std::vector<TLorentzVector>& vjets, 
 			const double minPt, const double maxEta);		
 		void FillJetHistogram(const vector<TLorentzVector>& jets, 
 				vector<JetHist_t> hist, const int jetcoll, const TLorentzVector& mhtvec, const double& wgt=1.0); 
 		float DelPhiMin(const vector<TLorentzVector>& jets, 
 					const TLorentzVector& mhtVec, const unsigned& njet50min);
-		bool PassRA2dphiCut(const vector<TLorentzVector>& jets, const TLorentzVector& mht);
 		bool PassDphiCut(const vector<TLorentzVector>& jets, 
 					const TLorentzVector& mht, const unsigned njet50min, 
 					const float& cut1, const float& cut2, const float& cut3);
@@ -171,7 +169,7 @@ FactorizationBySmearing::FactorizationBySmearing(
 
 	Init(tree);
 
-	HtBins_.push_back(0);
+	//HtBins_.push_back(0);
 	HtBins_.push_back(500);
 	HtBins_.push_back(750);
 	HtBins_.push_back(1000);
@@ -190,6 +188,7 @@ FactorizationBySmearing::FactorizationBySmearing(
 	pair <unsigned, unsigned> jetbin2 (3,5);
 	pair <unsigned, unsigned> jetbin3 (6,7);
 	pair <unsigned, unsigned> jetbin4 (8,1000);
+	//pair <unsigned, unsigned> jetbin4 (4,1000);
 	JetBins_.push_back(jetbin1);	
 	JetBins_.push_back(jetbin2);	
 	JetBins_.push_back(jetbin3);	
@@ -200,6 +199,7 @@ FactorizationBySmearing::FactorizationBySmearing(
 	nRecoJetEvts = 0;
 	nGenJetEvts  = 0;
 	nSmearedJetEvts = 0;
+	nVectorInexWarnings = 0;
 
 	//sanity check to have at least 1 bin in njet/ht/mht
 	bool ready = true;
@@ -207,6 +207,17 @@ FactorizationBySmearing::FactorizationBySmearing(
 	if (HtBins_.size()<1)  { ready = ready && false; cout << __FUNCTION__ << ": Require at least one Ht bin!" << endl; }
 	if (MhtBins_.size()<1) { ready = ready && false; cout << __FUNCTION__ << ": Require at least one Mht bin!" << endl; }
 	
+	//difference variation of the dPhiMin selections.
+	//make sure the book the correct number of histograms 
+	//when these are changed!!!
+	vDphiVariations.push_back(0.15);
+	vDphiVariations.push_back(0.20);
+	vDphiVariations.push_back(0.25);
+	vDphiVariations.push_back(0.30);
+	vDphiVariations.push_back(0.35);
+	vDphiVariations.push_back(0.40);
+
+
 	if (! ready) 
 	{ 
 		cout << __FUNCTION__ << ": Minimum run conditions failed. returning!!" << endl;
