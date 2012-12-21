@@ -1,4 +1,4 @@
-#define tree_cxx
+#define NtupleSelector_cxx
 // The class definition in NtupleSelector.h has been generated automatically
 // by the ROOT utility TTree::MakeSelector(). This class is derived
 // from the ROOT class TSelector. For more information on the TSelector
