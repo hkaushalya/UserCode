@@ -1,8 +1,8 @@
 //////////////////////////////////////////////////////////
 // This class has been automatically generated on
-// Tue Sep 25 10:11:39 2012 by ROOT version 5.30/00
+// Thu Dec 13 14:25:49 2012 by ROOT version 5.32/00
 // from TTree tree/tree
-// found on file: QCD1/Ntuple_1_1_mju.root
+// found on file: ../tmp/Ntuple_4.root
 //////////////////////////////////////////////////////////
 
 #ifndef NtupleSelector_h
@@ -12,12 +12,12 @@
 #include <TChain.h>
 #include <TFile.h>
 #include <TSelector.h>
-#include <iostream>
-#include <fstream>
-#include <cmath>
-#include <vector>
-#include <TLorentzVector.h>
 
+// Header file for the classes stored in the TTree if any.
+#include <vector>
+#include <string>
+
+// Fixed size dimensions of array or collections stored in the TTree if any.
 using namespace std;
 
 class NtupleSelector : public TSelector {
@@ -30,6 +30,7 @@ public :
    UInt_t          t_EvtLS;
    UInt_t          t_EvtEvent;
    Int_t           t_NVertices;
+   Int_t           t_MCflag;
    Double_t        t_PUWeight;
    Double_t        t_PUWeightAB;
    Double_t        t_PUWeightABC;
@@ -59,12 +60,16 @@ public :
    Int_t           t_ra2EcalBEFilter;
    Int_t           t_ra2EcalTPFilter;
    Int_t           t_trackingFailureFilter;
+   Int_t           t_HBHENoiseFilterRA2;
+   vector<string>  *t_firedTrigs;
+   vector<double>  *t_firedTrigsPrescale;
 
    // List of branches
    TBranch        *b_t_EvtRun;   //!
    TBranch        *b_t_EvtLS;   //!
    TBranch        *b_t_EvtEvent;   //!
    TBranch        *b_t_NVertices;   //!
+   TBranch        *b_t_MCflag;   //!
    TBranch        *b_t_PUWeight;   //!
    TBranch        *b_t_PUWeightAB;   //!
    TBranch        *b_t_PUWeightABC;   //!
@@ -94,8 +99,11 @@ public :
    TBranch        *b_t_ra2EcalBEFilter;   //!
    TBranch        *b_t_ra2EcalTPFilter;   //!
    TBranch        *b_t_trackingFailureFilter;   //!
+   TBranch        *b_t_HBHENoiseFilterRA2;   //!
+   TBranch        *b_t_firedTrigs;   //!
+   TBranch        *b_t_firedTrigsPrescale;   //!
 
-   NtupleSelector(TTree * /*tree*/ =0) { }
+   NtupleSelector(TTree * /*tree*/ =0) : fChain(0) { }
    virtual ~NtupleSelector() { }
    virtual Int_t   Version() const { return 2; }
    virtual void    Begin(TTree *tree);
@@ -111,12 +119,15 @@ public :
    virtual void    SlaveTerminate();
    virtual void    Terminate();
 
+	//When this class is created using TTree->MakeSelector(), following line is enables.
+	//But it seems to cause trouble with the current Makefile setup. 
    //ClassDef(NtupleSelector,0);
 };
 
 #endif
 
-#ifdef tree_cxx
+//This must match with what is in the cc file.
+#ifdef NtupleSelector_cxx
 void NtupleSelector::Init(TTree *tree)
 {
    // The Init() function is called when the selector needs to initialize
@@ -136,6 +147,8 @@ void NtupleSelector::Init(TTree *tree)
    t_genJetEta = 0;
    t_genJetPhi = 0;
    t_genJetE = 0;
+   t_firedTrigs = 0;
+   t_firedTrigsPrescale = 0;
    // Set branch addresses and branch pointers
    if (!tree) return;
    fChain = tree;
@@ -145,6 +158,7 @@ void NtupleSelector::Init(TTree *tree)
    fChain->SetBranchAddress("t_EvtLS", &t_EvtLS, &b_t_EvtLS);
    fChain->SetBranchAddress("t_EvtEvent", &t_EvtEvent, &b_t_EvtEvent);
    fChain->SetBranchAddress("t_NVertices", &t_NVertices, &b_t_NVertices);
+   fChain->SetBranchAddress("t_MCflag", &t_MCflag, &b_t_MCflag);
    fChain->SetBranchAddress("t_PUWeight", &t_PUWeight, &b_t_PUWeight);
    fChain->SetBranchAddress("t_PUWeightAB", &t_PUWeightAB, &b_t_PUWeightAB);
    fChain->SetBranchAddress("t_PUWeightABC", &t_PUWeightABC, &b_t_PUWeightABC);
@@ -174,6 +188,9 @@ void NtupleSelector::Init(TTree *tree)
    fChain->SetBranchAddress("t_ra2EcalBEFilter", &t_ra2EcalBEFilter, &b_t_ra2EcalBEFilter);
    fChain->SetBranchAddress("t_ra2EcalTPFilter", &t_ra2EcalTPFilter, &b_t_ra2EcalTPFilter);
    fChain->SetBranchAddress("t_trackingFailureFilter", &t_trackingFailureFilter, &b_t_trackingFailureFilter);
+   fChain->SetBranchAddress("t_HBHENoiseFilterRA2", &t_HBHENoiseFilterRA2, &b_t_HBHENoiseFilterRA2);
+   fChain->SetBranchAddress("t_firedTrigs", &t_firedTrigs, &b_t_firedTrigs);
+   fChain->SetBranchAddress("t_firedTrigsPrescale", &t_firedTrigsPrescale, &b_t_firedTrigsPrescale);
 }
 
 Bool_t NtupleSelector::Notify()
@@ -187,4 +204,4 @@ Bool_t NtupleSelector::Notify()
    return kTRUE;
 }
 
-#endif // #ifdef tree_cxx
+#endif // #ifdef NtupleSelector_cxx
