@@ -43,14 +43,6 @@ class FactorizationBySmearing : public NtupleSelector {
 		void SmearingGenJets(const vector<TLorentzVector>& jets_gen, std::vector<TLorentzVector> &genJets_smeared);
 		int GetIndex(const double& x, const std::vector<double>* vec);
 		double GetHFProb(const double& pt, const double& eta, const int& i_jet);
-		void JetDeltaMin(const string s);
-		void PtBinEdges_scaling(const string s);
-		void EtaBinEdges_scaling(const string s);
-		void AdditionalSmearing(const string s);
-		void LowerTailScaling(const string s);
-		void UpperTailScaling(const string s);
-		void PtBinEdges(const string s);
-		void EtaBinEdges(const string s);
 		bool PassCuts(const vector<TLorentzVector>& jets);
 		vector<TLorentzVector> GetPt50Eta2p5Jets(const vector<TLorentzVector>& jets);
 
@@ -106,15 +98,7 @@ class FactorizationBySmearing : public NtupleSelector {
 		bool absoluteTailScaling_;
 		bool applyDphiCut_; 
 
-		double MHTcut_low_;
-		double MHTcut_medium_;
-		double MHTcut_high_;
-		double HTcut_low_;
-		double HTcut_medium_;
-		double HTcut_high_;
-		double HTcut_veryhigh_;
-		double HTcut_extremehigh_;
-		std::vector<double> PtBinEdges_, EtaBinEdges_, HtBins_, MhtBins_;
+		std::vector<double> HtBins_, MhtBins_;
 		vector < pair<unsigned, unsigned> >JetBins_;
 		vector<vector<vector<Hist_t> > > Hist; //for each njet/HT/MHT bins
 		std::vector<float> vDphiVariations;
@@ -256,14 +240,13 @@ Bool_t FactorizationBySmearing::FillChain(TChain *chain, const TString &inputFil
 		return kFALSE;
 	}
 
-	std::cout << "TreeUtilities : FillChain " << std::endl;
 	while(1) {
 		infile >> buffer;
 		if(!infile.good()) break;
 		//std::cout << "Adding tree from " << buffer.c_str() << std::endl;                                                              
 		chain->Add(buffer.c_str());
 	}
-	std::cout << "No. of Entries in this tree : " << chain->GetEntries() << std::endl;
+	std::cout << "No. of Entries in this tree = " << chain->GetEntries() << std::endl;
 	return kTRUE;
 }
 
