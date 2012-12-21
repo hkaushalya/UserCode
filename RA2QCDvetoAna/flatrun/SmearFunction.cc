@@ -17,9 +17,9 @@ using namespace std;
 
 SmearFunction::SmearFunction() 
 {
-	cout << __FUNCTION__ << ": Setting Random Seed..." << endl;
+	cout << __FUNCTION__ << ": Setting Random Seed ... ";
 	gRandom->SetSeed();
-	cout << __FUNCTION__ << ": First rand#" << gRandom->Rndm() << endl;
+	cout << "first rand#" << gRandom->Rndm() << endl;
 
    // get parameters from config
    LowerTailScaling_variation_   = 1; 
@@ -389,8 +389,8 @@ void SmearFunction::CalculateSmearFunctions() {
                   if (smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetEntries() > 0) {
                      N = smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->Integral();
                   }
-                  cout << "Too few entries for (i_Pt, i_eta, i_jet, i_flav): " << i_Pt << ", " << i_eta << ", " << i_jet << ", " << i_flav
-                       << ", entries = " << smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetEntries() << endl;
+                  //cout << "Too few entries for (i_Pt, i_eta, i_jet, i_flav): " << i_Pt << ", " << i_eta << ", " << i_jet << ", " << i_flav
+                  //     << ", entries = " << smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetEntries() << endl;
                   for (int j = 1; j <= smearFunc_scaled.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetNbinsX(); ++j) {
                      double pt = (PtBinEdges_.at(i_Pt) + PtBinEdges_.at(i_Pt + 1)) / 2;
                      double g = N * TMath::Gaus(smearFunc_scaled.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetBinCenter(j), 1.,
