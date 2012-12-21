@@ -111,6 +111,9 @@ public:
 	string SmearingFile() const { return smearingfile_; }
 	void SetResFuncColl(const unsigned i);
 
+   double SetAdditionalSmearingVariation(const float v) { AdditionalSmearing_variation_ = v; }
+   double SetLowerTailScalingVariation(const float v) { LowerTailScaling_variation_ = v; }
+   double SetUpperTailScalingVariation(const float v) { UpperTailScaling_variation_ = v; }
    double GetAdditionalSmearingVariation() const { return AdditionalSmearing_variation_; }
    double GetLowerTailScalingVariation() const { return LowerTailScaling_variation_; }
    double GetUpperTailScalingVariation() const { return UpperTailScaling_variation_; }
