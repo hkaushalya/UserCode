@@ -6,13 +6,13 @@ echo "PYTHONHOME : $PYTHONHOME\n"
 set maxNum=$1
 set perNum=$2
 set fileList=$3
-set dataset=$4
+set systVariation=$4
 
 rm -vrf inputList* run_*
 echo "fnalCondorSubmit::  Inputs ========" 
 echo " maxNum  = ${maxNum}"
 echo " perNum  = ${perNum}"
-echo " dataset = ${dataset}"
+echo " systVariation = ${systVariation}"
 echo " filelist= ${fileList}"
 
 pwd
@@ -29,7 +29,7 @@ perl fnalMakeSplitInputs.pl ${perNum} ${fileList}
 set i=0
 
 while ( ${i} < ${maxNum} )
-bash fnalCondorPrep.sh ${i} ${dataset}
+bash fnalCondorPrep.sh ${i} ${systVariation}
 @ i = ${i} + "1"
 end
 

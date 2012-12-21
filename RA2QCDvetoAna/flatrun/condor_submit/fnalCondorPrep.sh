@@ -1,10 +1,8 @@
 #!/bin/bash
 
 export configSpecStr=$1
-export dataset=$2
+export systVariation=$2
 export totevts=-1
-export njet50min=6
-export njet50max=7
 
 export filetail="_"$configSpecStr
 
@@ -45,7 +43,7 @@ initialdir = ${outputDir}
 Output = ${logDir}_${configSpecStr}_\$(Cluster)_\$(Process).stdout
 Error = ${logDir}_${configSpecStr}_\$(Cluster)_\$(Process).stderr
 Log = ${logDir}_${configSpecStr}_\$(Cluster)_\$(Process).log
-Arguments = $inputlist \$(Cluster).root ${totevts} ${njet50min} ${njet50max} 
+Arguments = $inputlist \$(Cluster).root ${totevts} ${systVariation} 
 
 Queue 
 
