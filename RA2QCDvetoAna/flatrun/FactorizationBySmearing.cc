@@ -49,8 +49,7 @@ int main(int argc, char* argv[])
 	const char *evt2Proc      = argv[3];
 		
 	int evts    = -1;
-	int njet50min = 3;
-	int njet50max = 1000;
+	int systematic_var = 0;
 
 	if (isdigit(evt2Proc[0]))
 	{
@@ -65,36 +64,24 @@ int main(int argc, char* argv[])
 	{
 		cout << __FUNCTION__ << ": processing arg4 ..." << endl;
 		const char *g4 = argv[4];
-		if (isdigit(g4[0])) njet50min = atoi(g4);
+		if (isdigit(g4[0])) systematic_var = atoi(g4);
 		else {
-			cout << "argument 5 is not a number. using default value for njet50min = " << njet50min << endl;
+			cout << "argument 4 is not a number. using default value for systematic_var = " << systematic_var << endl;
 		}
 	}
 
-	if (argc>5)
-	{
-		cout << __FUNCTION__ << ": processing arg5 ..." << endl;
-		const char *g5 = argv[5];
-		cout << __LINE__ << endl;
-		if (isdigit(g5[0])) 
-		{
-			cout << __LINE__ << endl;
-			njet50max = atoi(g5);
-		} else {
-			cout << "argument 6 is not a number. using default value for njet50max = " << njet50max << endl;
-		}
-	}
+	cout << "systematic_var = " << systematic_var << endl;
+	FactorizationBySmearing smear(inputFileList, outFileName);
 
-	cout << "njet50min = " << njet50min << endl;
-	cout << "njet50max = " << njet50max << endl;
-	FactorizationBySmearing smear(inputFileList, outFileName, njet50min, njet50max);
-
-	smear.EventLoop(inputFileList, evts);
+	smear.EventLoop(inputFileList, evts, systematic_var);
 
 	return 0;
 }
 
-void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2Process)
+void FactorizationBySmearing::EventLoop(const char *datasetname, 
+									const int evts2Process,
+									const int systematicVarition
+									)
 {
 	if (fChain == 0) return;
 
@@ -108,7 +95,9 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	/*****************************************************
 	 * Smearing function constants and variables
 	 ******************************************************/
+	
 	absoluteTailScaling_ = true;  //false for systematics
+
 	smearedJetPt_        = 13.0;
 	MHTcut_low_          = 200.;
 	MHTcut_medium_       = 350.;
@@ -167,13 +156,14 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 		cout << "Requested events to process = " << nentries << endl;
 	}
 
+	bRUNNING_ON_MC = true;
 	bDEBUG = false;
 	const double dDATA_LUMI = 10000.0; // 10 fb-1
-	const double lumiWgt = GetLumiWgt(datasetname, dDATA_LUMI); 
-	//const double lumiWgt = 1; 
+	//const double lumiWgt = GetLumiWgt(datasetname, dDATA_LUMI); 
+	const double lumiWgt = 1; 
 	applyDphiCut_        = 0;
 	//unsigned nTries_     = (unsigned) max((double)1000 * NJet50_min_ * 2 , 5000.0) ; //number of pseudo experiments per event
-	unsigned nTries_     = 5000; //number of pseudo experiments per event
+	unsigned nTries_     = 10000; //number of pseudo experiments per event
 	if (bDEBUG) nTries_  = 1;
 	const double smearingWgt = 1.0/(double)nTries_;
 
@@ -186,6 +176,30 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	
    smearFunc_ = new SmearFunction();
 		smearFunc_->SetAbsoluteTailScaling(absoluteTailScaling_);
+
+	switch (systematicVarition)
+	{
+		case 1:
+			smearFunc_->SetUpperTailScalingVariation(0.5);
+			break;
+		case 2:
+			smearFunc_->SetUpperTailScalingVariation(2.0);
+			break;
+		case 3:
+			smearFunc_->SetLowerTailScalingVariation(0.5);
+			break;
+		case 4:
+			smearFunc_->SetLowerTailScalingVariation(2.0);
+			break;
+		case 5:
+			smearFunc_->SetAdditionalSmearingVariation(0.9);
+			break;
+		case 6:
+			smearFunc_->SetAdditionalSmearingVariation(1.1);
+			break;
+	}
+
+
 
 	vector<TLorentzVector> recoJets, genJets, smearedGenJets;
 	BookJerDebugHists();
@@ -223,27 +237,39 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 		const double evtWeight = t_EvtWeight; //==1 except for Flat QCD sample
 		
 		CreateRecoJetVec(recoJets);
-		const bool accept_reco_evt = FillHistogram(recoJets,0, lumiWgt * evtWeight);
-		if (accept_reco_evt) 
+		double recoEvtTotWgt = 1;
+		if (bRUNNING_ON_MC) recoEvtTotWgt = lumiWgt * evtWeight;
+		else 
 		{
-			nRecoJetEvts += lumiWgt * evtWeight;
+			bool failTrigger = true;
+			TrigPrescaleWeight(failTrigger, recoEvtTotWgt); 
+			if (failTrigger) continue;   //when running on data accept event passing trigger only
 		}
 
-		CreateGenJetVec(genJets);
-		++nGenJetEvts;
-		FillHistogram(genJets,1, lumiWgt * evtWeight);
-
-		for (unsigned n = 0; n < nTries_; ++n)
+		const bool accept_reco_evt = FillHistogram(recoJets,0, recoEvtTotWgt);
+		if (accept_reco_evt) 
 		{
-			SmearingGenJets(genJets, smearedGenJets);
-			const double totWeight = smearingWgt * lumiWgt * evtWeight;
-			const bool accept_smear_evt = FillHistogram(smearedGenJets,2, totWeight);
-			if (accept_smear_evt) {
-				nSmearedJetEvts += totWeight;
-			}
-			if (accept_reco_evt && !accept_reco_evt)
+			nRecoJetEvts += recoEvtTotWgt;
+		}
+
+		if (bRUNNING_ON_MC)
+		{
+			CreateGenJetVec(genJets);
+			++nGenJetEvts;
+			FillHistogram(genJets,1, lumiWgt * evtWeight);
+
+			for (unsigned n = 0; n < nTries_; ++n)
 			{
-				cout << red << __LINE__ << ": Smeared event thrown out at ntries= " << n << clearatt <<endl;
+				SmearingGenJets(genJets, smearedGenJets);
+				const double totWeight = smearingWgt * lumiWgt * evtWeight;
+				const bool accept_smear_evt = FillHistogram(smearedGenJets,2, totWeight);
+				if (accept_smear_evt) {
+					nSmearedJetEvts += totWeight;
+				}
+				if (accept_reco_evt && !accept_reco_evt)
+				{
+					cout << red << __LINE__ << ": Smeared event thrown out at ntries= " << n << clearatt <<endl;
+				}
 			}
 		}
 
@@ -251,7 +277,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 
 
 	/***** NORMALIZE VARIABLE BINNED HIST BY BIN WIDTH *****/
-
+	/*
 	TCanvas *pf = new TCanvas("pf");
 	gPad->Print("passfail.eps[");
 	for (unsigned jetbin=0; jetbin < JetBins_.size(); ++jetbin)
@@ -312,6 +338,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 
 	gPad->Print("passfail.eps]");
 	delete pf;
+	*/
 
 
 	/****************************************************************************
@@ -463,6 +490,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	//end job summary
 	cout << ">>>>>>> " << __FILE__ << ":" << __FUNCTION__ << ": End Job " << endl;
 	if (bDEBUG) cout << red << " ------ DEBUG MODE ---------- " << clearatt << endl;
+	cout << red <<  "MC Flag  ------------- = " << bRUNNING_ON_MC << clearatt << endl;
 	cout << "Entries found/proces'd = " << entriesFound << " / " << nProcessed << endl;
 	cout << "Cleaning Failed Evts   = " << nCleaningFailed << endl;
 	cout << "---------- Settings ----------------" << endl;
@@ -478,11 +506,27 @@ void FactorizationBySmearing::EventLoop(const char *datasetname, const int evts2
 	cout << "smearedJetPt_          = " << smearedJetPt_ << endl;
 	cout << "nReco/nGen/nSm Evts    = " << nRecoJetEvts << "/" << nGenJetEvts << "/" << nSmearedJetEvts << endl;
 	cout << "---- Smearing Function Settings ----" << endl;
+	
+
+	const bool  absTailScalingFact_val   = smearFunc_->GetAbsoluteTailScaling();
+	const float lowerTailScalingFact_val = smearFunc_->GetLowerTailScalingVariation();
+	const float upperTailScalingFact_val = smearFunc_->GetUpperTailScalingVariation();
+	const float additionalSmearingFact_val   = smearFunc_->GetAdditionalSmearingVariation();
+
+	const bool bSystematicMode = (absTailScalingFact_val != true || lowerTailScalingFact_val != 1 
+											|| upperTailScalingFact_val != 1 || additionalSmearingFact_val != 1);
+	
+	if (bSystematicMode) {	
+		cout << red << " >>>> SYSTEMATIC MODE <<<< " << endl;
+	}
+	cout << "AbsoluteTailScaling_val= " << absTailScalingFact_val << endl;
+	cout << "LowerTailScaling_val   = " << lowerTailScalingFact_val << endl;
+	cout << "UpperTailScaling_val   = " << upperTailScalingFact_val << endl;
+	cout << "AdditionalSmearing_val = " << additionalSmearingFact_val << endl;
+	if (bSystematicMode) {	
+		cout << clearatt << endl;
+	}
 	cout << "Smearing file          = " << smearFunc_->SmearingFile() << endl;
-	cout << "absoluteTailScaling_   = " << smearFunc_->GetAbsoluteTailScaling() << endl;
-	cout << "LowerTailScaling_var   = " << smearFunc_->GetLowerTailScalingVariation() << endl;
-	cout << "UpperTailScaling_var   = " << smearFunc_->GetLowerTailScalingVariation() << endl;
-	cout << "AdditionalSmearing_var = " << smearFunc_->GetAdditionalSmearingVariation() << endl;
 	cout << "Jet Res. Collection    = " << smearFunc_->GetResFuncCollType() << endl;
 	cout << "MHTcut_low_            = " << MHTcut_low_  << endl;
 	cout << "MHTcut_medium_         = " << MHTcut_medium_  << endl;
@@ -1235,6 +1279,8 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 	const double evt_ht_max = 4000, evt_ht_bins = 800;
 	const float npassFailHistBins = 14;
 	const float passFailHistBins[] = {50,60,70,80,90,100,110,120,140,160,200,350,500,800,1000};
+	const float npassFail_min = 50, npassFail_max = 1050, npassFail_nbins = 100;
+	const int passFailBinOption = 1;
 
 
 	for (unsigned i = 0;i < jetcoll.size(); ++i)
@@ -1295,8 +1341,14 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 				passFineBin_title <<"Events with #Delta#Phi_{min}>" << dphival << ";MHT;Events;";
 				failFineBin_title <<"Events with #Delta#Phi_{min}<" << dphival << ";MHT;Events;";
 
-				hist.hv_RecoEvt.pass.push_back( new TH1D(pass_name.str().c_str(), pass_title.str().c_str(), npassFailHistBins, passFailHistBins) ); 
-				hist.hv_RecoEvt.fail.push_back( new TH1D(fail_name.str().c_str(), fail_title.str().c_str(), npassFailHistBins, passFailHistBins) );
+				if (passFailBinOption == 1)
+				{
+					hist.hv_RecoEvt.pass.push_back( new TH1D(pass_name.str().c_str(), pass_title.str().c_str(), npassFail_nbins, npassFail_min, npassFail_max) ); 
+					hist.hv_RecoEvt.fail.push_back( new TH1D(fail_name.str().c_str(), fail_title.str().c_str(), npassFail_nbins, npassFail_min, npassFail_max) );
+				} else {
+					hist.hv_RecoEvt.pass.push_back( new TH1D(pass_name.str().c_str(), pass_title.str().c_str(), npassFailHistBins, passFailHistBins) ); 
+					hist.hv_RecoEvt.fail.push_back( new TH1D(fail_name.str().c_str(), fail_title.str().c_str(), npassFailHistBins, passFailHistBins) );
+				}
 				hist.hv_RecoEvt.passFineBin.push_back( new TH1D(passFineBin_name.str().c_str(), passFineBin_title.str().c_str(), evt_mht_bins, 0, evt_mht_max) ); 
 				hist.hv_RecoEvt.failFineBin.push_back( new TH1D(failFineBin_name.str().c_str(), failFineBin_title.str().c_str(), evt_mht_bins, 0, evt_mht_max) );
 
@@ -1306,12 +1358,23 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 				hist.hv_RecoEvt.failFineBin.at(j)->Sumw2(); 
 			}
 
-			hist.hv_RecoEvt.sidebandSyst[0] = new TH1D("reco_sidebandSyst1","Reco Events: Sideband Syst1: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
-			hist.hv_RecoEvt.sidebandSyst[1] = new TH1D("reco_sidebandSyst2","Reco Events: Sideband Syst2: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
+			if (passFailBinOption == 1)
+			{
+				hist.hv_RecoEvt.sidebandSyst[0] = new TH1D("reco_sidebandSyst1","Reco Events: Sideband Syst1: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFail_nbins, npassFail_min, npassFail_max);
+				hist.hv_RecoEvt.sidebandSyst[1] = new TH1D("reco_sidebandSyst2","Reco Events: Sideband Syst2: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFail_nbins, npassFail_min, npassFail_max);
+			} else {
+				hist.hv_RecoEvt.sidebandSyst[0] = new TH1D("reco_sidebandSyst1","Reco Events: Sideband Syst1: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
+				hist.hv_RecoEvt.sidebandSyst[1] = new TH1D("reco_sidebandSyst2","Reco Events: Sideband Syst2: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
+			}
 			hist.hv_RecoEvt.sidebandSystFineBin[0] = new TH1D("reco_sidebandSyst1_fineBin","Reco Events: Sideband Syst1 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", 1500, 0, 1500);
 			hist.hv_RecoEvt.sidebandSystFineBin[1] = new TH1D("reco_sidebandSyst2_fineBin","Reco Events: Sideband Syst2 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", 1500, 0, 1500);
 
-			hist.hv_RecoEvt.signal = new TH1D("reco_signal" ,"Reco Events: Signal Region", npassFailHistBins, passFailHistBins);
+			if (passFailBinOption == 1)
+			{
+				hist.hv_RecoEvt.signal = new TH1D("reco_signal" ,"Reco Events: Signal Region", npassFail_nbins, npassFail_min, npassFail_max);
+			} else {
+				hist.hv_RecoEvt.signal = new TH1D("reco_signal" ,"Reco Events: Signal Region", npassFailHistBins, passFailHistBins);
+			}
 			hist.hv_RecoEvt.signalFineBin = new TH1D("reco_signalFineBin" ," Reco Events: Signal Region", 1500, 0, 1500);
 
 			hist.hv_RecoEvt.sidebandSyst[0]->Sumw2();
@@ -1386,8 +1449,14 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 				passFineBin_title <<"Smeared events with #Delta#Phi_{min}>" << dphival << ";MHT;Events;";
 				failFineBin_title <<"Smeared events with #Delta#Phi_{min}<" << dphival << ";MHT;Events;";
 
-				hist.hv_SmearedEvt.pass.push_back( new TH1D(pass_name.str().c_str(), pass_title.str().c_str(), npassFailHistBins, passFailHistBins) ); 
-				hist.hv_SmearedEvt.fail.push_back( new TH1D(fail_name.str().c_str(), fail_title.str().c_str(), npassFailHistBins, passFailHistBins) );
+				if (passFailBinOption == 1)
+				{
+					hist.hv_SmearedEvt.pass.push_back( new TH1D(pass_name.str().c_str(), pass_title.str().c_str(), npassFail_nbins, npassFail_min, npassFail_max) ); 
+					hist.hv_SmearedEvt.fail.push_back( new TH1D(fail_name.str().c_str(), fail_title.str().c_str(), npassFail_nbins, npassFail_min, npassFail_max) );
+				} else {
+					hist.hv_SmearedEvt.pass.push_back( new TH1D(pass_name.str().c_str(), pass_title.str().c_str(), npassFailHistBins, passFailHistBins) ); 
+					hist.hv_SmearedEvt.fail.push_back( new TH1D(fail_name.str().c_str(), fail_title.str().c_str(), npassFailHistBins, passFailHistBins) );
+				}
 				hist.hv_SmearedEvt.passFineBin.push_back( new TH1D(passFineBin_name.str().c_str(), passFineBin_title.str().c_str(), evt_mht_bins, 0, evt_mht_max) ); 
 				hist.hv_SmearedEvt.failFineBin.push_back( new TH1D(failFineBin_name.str().c_str(), failFineBin_title.str().c_str(), evt_mht_bins, 0, evt_mht_max) );
 
@@ -1397,13 +1466,24 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 				hist.hv_SmearedEvt.failFineBin.at(j)->Sumw2(); 
 			}
 
-			hist.hv_SmearedEvt.sidebandSyst[0] = new TH1D("smear_sidebandSyst1"," Smeared Events: Sideband Syst1: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
-			hist.hv_SmearedEvt.sidebandSyst[1] = new TH1D("smear_sidebandSyst2"," Smeared Events: Sideband Syst2: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
-			hist.hv_SmearedEvt.sidebandSystFineBin[0] = new TH1D("smear_sidebandSyst1_fineBin"," Smeared Events:Sideband Syst1 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", 1500, 0, 1500);
+			if (passFailBinOption == 1)
+			{
+				hist.hv_SmearedEvt.sidebandSyst[0] = new TH1D("smeared_sidebandSyst1"," Smeared Events: Sideband Syst1: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFail_nbins, npassFail_min, npassFail_max);
+				hist.hv_SmearedEvt.sidebandSyst[1] = new TH1D("smeared_sidebandSyst2"," Smeared Events: Sideband Syst2: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFail_nbins, npassFail_min, npassFail_max);
+			} else {
+				hist.hv_SmearedEvt.sidebandSyst[0] = new TH1D("smeared_sidebandSyst1"," Smeared Events: Sideband Syst1: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
+				hist.hv_SmearedEvt.sidebandSyst[1] = new TH1D("smeared_sidebandSyst2"," Smeared Events: Sideband Syst2: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
+			}
+			hist.hv_SmearedEvt.sidebandSystFineBin[0] = new TH1D("smeared_sidebandSyst1_fineBin"," Smeared Events:Sideband Syst1 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", 1500, 0, 1500);
 			hist.hv_SmearedEvt.sidebandSystFineBin[1] = new TH1D("smear_sidebandSyst2_fineBin"," Smeared Events:Sideband Syst2 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", 1500, 0, 1500);
 
-			hist.hv_SmearedEvt.signal = new TH1D("smear_signal", " Smeared Events:Signal Region", npassFailHistBins, passFailHistBins);
-			hist.hv_SmearedEvt.signalFineBin = new TH1D("smear_signalFineBin", " Smeared Events:Signal Region", 1500, 0, 1500);
+			if (passFailBinOption == 1)
+			{
+				hist.hv_SmearedEvt.signal = new TH1D("smeared_signal", " Smeared Events:Signal Region", npassFail_nbins, npassFail_min, npassFail_max);
+			} else {
+				hist.hv_SmearedEvt.signal = new TH1D("smeared_signal", " Smeared Events:Signal Region", npassFailHistBins, passFailHistBins);
+			}
+			hist.hv_SmearedEvt.signalFineBin = new TH1D("smeared_signalFineBin", " Smeared Events:Signal Region", 1500, 0, 1500);
 
 			hist.hv_SmearedEvt.sidebandSyst[0]->Sumw2();
 			hist.hv_SmearedEvt.sidebandSyst[1]->Sumw2();
@@ -1520,4 +1600,37 @@ bool FactorizationBySmearing::PassCleaning()
 			<< endl;
 */
 	return pass;
+}
+
+void FactorizationBySmearing::TrigPrescaleWeight(bool &failTrig, double &weight) const
+{
+	/*****************************************************************
+	 *  For DATA only. Need to find the highest prescaled HT trigger
+	 *  from the given list of triggers
+	 *  Assume the trigger names are given without wildcards!!!
+	 ****************************************************************/
+
+	unsigned highestTrigPrescale = 999999;
+	bool fired = false;
+	for (unsigned j =0; j < vTriggersToUse.size(); ++j)
+	{
+		//cout << __LINE__ << ":: trigtouse[" << j << "] = " << vTriggersToUse.at(j) << endl; 
+		for (unsigned i =0; i < t_firedTrigs->size(); ++i)
+		{
+			//cout << __LINE__ << ":: fired[" << t_firedTrigs->size()  << endl; 
+			if (t_firedTrigs->at(i).find(vTriggersToUse.at(j)) != string::npos)
+			{	//found fired trigger
+				if (t_firedTrigsPrescale->at(i) < highestTrigPrescale)
+				{
+					fired = true;
+					cout << __LINE__ << ":: fired[" << i << "] = " << t_firedTrigs->at(i) << endl; 
+					highestTrigPrescale = t_firedTrigsPrescale->at(i);
+				}
+			}
+		}
+	}
+
+	failTrig = fired;
+	weight = (double) highestTrigPrescale;
+	if (fired) cout << "\t" << __LINE__ << ": selected prescale = " << highestTrigPrescale << endl;  
 }

@@ -22,16 +22,15 @@
  * Sam Hewamanage, Florida International University
  **************************************************************/
 
-class FactorizationBySmearing : public NtupleSelector{
+class FactorizationBySmearing : public NtupleSelector {
 
 	public:
 		FactorizationBySmearing(const TString &inputFileList="foo.txt", 
-								const char *outFileName="histo.root",
-								const int njet50min=3, const int njet50max=1000); 
+								const char *outFileName="histo.root");
 		~FactorizationBySmearing();
 		Bool_t   FillChain(TChain *chain, const TString &inputFileList);
 		Long64_t LoadTree(Long64_t entry);
-		void     EventLoop(const char * datasetname, const int evt2Process);
+		void     EventLoop(const char * datasetname, const int evt2Process, const int systVariations);
 		void     BookHistogram(const char *);
 		double   DeltaPhi(double, double);
 		double   DeltaR(double eta1, double phi1, double eta2, double phi2);
@@ -93,6 +92,7 @@ class FactorizationBySmearing : public NtupleSelector{
 
 	private:
 		bool bDEBUG;
+		bool bRUNNING_ON_MC;
 		SmearFunction *smearFunc_;
 		double smearedJetPt_;
 		std::vector<double> PtBinEdges_scaling_;
@@ -119,6 +119,7 @@ class FactorizationBySmearing : public NtupleSelector{
 		vector<vector<vector<Hist_t> > > Hist; //for each njet/HT/MHT bins
 		std::vector<float> vDphiVariations;
 		double nRecoJetEvts, nGenJetEvts, nSmearedJetEvts, nVectorInexWarnings;
+		vector<string> vTriggersToUse; 
 
 		vector<vector<TH1*> > jerHist; //for each pt/eta bins
 		void BookJerDebugHists();
@@ -145,6 +146,7 @@ class FactorizationBySmearing : public NtupleSelector{
 		double GetLumiWgt(const string& datasetname, const double& dataLumi);
 		void DivideByBinWidth(TH1* h);
 		bool PassCleaning();
+		void  TrigPrescaleWeight(bool &failTrig, double &weight) const;
 };
 #endif
 
@@ -152,13 +154,8 @@ class FactorizationBySmearing : public NtupleSelector{
 
 FactorizationBySmearing::FactorizationBySmearing(
 				const TString &inputFileList, 
-				const char *outFileName,
-				const int njet50min,
-				const int njet50max
+				const char *outFileName
 				) {
-
-	//isItMC = true;
-	//isItZ  = false;
 
 	TChain *tree = new TChain("treeMaker/tree");  
 
@@ -213,9 +210,30 @@ FactorizationBySmearing::FactorizationBySmearing(
 	vDphiVariations.push_back(0.15);
 	vDphiVariations.push_back(0.20);
 	vDphiVariations.push_back(0.25);
-	vDphiVariations.push_back(0.30);
-	vDphiVariations.push_back(0.35);
-	vDphiVariations.push_back(0.40);
+	//vDphiVariations.push_back(0.30);
+	//vDphiVariations.push_back(0.35);
+	//vDphiVariations.push_back(0.40);
+
+	//List all the triggers to be used for data WITHOUT wildcards (i.e. * )
+
+//HLTPathsByName_[0] = HLT_HT*");
+vTriggersToUse.push_back("HLT_HT200_v");
+vTriggersToUse.push_back("HLT_HT250_v");
+vTriggersToUse.push_back("HLT_HT300_v");
+vTriggersToUse.push_back("HLT_HT350_v");
+vTriggersToUse.push_back("HLT_HT400_v");
+vTriggersToUse.push_back("HLT_HT450_v");
+vTriggersToUse.push_back("HLT_HT500_v");
+vTriggersToUse.push_back("HLT_HT550_v");
+vTriggersToUse.push_back("HLT_HT650_v");
+vTriggersToUse.push_back("HLT_HT750_v");
+//HLTPathsByName_[1] = HLT_PFHT*");
+vTriggersToUse.push_back("HLT_PFHT350_v");
+vTriggersToUse.push_back("HLT_PFHT650_v");
+vTriggersToUse.push_back("HLT_PFHT700_v");
+vTriggersToUse.push_back("HLT_PFHT750_v");
+
+//need to add triggers for other run periods as well
 
 
 	if (! ready) 
