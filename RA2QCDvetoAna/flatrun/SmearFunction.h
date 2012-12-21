@@ -99,8 +99,8 @@ private:
 	unsigned uResFuncCollType_; //default=0 (JetAll), jet Ranked=1
 
 public:
-	vector<double> GetPtBinEdges() { return PtBinEdges_; }
-	vector<double> GetEtaBinEdges() { return EtaBinEdges_; }
+	vector<double>* GetPtBinEdges() { return &PtBinEdges_; }
+	vector<double>* GetEtaBinEdges() { return &EtaBinEdges_; }
 
 	//setters (override default settings)
 	void SetPtBinEdges(const vector<double> ptBins);
