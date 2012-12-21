@@ -810,3 +810,24 @@ void SmearFunction::SetResFuncColl(const unsigned i)
 		assert (false);
 	}
 }
+
+void SmearFunction::SetPtBinEdges(const vector<double> ptBins)
+{
+	if (ptBins.size()>1) //just a sanity check
+	{
+		PtBinEdges_ =  ptBins;
+	} else 
+	{
+		cout << __FUNCTION__ << ": Number of  Pt bins should be >0! Using default bins." << endl;
+	}
+}
+void SmearFunction::SetEtaBinEdges(const vector<double> etaBins)
+{
+	if (etaBins.size()>1) //just a sanity check
+	{
+		EtaBinEdges_ =  etaBins;
+	} else 
+	{
+		cout << __FUNCTION__ << ": Number of  Eta bins should be >0! Using default bins." << endl;
+	}
+}
