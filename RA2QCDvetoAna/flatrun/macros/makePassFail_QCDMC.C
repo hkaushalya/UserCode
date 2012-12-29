@@ -12,6 +12,7 @@
 #include "TPaveStats.h"
 #include "TPaveText.h"
 #include <iomanip>
+#include "IOColors.hh"
 
 using namespace std;
 
@@ -19,15 +20,17 @@ const static float fDATA_LUMI = 10000; //pb-1
 const static float passFailRatio_fitrange_xmin = 50.0;
 const static float passFailRatio_fitrange_xmax = 150.0;
 std::vector<float> incMHTBins;
-//const static int nMHTbins = 5;
 const static int nMHTbins = 5;
-//const static float arrHTbins[nHTbins] = {0,500,800,1000,1200,1400,7000};
-const static float arrMHTbins[nMHTbins] = {200,350,500,600,7000};
-float CONST_C = 0.0217;
+//const static int nMHTbins = 2;
+//const static float arrHTbins[nHTbins] = {0,500,800,1000,1200,1400,8000};
+const static float arrMHTbins[nMHTbins] = {200,300,450,600,8000};
+//const static float arrMHTbins[nMHTbins] = {500,800};
+//float CONST_C = 0.0217;
+float CONST_C = 0.01;
 const static bool bFLATSAMPLE = 0;
 const static string sQCD_FLAT_FILE_NAME("QCD_Flat_8TeV.root");
 const static float fQCD_FLAT_LUMI = 9998154/2.99913994E10; //pb-1
-const Int_t nBins = 7;
+const Int_t nBins = 1;
 TFile *files[nBins];
 
 struct Predictions_t
@@ -44,26 +47,49 @@ struct Predictions_t
 		float excl_signal_statErr[nMHTbins-1];
 };
 
+void DumpHist(const TH1* hist)
+{
+	cout << ">>>> HIST INFO OF :" << hist->GetName() << endl;
+	for (int bin = 1; bin < hist->GetNbinsX(); ++bin)
+	{
+		cout << "bin/val/err=" << bin << "\t" << hist->GetBinContent(bin) << "\t" << hist->GetBinError(bin) << endl;
+	}
+}
+
 void PrintExclResults(const Predictions_t& gaus, const Predictions_t& exp,
 							const Predictions_t& gaus_cplus, Predictions_t& exp_cplus)
 {
-/*	cout << setprecision(3) 
+	cout << setprecision(3) 
 					<< setw(10) << " HT "
 					<< setw(15) << "MHT"
 					<< setw(15) << " mean " 
 					<< setw(20) << "statFitErr"
 					<< setw(30) << "Signal+/-stat"
 					<< endl;
-*/	for (int i=0; i< nMHTbins -1 ; ++i)
+	for (int i=0; i< nMHTbins -1 ; ++i)
 	{
 		cout << setprecision(4) 
-					//<< setw(5) << HTmin << "-" << HTmax << " & "
+					/*//<< setw(5) << HTmin << "-" << HTmax << " & "
 					<< setw(10) << incMHTBins.at(i) << "-" << incMHTBins.at(i+1) << " & "
-					<< setw(15) << gaus.excl_mean[i]   << "& $\\pm$ " << gaus.excl_statErr[i] << " & ("
-					<< setw(15) << gaus_cplus.excl_mean[i] << ") & "
-					<< setw(15) << exp.excl_mean[i]   << "& $\\pm$ " << exp.excl_statErr[i] << " & ("
-					<< setw(15) << exp_cplus.excl_mean[i] << ") & "
-					<< setw(15) << gaus.excl_signal_mean[i] << "& $\\pm$ " << gaus.excl_signal_statErr[i]
+					//<< setw(15) << gaus.excl_mean[i]   << "& $\\pm$ " << gaus.excl_statErr[i] << " & ("
+					<< "\t" << gaus.excl_mean[i]   << "& $\\pm$ " << gaus.excl_statErr[i] << " & ("
+					//<< setw(15) << gaus_cplus.excl_mean[i] << ") & "
+					<< "\t" << gaus_cplus.excl_mean[i] << ") & "
+					//<< setw(15) << exp.excl_mean[i]   << "& $\\pm$ " << exp.excl_statErr[i] << " & ("
+					<< "\t" << exp.excl_mean[i]   << "& $\\pm$ " << exp.excl_statErr[i] << " & ("
+					//<< setw(15) << exp_cplus.excl_mean[i] << ") & "
+					<< "\t" << exp_cplus.excl_mean[i] << ") & "
+					//<< setw(15) << gaus.excl_signal_mean[i] << "& $\\pm$ " << gaus.excl_signal_statErr[i]
+					<< "\t" << gaus.excl_signal_mean[i] << "& $\\pm$ " << gaus.excl_signal_statErr[i]
+					<< endl;
+					*/
+
+					<< setw(10) << incMHTBins.at(i) << "-" << incMHTBins.at(i+1) << " & "<< fixed 
+					<< "\t" << gaus.excl_mean[i]   << "& $\\pm$ " << gaus.excl_statErr[i] << " & ("
+					<< "\t" << gaus_cplus.excl_mean[i] << ") & "
+					<< "\t" << exp.excl_mean[i]   << "& $\\pm$ " << exp.excl_statErr[i] << " & ("
+					<< "\t" << exp_cplus.excl_mean[i] << ") & "
+					<< "\t" << gaus.excl_signal_mean[i] << "& $\\pm$ " << gaus.excl_signal_statErr[i]
 					<< endl;
 	}
 }
@@ -155,22 +181,17 @@ double GetFitFunctionError(TF1* f1, double x) {
 
 void OpenFiles()
 {
-		files[0] = new TFile ("QCD_HT300to470.root");
-		files[1] = new TFile ("QCD_HT470to600.root");
-		files[2] = new TFile ("QCD_HT600to800.root");
-		files[3] = new TFile ("QCD_HT800to1000.root");
-		files[4] = new TFile ("QCD_Ht1000to1400.root");
-		files[5] = new TFile ("QCD_HT1400to1800.root");
-		files[6] = new TFile ("QCD_HT1800.root");
+	//files[0] = new TFile ("qcd_all.root");
+	files[0] = new TFile ("qcd_all_HTranged.root");
 
-		for (int i=0; i<nBins; ++i)
+	for (int i=0; i<nBins; ++i)
+	{
+		if (files[i]->IsZombie())
 		{
-			if (files[i]->IsZombie())
-			{
-				cout << "QCD file # " << i << " not found!" <<  endl;
-				assert (false);
-			}
+			cout << "QCD file # " << i << " not found!" <<  endl;
+			assert (false);
 		}
+	}
 }
 
 TH1* GetHist(const std::string histname, const float scaleTo=1.0)
@@ -179,10 +200,11 @@ TH1* GetHist(const std::string histname, const float scaleTo=1.0)
 
 	if (! bFLATSAMPLE)
 	{
-		TH1 *hists[nBins] = {0,0,0,0,0,0,0};
+		TH1 *hists[nBins];
 
 		for (int i=0; i<nBins; ++i)
 		{
+			hists[i] = 0; 
 			if (files[i]->IsZombie())
 			{
 				cout << files[i]->GetName() << " not found!" <<  endl;
@@ -198,8 +220,9 @@ TH1* GetHist(const std::string histname, const float scaleTo=1.0)
 				{
 					hists[i]->Sumw2();
 
-					const float scale = scaleTo/ ( nEvents[i] / xSec[i] );
-					hists[i]->Scale(scale);
+					//temp: no scaling for lumi wgted samples
+					//const float scale = scaleTo/ ( nEvents[i] / xSec[i] );
+					//hists[i]->Scale(scale);
 
 					if (i == 0) 
 					{ 
@@ -236,7 +259,8 @@ double expFitFunc_Cup(double *x, double *par)
 	double fitval=0.0;
 	//if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + 0.03;
 	//if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + 0.0217;
-	if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + (CONST_C * 2);  //100% error for C
+	//if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + (CONST_C * 2);  //100% error for C
+	if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + par[2];  //100% error for C
 	else fitval=-1.0E6;
 	return fitval;
 }
@@ -244,7 +268,8 @@ double expFitFunc_Cup(double *x, double *par)
 double gausFitFunc_Cup(double *x, double *par)
 {
 	double arg = par[0] * exp(par[1] * x[0]);
-	double fitval = 1.0 / TMath::Erf (arg) - 1 + (CONST_C * 2); //100% ERROR FOR C
+	//double fitval = 1.0 / TMath::Erf (arg) - 1 + (CONST_C * 2); //100% ERROR FOR C
+	double fitval = 1.0 / TMath::Erf (arg) - 1 + par[2]; //100% ERROR FOR C
 	return fitval;
 }
 
@@ -254,7 +279,8 @@ double expFitFunc(double *x, double *par)
 	double fitval=0.0;
 	//if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + 0.03;
 	//if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + 0.0217;
-	if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + CONST_C;
+	//if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + CONST_C;
+	if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + par[2];
 	else fitval=-1.0E6;
 	return fitval;
 }
@@ -266,7 +292,8 @@ double gausFitFunc(double *x, double *par)
 	//double fitval = 1.0 / TMath::Erf (arg) - 1 + 0.03;
 	//double fitval = 1.0 / TMath::Erf (arg) - 1 + 0.02;
 	//double fitval = 1.0 / TMath::Erf (arg) - 1 + 0.0217;
-	double fitval = 1.0 / TMath::Erf (arg) - 1 + CONST_C;
+	//double fitval = 1.0 / TMath::Erf (arg) - 1 + CONST_C;
+	double fitval = 1.0 / TMath::Erf (arg) - 1 + par[2];
 	return fitval;
 }
 
@@ -277,29 +304,34 @@ Predictions_t GetPredictions(const TH1* hist, TF1* f1, const TH1* signalHist)
 	assert(signalHist != NULL && "GetPredictions:: signalHist not found!");
 	//new TCanvas(); gPad->SetLogy(); hist->SetStats(1); hist->DrawCopy(); //gPad->Print("control.eps");
 	
+	assert (hist->GetNbinsX() == signalHist->GetNbinsX() && "GetPredictions:: controlHist and signalHist have different binning!!!");
 
-	std::cout << "INITIAL INFO FOR HIST:"; hist->Print();
+	//std::cout << "INITIAL INFO FOR HIST:"; hist->Print();
 	int bin1 = 0;
 	for (int bin =0; bin<hist->GetNbinsX(); ++bin) 
 	{ 
-		if (hist->GetBinLowEdge(bin)<incMHTBins.at(0)) continue;
+		if (hist->GetBinLowEdge(bin)<incMHTBins.at(1)) continue;
 		else { bin1 = bin; break; }
 	}
 	int bin2 = hist->GetNbinsX()+1;
 	double err =0;
 	double integral = hist->IntegralAndError(bin1, bin2, err);
-	std::cout << "Intergral for MHT> "<< incMHTBins.at(0) << ":" << integral << "+/-" << err << std::endl;
+//	std::cout << "Intergral for MHT> "<< incMHTBins.at(0) << ":" << integral << "+/-" << err << std::endl;
 /*	double sig_sum = 0;
 	double sig_err2 =0;
 	for (int bin =0; bin<signalHist->GetNbinsX()+1; ++bin) 
 	{
-		if (signalHist->GetBinContent(bin)>0)
+		cout << std::setw(10) << signalHist->GetBinLowEdge(bin) << ", "  << std::setw(10) 
+							 << signalHist->GetXaxis()->GetBinUpEdge(bin)<< "]" 
+							 << std::setw(10) << signalHist->GetBinContent(bin) << endl;
+
+		if (signalHist->GetBinContent(bin)>0 && signalHist->GetBinCenter(bin)>= arrMHTbins[0] && signalHist->GetBinCenter(bin)< arrMHTbins[1])
 		{
 			sig_sum += signalHist->GetBinContent(bin);
 			sig_err2 += pow(signalHist->GetBinError(bin),2);
 		}
 	}
-	std::cout << "Signal hist  := " << sig_sum << " +/- " << sqrt(sig_err2) << std::endl;
+	std::cout << red <<"Signal hist  [" << arrMHTbins[0] << "-" << arrMHTbins[1] << "]:= " << sig_sum << " +/- " << sqrt(sig_err2) << clearatt << std::endl;
 */
 	double sumGaus[incMHTBins.size()];
 	double Gaus_StatErr[incMHTBins.size()];
@@ -334,11 +366,11 @@ Predictions_t GetPredictions(const TH1* hist, TF1* f1, const TH1* signalHist)
 		{
 			if (hist->GetBinContent(bin)>0)
 			{
-				/*			 cout << std::setprecision(4) << std::setw(5) << bin << std::setw(3) << "[" 
+							/* cout << std::setprecision(4) << std::setw(5) << bin << std::setw(3) << "[" 
 							 << std::setw(10) << hist->GetBinLowEdge(bin) << ", "  << std::setw(10) 
 							 << hist->GetXaxis()->GetBinUpEdge(bin)<< "]" 
 							 << std::setw(10) << hist->GetBinContent(bin) 
-							 << std::setw(10) << hist->GetBinContent(bin) * gausFit2->Eval(hist->GetBinCenter(bin))
+							 << std::setw(10) << hist->GetBinContent(bin) * f1->Eval(hist->GetBinCenter(bin))
 							 << endl;
 							 */				//inclusive bin stuff
 
@@ -367,14 +399,16 @@ Predictions_t GetPredictions(const TH1* hist, TF1* f1, const TH1* signalHist)
 				//exclsuive bin stuff
 				if (mhtBin+1<incMHTBins.size())
 				{
-					if (hist->GetBinCenter(bin) > incMHTBins.at(mhtBin) 
-							&& hist->GetBinCenter(bin) < incMHTBins.at(mhtBin+1))
+					if (binCenter >= incMHTBins.at(mhtBin) 
+							&& binCenter < incMHTBins.at(mhtBin+1))
 					{
+						//cout << green << "binCenter/MhtBin " << binCenter << "/" << incMHTBins.at(mhtBin) << clearatt<< endl;
 						sumGaus_excl[mhtBin]      += res;
 						Gaus_StatErr_excl[mhtBin] += statErr2;
 						Gaus_FitErr_excl[mhtBin]  += fitErr;
 						signal_mean_excl[mhtBin]  += binSig;
 						signal_statErr_excl[mhtBin]  += binSigStatErr2;
+						//cout << __LINE__ << ":" << mhtBin << " = " << binSig  << " [ " << signal_mean_excl[mhtBin]  << " ]" << endl; 
 					}
 				}
 			}
@@ -397,6 +431,7 @@ Predictions_t GetPredictions(const TH1* hist, TF1* f1, const TH1* signalHist)
 			std::stringstream excl_pred;
 			excl_pred << setprecision(3) << setw(10) << incMHTBins.at(mhtBin) << "<MHT<" << incMHTBins.at(mhtBin+1)
 				<< setw(20) << sumGaus_excl[mhtBin]  << "&$\\pm$" << Gaus_StatErr_excl[mhtBin] << " &$\\pm$ " << Gaus_FitErr_excl[mhtBin];
+				//cout << ">>> " <<  excl_pred.str() << endl;
 			results.excl_mean[mhtBin]    = sumGaus_excl[mhtBin];
 			results.excl_statErr[mhtBin] = Gaus_StatErr_excl[mhtBin];
 			results.excl_fitErr[mhtBin]  = Gaus_FitErr_excl[mhtBin];
@@ -408,9 +443,31 @@ Predictions_t GetPredictions(const TH1* hist, TF1* f1, const TH1* signalHist)
 	return results;
 }
 
+double GetAvgVal(TH1* hist, const float& xmin)
+{
+	assert(hist != NULL && "GetAvgVal:: hist is null!");
+	assert(hist->GetDimension() == 1 && "GetAvgVal:: hist is not 1D!");
+	
+	double sum = 0, N = 0;
+
+	for (int bin=1; bin<= hist->GetNbinsX(); ++bin)
+	{
+		if (hist->GetBinCenter(bin)< xmin) continue;
+		
+		cout << "Adding bin " << bin << " = " << hist->GetBinContent(bin) <<endl; 
+		sum += hist->GetBinContent(bin); 
+		++N;
+	}
+
+	cout << "avg = " << (sum/N) << endl;
+	return (sum/N);
+
+}
+
 void makePassFail_QCDMC(const string numeHistName, const string denoHistName, 
 			const string title, const string HTbinlabel, 
 			const string signalHistName, const string controlHistName,
+			const pair<unsigned, unsigned>& jetBin,
 			const float fitrange_xmin = 50, const float fitrange_xmax = 150) 
 {
 	incMHTBins.clear();
@@ -421,39 +478,30 @@ void makePassFail_QCDMC(const string numeHistName, const string denoHistName,
 	TH1 *Hist_pass = GetHist(numeHistName, scaleTo);
 	TH1 *Hist_fail = GetHist(denoHistName, scaleTo);
 
-	//new TCanvas();
-	//Hist_pass->Draw();
-	//Hist_fail->Draw("same");
+	Hist_pass->SetMarkerColor(kBlack);
+	Hist_pass->SetLineColor(kBlack);
+	/*new TCanvas();
+	gPad->SetLogy();
+	Hist_pass->SetLineColor(kRed);
+	Hist_pass->SetMarkerColor(kRed);
+	Hist_pass->DrawCopy();
+	Hist_fail->DrawCopy("same");
+	*/
+	//gPad->Print("range.eps");
 	cout << __LINE__ << ": Integrals= " << Hist_fail->Integral() << "/" << Hist_pass->Integral() << endl;
 	if (Hist_fail->GetEntries()<1 || Hist_pass->GetEntries()<1) 
 	{
 		cout << __LINE__ << ": not enough intries to make the plots!!! " << Hist_fail->Integral() << "/" << Hist_pass->Integral() << endl;
 		return;
 	}
-/*
-	new TCanvas();
-	gPad->SetLogy();
-	gStyle->SetOptStat(0);
-	Hist_fail->SetLineColor(kBlue);
-	Hist_pass->SetLineColor(kRed);
-	Hist_fail->SetTitle(";MHT;");
-	Hist_fail->Draw();
-	Hist_pass->Draw("Psame");
 
-	TLegend *leg1  = new TLegend(0.7,0.8,0.9,0.9);
-	leg1->AddEntry(Hist_pass,"PASS");
-	leg1->AddEntry(Hist_fail,"FAIL");
-	leg1->Draw();
-	return;
-*/
-	//gPad->SetEditable(0);
-	//new TCanvas();
-//	new TCanvas(); gPad->SetLogy(); Hist_pass->DrawCopy();
-//	new TCanvas(); gPad->SetLogy(); Hist_fail->DrawCopy();
-//	new TCanvas(); gPad->SetLogy(); Hist_signal_mht200->DrawCopy();
-//	return;
+//	DumpHist(Hist_pass);
+//	DumpHist(Hist_fail);
 
 	Hist_pass->Divide(Hist_fail);
+
+//	cout << ">>>>>>> AFTER DIVIDE <<<<< " << endl;
+//	DumpHist(Hist_pass);
 	const int maxbin = Hist_pass->GetMaximumBin();
 	const double max = Hist_pass->GetBinContent(maxbin);
 	//Hist_pass->GetYaxis()->SetRangeUser(-0.05, max+0.05);
@@ -463,7 +511,8 @@ void makePassFail_QCDMC(const string numeHistName, const string denoHistName,
 	//const float fitrange_xmin = 50, fitrange_xmax = 120;
 	stringstream newtitle;
 	//newtitle << "Fit Range " << fitrange_xmin << "--" << fitrange_xmax << title;
-	newtitle << title << " (fit range = " <<  fitrange_xmin << "--" << fitrange_xmax << "), c = " << CONST_C << ";MHT [GeV];Ratio (r);";
+	//newtitle << title << " (fit range = " <<  fitrange_xmin << "--" << fitrange_xmax << "), c = " << CONST_C << ";MHT [GeV];Ratio (r);";
+	newtitle << title << " (fit range = " <<  fitrange_xmin << "-" << fitrange_xmax << ");MHT [GeV];Ratio (r);";
 
 
 	gStyle->SetOptStat(0);	
@@ -477,16 +526,47 @@ void makePassFail_QCDMC(const string numeHistName, const string denoHistName,
 
 	gStyle->SetOptFit(1);
 	//Hist_pass->SetStats(0);
-	Hist_pass->SetMinimum(0.5E-2);
 	Hist_pass->Draw();
 	//return;
 
 	//do fittings exp and gaus
+	/*float C_UPLIMIT = 0.04;
+	float C_LOLIMIT = 0.02;
+	if (jetBin.first == 2 && jetBin.second == 2)
+	{
+		C_UPLIMIT = 0.00235;
+		C_LOLIMIT = 0.00232;
+	} else if (jetBin.first == 3 && jetBin.second == 5)
+	{
+		C_UPLIMIT = 0.03;
+		C_LOLIMIT = 0.025;
+	} else if (jetBin.first == 6 && jetBin.second == 7)
+	{
+		C_UPLIMIT = 0.2;
+		C_LOLIMIT = 0.17;
+	} else if (jetBin.first == 8)
+	{
+		C_UPLIMIT = 0.4;
+		C_LOLIMIT = 0.2;
+	}
+	*/
 
-	TF1 *expFit=new TF1("fit_1",expFitFunc,fitrange_xmin,fitrange_xmax,2);
+	const float mean_c_initial = GetAvgVal(Hist_pass, 350);
+
+	//do fittings exp and gaus
+	const float C_UPLIMIT = mean_c_initial+0.0001; //this only to get this values on the stat box
+	const float C_LOLIMIT = mean_c_initial-0.0001;
+
+
+
+	Hist_pass->SetMinimum(C_LOLIMIT/10);
+
+
+	TF1 *expFit=new TF1("fit_1",expFitFunc,fitrange_xmin,fitrange_xmax,3);
 	expFit->SetParameter(0,0.09);
 	expFit->SetParameter(1,-0.0002);
-	//expFit->SetParameter(2,-1.0);
+	expFit->SetParameter(2,CONST_C);
+	expFit->SetParLimits(2,C_LOLIMIT, C_UPLIMIT);
 	Hist_pass->Fit(expFit,"E0","",fitrange_xmin, fitrange_xmax);
 	gPad->Modified();
 	gPad->Update();
@@ -494,25 +574,27 @@ void makePassFail_QCDMC(const string numeHistName, const string denoHistName,
 	e_stats->SetTextColor(kRed);
 	TPaveStats *exp_stats = (TPaveStats*) e_stats->Clone("exp_stats");
 
-	TF1 *expFit2=new TF1("fit_2",expFitFunc,50,1000.0,2);
+	TF1 *expFit2=new TF1("fit_2",expFitFunc,50,1000.0,3);
 	expFit2->SetParameter(0,expFit->GetParameter(0));
 	expFit2->SetParameter(1,expFit->GetParameter(1));
-	//expFit2->SetParameter(2,expFit->GetParameter(2));
+	expFit2->SetParameter(2,expFit->GetParameter(2));
 	expFit2->SetLineColor(kRed+1);
 	expFit2->SetLineWidth(2);
 
 	//for unceratinty on c
-	TF1 *expFit_sigma = new TF1("Exp_sigma",expFitFunc_Cup,50,1000.0,2);
+	TF1 *expFit_sigma = new TF1("Exp_sigma",expFitFunc_Cup,50,1000.0,3);
 	expFit_sigma->SetParameter(0,expFit->GetParameter(0));
 	expFit_sigma->SetParameter(1,expFit->GetParameter(1));
+	expFit_sigma->SetParameter(2,expFit->GetParameter(2)); //%100 error
+	expFit_sigma->SetParLimits(2,C_LOLIMIT/2., C_UPLIMIT*2.);
 	Hist_pass->Fit(expFit_sigma,"E0","",fitrange_xmin, fitrange_xmax);
 
 
-	TF1 *gausFit=new TF1("fit_3",gausFitFunc,fitrange_xmin, fitrange_xmax,2);
+	TF1 *gausFit=new TF1("fit_3",gausFitFunc,fitrange_xmin, fitrange_xmax,3);
 	gausFit->SetParameter(0,0.09); 
 	gausFit->SetParameter(1,-0.0002);
-	//gausFit->SetParameter(2,-1.0);
-	//gausFit->SetParLimits(2,0.01,0.02);
+	gausFit->SetParameter(2,CONST_C);
+	gausFit->SetParLimits(2,C_LOLIMIT,C_UPLIMIT);
 	gausFit->SetLineColor(kGreen-2);
 	Hist_pass->Fit(gausFit,"E0","", fitrange_xmin, fitrange_xmax);
 	gPad->Modified();
@@ -521,25 +603,33 @@ void makePassFail_QCDMC(const string numeHistName, const string denoHistName,
 	gaus_stats->SetTextColor(kGreen);
 	//TPaveStats *gaus_stats = (TPaveStats*) g_stats->Clone("gaus_stats");
 
-	TF1 *gausFit2=new TF1("fit_4",gausFitFunc,50,1000.0,2);
+	//TF1 *gausFit2=new TF1("fit_4",gausFitFunc,50,1000.0,2);
+	TF1 *gausFit2=new TF1("fit_4",gausFitFunc,50,1000.0,3);
 	gausFit2->SetParameter(0,gausFit->GetParameter(0)); 
 	gausFit2->SetParameter(1,gausFit->GetParameter(1));
-	//gausFit2->SetParameter(2,gausFit->GetParameter(2));
+	gausFit2->SetParameter(2,gausFit->GetParameter(2));
 	gausFit2->SetLineColor(kGreen);
 	gausFit2->SetLineWidth(2);
 
 	//for unceratinty on c
-	TF1 *gausFit_sigma=new TF1("Gaus_sigma",gausFitFunc_Cup,50,1000.0,2);
+	TF1 *gausFit_sigma=new TF1("Gaus_sigma",gausFitFunc_Cup,50,1000.0,3);
 	gausFit_sigma->SetParameter(0,gausFit->GetParameter(0)); 
 	gausFit_sigma->SetParameter(1,gausFit->GetParameter(1));
+	gausFit_sigma->SetParameter(2,gausFit->GetParameter(2) * 2); //100% error
+	gausFit_sigma->SetParLimits(2,C_LOLIMIT/2., C_UPLIMIT*2.);
 	Hist_pass->Fit(gausFit_sigma,"E0","", fitrange_xmin, fitrange_xmax);
-
-
 
 
 	gausFit2->Draw("same");
 	expFit2->Draw("same");
-
+	/*gausFit_sigma->SetLineStyle(10);
+	gausFit_sigma->SetLineColor(gausFit2->GetLineColor());
+	expFit_sigma->SetLineStyle(10);
+	expFit_sigma->SetLineWidth(2);
+	expFit_sigma->SetLineColor(expFit2->GetLineColor());
+	gausFit_sigma->Draw("same");
+	expFit_sigma->Draw("same");
+*/
 	//TLegend *leg  = new TLegend(0.7,0.8,0.9,0.9);
 	TLegend *leg  = new TLegend(0.7,0.7,0.9,0.9);
 	leg->AddEntry(gausFit2,"Gaussian");
@@ -581,79 +671,200 @@ void makePassFail_QCDMC(const string numeHistName, const string denoHistName,
 	//epsname << "factnomht_" << HTbinlabel << ".eps";
 	//gPad->Print(epsname.str().c_str());
 	gPad->Print("ratios.eps");
+	//return;
 
 	 //make a predicion
 	TH1 *sigHist      = GetHist(signalHistName, scaleTo);
 	TH1 *controlHist  = GetHist(controlHistName, scaleTo);
-	Predictions_t pred_gaus       = GetPredictions(controlHist, gausFit2, sigHist); 
+
+	//temp hack to get # of bins the same for easy debugging
+	sigHist->Rebin(2);
+
+	cout << red << "sigHist/controlHist bins = " << sigHist->GetNbinsX() << "/" << controlHist->GetNbinsX() << clearatt << endl; 
+//	new TCanvas();
+//	sigHist->SetLineColor(kRed);
+//	sigHist->Rebin(50);
+//	controlHist->Rebin(50);
+//	sigHist->Draw();
+//	controlHist->Draw("same");
+
+
+	//collect results
+/*	Predictions_t pred_gaus       = GetPredictions(controlHist, gausFit2, sigHist); 
 	Predictions_t pred_gaus_sigma = GetPredictions(controlHist, gausFit_sigma, sigHist); 
 	Predictions_t pred_exp        = GetPredictions(controlHist, expFit2, sigHist); 
 	Predictions_t pred_exp_sigma  = GetPredictions(controlHist, expFit_sigma, sigHist); 
 
-	//PrintExclResults(pred_gaus);
-	//PrintExclResults(pred_exp);
+//	PrintExclResults(pred_gaus);
+//	PrintExclResults(pred_exp);
 	PrintExclResults(pred_gaus, pred_exp, pred_gaus_sigma, pred_exp_sigma);
+*/
+	/*****************************************/
+	// TEMP HACK TO GET RESULTS for all HT bins 
+	// using these inclusive fits
+	/*****************************************/
+	vector<pair<float, float> > htBins_temp;
+	pair<float, float> htbin1(500,750);	
+	pair<float, float> htbin2(750,1000);	
+	pair<float, float> htbin3(1000,1250);	
+	pair<float, float> htbin4(1250,1500);	
+	pair<float, float> htbin5(1500,8000);	
+
+	htBins_temp.push_back(htbin1);
+	htBins_temp.push_back(htbin2);
+	htBins_temp.push_back(htbin3);
+	htBins_temp.push_back(htbin4);
+	htBins_temp.push_back(htbin5);
+
+	TFile file("qcd_all.root");
+	if (file.IsZombie()) 
+	{ 
+		cout << __FUNCTION__ << ":" << __LINE__ 
+				<< "File to get exlcusive HT prediction is not found!" << endl;assert (false);
+	}
+
+	for (unsigned htbin=0; htbin<htBins_temp.size(); ++htbin)
+	{
+		stringstream folder, control_hist_name, signal_hist_name;
+		folder << "Hist/Njet" << jetBin.first << "to" << jetBin.second 
+			<< "HT"   << htBins_temp.at(htbin).first << "to" << htBins_temp.at(htbin).second 
+			<< "MHT0to8000";
+		control_hist_name << folder.str() << "/smeared_failFineBin1"; 
+		signal_hist_name << folder.str() << "/smear_signalFineBin"; 
+		TH1* control_hist = (TH1*) (file.Get(control_hist_name.str().c_str())); 
+		if (control_hist == NULL) { 
+			cout << __LINE__ << ": control hist " << control_hist_name.str() << " not found for htbin " << htBins_temp.at(htbin).first 
+				<< "-" << htBins_temp.at(htbin).second << endl; 
+			assert(false);		
+		} 
+		TH1* signal_hist = (TH1*) (file.Get(signal_hist_name.str().c_str())); 
+		if (signal_hist == NULL) { cout << __LINE__ << ": signal hist not found for htbin " << htBins_temp.at(htbin).first << "-" << htBins_temp.at(htbin).second << endl; } 
+
+		control_hist->Print();
+		signal_hist->Print();
+
+		//temp hack to get # of bins the same for easy debugging
+		signal_hist->Rebin(2);
+
+		Predictions_t pred_gaus       = GetPredictions(control_hist, gausFit2, signal_hist); 
+		Predictions_t pred_gaus_sigma = GetPredictions(control_hist, gausFit_sigma, signal_hist); 
+		Predictions_t pred_exp        = GetPredictions(control_hist, expFit2, signal_hist); 
+		Predictions_t pred_exp_sigma  = GetPredictions(control_hist, expFit_sigma, signal_hist); 
+
+		cout << ">>>>>>>>>>>>>>> PREDICTIONS FOR " << jetBin.first << "-" << jetBin.second 
+					<< ", HT=" << htBins_temp.at(htbin).first << "-" << htBins_temp.at(htbin).second << endl;
+		PrintExclResults(pred_gaus, pred_exp, pred_gaus_sigma, pred_exp_sigma);
+	}
+
+	file.Close();
 
 }
 
-void makePassFail_QCDMC() 
+void makePassFail_QCDMC()
 {
-	vector<string> folders, htbinlabels;
-/*	folders.push_back("factnomht");
-	folders.push_back("factnomhtnjet4");
-	folders.push_back("factnomhtnjet5");
-	folders.push_back("factnomhtnjet6");
-	folders.push_back("factnomhtnjet7");
-	folders.push_back("factnomhtnjet8");
-*/
-	folders.push_back("factnomhtnjet2to3");
-	folders.push_back("factnomhtnjet4to5");
-	folders.push_back("factnomhtnjet6to7");
-	folders.push_back("factnomhtnjet8");
 
-	htbinlabels.push_back("HT500to800");
-	htbinlabels.push_back("HT800to1000");
-	htbinlabels.push_back("HT1000to1200");
-	htbinlabels.push_back("HT1200to1400");
-	htbinlabels.push_back("HT1400to7000");
+	//jetbins
+	//
+	vector<pair<unsigned, unsigned> > jetBins;
+	vector<pair<float, float> > htBins, mhtBins;
+	pair<float, float> jetbin1(2,2);	
+	pair<float, float> jetbin2(3,5);	
+	pair<float, float> jetbin3(6,7);	
+	pair<float, float> jetbin4(8,1000);	
 
+	pair<float, float> htbin1(500,750);	
+	pair<float, float> htbin2(750,1000);	
+	pair<float, float> htbin3(1000,1250);	
+	pair<float, float> htbin4(1250,1500);	
+	pair<float, float> htbin5(1500,8000);	
+
+
+	pair<float, float> mhtbin1(0,8000);	
+	
+	jetBins.push_back(jetbin1);
+	jetBins.push_back(jetbin2);
+	jetBins.push_back(jetbin3);
+	jetBins.push_back(jetbin4);
+	
+	htBins.push_back(htbin1);
+	htBins.push_back(htbin2);
+	htBins.push_back(htbin3);
+	htBins.push_back(htbin4);
+
+	mhtBins.push_back(mhtbin1);
+
+	vector<string> dphibins;
+//	dphibins.push_back("0.15");
+	dphibins.push_back("0.20");
+//	dphibins.push_back("0.25");
+//	dphibins.push_back("0.30");
+//	dphibins.push_back("0.35");
+//	dphibins.push_back("0.40");
 
 	OpenFiles();
 	TCanvas *c = new TCanvas("print");	
 	c->Draw();
 	c->Print("ratios.eps[");
 	
-	for (unsigned i = 0; i < folders.size(); ++i)
+/*	for (unsigned d = 0; d < dphibins.size(); ++d)
 	{	
-		string njet("");
-		if (i==0) njet += "[2-3]";
-		else if (i==1) njet += "[4-5]";
-		else if (i==2) njet += "[6-7]";
-		else if (i==3) njet += "#geq 8";
-		//else if (i==4) njet += "7";
-		//else if (i==5) njet += "8";
-		
-		cout << " >>>>> " << njet << " <<<<< " << endl;
+		for (unsigned jetbin = 0; jetbin < jetBins.size(); ++jetbin)
+		{	
+			for (unsigned htbin = 0; htbin < htBins.size(); ++htbin)
+			{
+				for (unsigned mhtbin = 0; mhtbin < mhtBins.size(); ++mhtbin)
+				{
+					stringstream htrange;
+					htrange << htBins.at(htbin).first << "<HT<" << htBins.at(htbin).second << " GeV, "
+						<< mhtBins.at(mhtbin).first << "<MHT<" << mhtBins.at(mhtbin).second << " GeV";
 
-		for (unsigned j = 0; j < htbinlabels.size(); ++j)
-		{
-			string htrange("");
-			if (j==0) htrange += "500<HT<800 GeV";
-			else if (j==1) htrange += "800<HT<1000 GeV";
-			else if (j==2) htrange += "1000<HT<1200 GeV";
-			else if (j==3) htrange += "1200<HT<1400 GeV";
-			else if (j==4) htrange += "HT>1400 GeV";
+					stringstream folder;
+					folder << "Hist/Njet" << jetBins.at(jetbin).first << "to" << jetBins.at(jetbin).second 
+						<< "HT"   << htBins.at(htbin).first << "to" << htBins.at(htbin).second 
+						<< "MHT"  << mhtBins.at(mhtbin).first << "to" << mhtBins.at(mhtbin).second;
 
-			cout << " >>>>>>>>>>> " << htrange << endl; 
-			stringstream title, numeHistName, denoHistName, signalHistName, controlHistName;
-			//title << htrange << ";#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
-			title << "Njet " << njet << ", " << htrange;
-			numeHistName << folders.at(i) << "/" << htbinlabels.at(j) << "/signal";
-			denoHistName << folders.at(i) << "/" << htbinlabels.at(j) << "/fail1";
-			signalHistName << folders.at(i) << "/" << htbinlabels.at(j) << "/signalFineBin";
-			controlHistName << folders.at(i) << "/" << htbinlabels.at(j) << "/failFineBin1";
-			makePassFail_QCDMC(numeHistName.str(), denoHistName.str(), title.str(), htbinlabels.at(j), signalHistName.str(), controlHistName.str()); 
+					stringstream njetlabel, title, numeHistName, denoHistName, signalHistName, controlHistName;
+					njetlabel << jetBins.at(jetbin).first << "-" << jetBins.at(jetbin).second << " Jets";
+					title << "Njet " << njetlabel.str() << ", " << htrange.str() << ", #Delta #Phi _{min}<" << dphibins.at(d);
+					numeHistName << folder.str() << "/smear_signal";
+					//denoHistName << folder.str() << "/smeared_fail1";
+					denoHistName << folder.str() << "/smeared_fail" << d;
+					signalHistName << folder.str() << "/smear_signalFineBin";
+					controlHistName << folder.str() << "/smeared_failFineBin" << d;
+					//makePassFail_QCDMC(numeHistName.str(), denoHistName.str(), 
+					//		title.str(), htrange.str(), signalHistName.str(), controlHistName.str()); 
+					makePassFail_QCDMC(numeHistName.str(), denoHistName.str(), 
+							title.str(), htrange, signalHistName.str(), controlHistName.str(), jetBins.at(jetbin), 50, 150); 
+				}
+
+			}
 		}
 	}
+*/	
+
+
+	for (unsigned d = 0; d < dphibins.size(); ++d)
+	{	
+		for (unsigned jetbin = 0; jetbin < jetBins.size(); ++jetbin)
+		{	
+			stringstream folder;
+			folder << "Hist/Njet" << jetBins.at(jetbin).first << "to" << jetBins.at(jetbin).second; 
+			string htrange("HT>500 GeV");
+			cout << folder.str() << endl;
+
+			stringstream njetlabel, title, numeHistName, denoHistName, signalHistName, controlHistName;
+			njetlabel << jetBins.at(jetbin).first << "-" << jetBins.at(jetbin).second << " Jets";
+			title << "Njet " << njetlabel.str() << ", " << htrange << ", #Delta #Phi _{min}<" << dphibins.at(d);
+			numeHistName << folder.str() << "/smear_signal";
+			denoHistName << folder.str() << "/smeared_fail" << d;
+			signalHistName << folder.str() << "/smear_signalFineBin";
+			//signalHistName << folder.str() << "/smear_signal";
+			controlHistName << folder.str() << "/smeared_failFineBin" << d;
+			makePassFail_QCDMC(numeHistName.str(), denoHistName.str(), 
+					title.str(), htrange, signalHistName.str(), controlHistName.str(), jetBins.at(jetbin), 50, 150); 
+		}
+	}
+
+
 	c->Print("ratios.eps]");
 }
