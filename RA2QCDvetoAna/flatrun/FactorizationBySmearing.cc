@@ -111,7 +111,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 	const double lumiWgt = 1; 
 	applyDphiCut_        = 0;
 	//unsigned nTries_     = (unsigned) max((double)1000 * NJet50_min_ * 2 , 5000.0) ; //number of pseudo experiments per event
-	unsigned nTries_     = 10; //number of pseudo experiments per event
+	unsigned nTries_     = 5000; //number of pseudo experiments per event
 	if (bDEBUG) nTries_  = 1;
 	const double smearingWgt = 1.0/(double)nTries_;
 
@@ -125,25 +125,32 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
    smearFunc_ = new SmearFunction();
 		smearFunc_->SetAbsoluteTailScaling(absoluteTailScaling_);
 
+	//const float sysVarScale = 2.0; //this is the default 
+	const float sysVarScale = 5.0;  //this is what is used in 2010 note
+	const float systvarLowFactor = 1.0 / sysVarScale;
+	const float systvarHiFactor  = 1.0 * sysVarScale;
+
 	switch (systematicVarition)
 	{
 		case 1:
-			smearFunc_->SetUpperTailScalingVariation(0.5);
+			smearFunc_->SetUpperTailScalingVariation(systvarLowFactor);
 			break;
 		case 2:
-			smearFunc_->SetUpperTailScalingVariation(2.0);
+			smearFunc_->SetUpperTailScalingVariation(systvarHiFactor);
 			break;
 		case 3:
-			smearFunc_->SetLowerTailScalingVariation(0.5);
+			smearFunc_->SetLowerTailScalingVariation(systvarLowFactor);
 			break;
 		case 4:
-			smearFunc_->SetLowerTailScalingVariation(2.0);
+			smearFunc_->SetLowerTailScalingVariation(systvarHiFactor);
 			break;
 		case 5:
-			smearFunc_->SetAdditionalSmearingVariation(0.9);
+			//smearFunc_->SetAdditionalSmearingVariation(0.9);
+			smearFunc_->SetAdditionalSmearingVariation(0.8); //20% as in 2010 note
 			break;
 		case 6:
-			smearFunc_->SetAdditionalSmearingVariation(1.1);
+			//smearFunc_->SetAdditionalSmearingVariation(1.1);
+			smearFunc_->SetAdditionalSmearingVariation(1.2); //20% as in 2012 note
 			break;
 	}
 
@@ -500,7 +507,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 			}
 		}
 	}
-	if (nVectorInexWarnings)
+	if (nVectorInexWarnings>0)
 	{
 		cout << "---- ERROR/WARNING SUMMARY ---------" << endl;
 		cout << "Values out of range errors = " << nVectorInexWarnings << endl;
@@ -984,7 +991,7 @@ unsigned FactorizationBySmearing::GetVectorIndex(const vector<double>& binEdges,
 	}
 	msg << "]" << endl;
 	msg << "   Assigning extreme value!" << endl;
-	if ( (unsigned)nVectorInexWarnings % 500  == 0) cout << msg.str();
+	if ( (unsigned)nVectorInexWarnings % 1000  == 0) cout << msg.str();
 	return 99999;
 }
 unsigned FactorizationBySmearing::GetVectorIndex(const vector< pair<unsigned, unsigned> >& binEdges, const unsigned& val)
@@ -1007,7 +1014,7 @@ unsigned FactorizationBySmearing::GetVectorIndex(const vector< pair<unsigned, un
 	}
 	msg << "]" << endl;
 	msg << "   Assigning extreme value!" << endl;
-	if ( (unsigned) nVectorInexWarnings % 500 ==0 ) cout << msg.str();
+	if ( (unsigned) nVectorInexWarnings % 1000 ==0 ) cout << msg.str();
 	return 99999;
 }
 
@@ -1019,7 +1026,7 @@ double FactorizationBySmearing::GetLumiWgt(const string& datasetname, const doub
 	 * **********************************************/
 
 	//cross section for each sample in pt order
-	const float xSec[] = {
+	const float xSec_Pythia[] = {
 		1759.549,  //pt 300-470
 		113.8791,  //470-600
 		26.9921,  //600-800
@@ -1029,7 +1036,7 @@ double FactorizationBySmearing::GetLumiWgt(const string& datasetname, const doub
 		0.001829005 //1800
 	};
 
-	const float nEvents[] = {
+	const float nEvts_Pythia[] = {
 		5927300, // 300-470  #numbers from DBS, PREP page numbers are approximate
 		3994848, // 470-600
 		3992760, // 600-800
@@ -1039,43 +1046,75 @@ double FactorizationBySmearing::GetLumiWgt(const string& datasetname, const doub
 		977586 //1800
 	};
 
+	const float xSec_MG[] = {
+		276000, //250-HT-500
+		8426,   //500-HT-1000
+		204 	  //HT>1000
+	};
+
+	const float nEvts_MG[] = {
+		27002490,
+		30599239,
+		13829995
+	};
+
 	double lumiWgt = 1;
 
-	if( (std::string(datasetname)).find("qcd1") != string::npos  
-		 ||  (std::string(datasetname)).find("QCD1") != string::npos)  
+	if (datasetname.find("pythia") != string::npos)
 	{
-		cout << "Lum for qcd 1 used." << endl; 
-		lumiWgt = dataLumi/(nEvents[0] / xSec[0]);
-	} else if ( (std::string(datasetname)).find("qcd2") != string::npos
-				  || (std::string(datasetname)).find("QCD2") != string::npos)
+		if (datasetname.find("QCD_Pt_300to470") != string::npos) 
+		{
+			cout << "Lum for Pythia qcd 1 used." << endl; 
+			lumiWgt = dataLumi/(nEvts_Pythia[0] / xSec_Pythia[0]);
+		} else if (datasetname.find("QCD_Pt_470to600") != string::npos) 
+		{
+			cout << "Lum for Pythia qcd 2 used." << endl; 
+			lumiWgt = dataLumi/(nEvts_Pythia[1] / xSec_Pythia[1]);
+		} else if (datasetname.find("QCD_Pt_600to800") != string::npos) 
+		{
+			cout << "Lum for Pythia qcd 3 used." << endl; 
+			lumiWgt = dataLumi/(nEvts_Pythia[2] / xSec_Pythia[2]);
+		} else if (datasetname.find("QCD_Pt_800to1000") != string::npos) 
+		{
+			cout << "Lum for Pythia qcd 4 used." << endl; 
+			lumiWgt = dataLumi/(nEvts_Pythia[3] / xSec_Pythia[3]);
+		} else if (datasetname.find("QCD_Pt_1000to1400") != string::npos) 
+		{
+			cout << "Lum for Pythia qcd 5 used." << endl; 
+			lumiWgt = dataLumi/(nEvts_Pythia[4] / xSec_Pythia[4]);
+		} else if (datasetname.find("QCD_Pt_1400to1800") != string::npos) 
+		{ 
+			cout << "Lum for Pythia qcd 6 used." << endl; 
+			lumiWgt = dataLumi/(nEvts_Pythia[5] / xSec_Pythia[5]);
+		} else if (datasetname.find("QCD_Pt_1800") != string::npos) 
+		{
+			cout << "Lum for Pythia qcd 7 used." << endl; 
+			lumiWgt = dataLumi/(nEvts_Pythia[6] / xSec_Pythia[6]);
+		} else {
+			cout << red << "WARNING! UNKNOWN PYTHIA dataset name, " << datasetname 
+				<< " given. returning lumiWgt = 1 !!!" << clearatt << endl;  
+		}
+		
+	//QCD MG Samples
+	} else if (datasetname.find("MGPythia") != string::npos )
 	{
-		cout << "Lum for qcd 2 used." << endl; 
-		lumiWgt = dataLumi/(nEvents[1] / xSec[1]);
-	} else if( (std::string(datasetname)).find("qcd3") != string::npos 
-					|| (std::string(datasetname)).find("QCD3") != string::npos) 
-	{
-		cout << "Lum for qcd 3 used." << endl; 
-		lumiWgt = dataLumi/(nEvents[2] / xSec[2]);
-	} else if( (std::string(datasetname)).find("qcd4") != string::npos  
-					|| (std::string(datasetname)).find("QCD4") != string::npos)  
-	{
-		cout << "Lum for qcd 4 used." << endl; 
-		lumiWgt = dataLumi/(nEvents[3] / xSec[3]);
-	} else if( (std::string(datasetname)).find("qcd5") != string::npos  
-					|| (std::string(datasetname)).find("QCD5") != string::npos)  
-	{
-		cout << "Lum for qcd 5 used." << endl; 
-		lumiWgt = dataLumi/(nEvents[4] / xSec[4]);
-	} else if( (std::string(datasetname)).find("qcd6") != string::npos  
-					|| (std::string(datasetname)).find("QCD6") != string::npos)  
-	{ 
-		cout << "Lum for qcd 6 used." << endl; 
-		lumiWgt = dataLumi/(nEvents[5] / xSec[5]);
-	} else if( (std::string(datasetname)).find("qcd7") != string::npos  
-					|| (std::string(datasetname)).find("QCD7") != string::npos)  
-	{
-		cout << "Lum for qcd 7 used." << endl; 
-		lumiWgt = dataLumi/(nEvents[6] / xSec[6]);
+		if (datasetname.find("QCD_HT_250To500") != string::npos)
+		{
+			cout << "Lum for MG qcd 1 used." << endl; 
+			lumiWgt = dataLumi/(nEvts_MG[0] / xSec_MG[0]);
+		} else if (datasetname.find("QCD_HT_500To1000") != string::npos)
+		{
+			cout << "Lum for MG qcd 2 used." << endl; 
+			lumiWgt = dataLumi/(nEvts_MG[1] / xSec_MG[1]);
+		} else if (datasetname.find("QCD_HT_1000ToInf") != string::npos)
+		{
+			cout << "Lum for MG qcd 3 used." << endl; 
+			lumiWgt = dataLumi/(nEvts_MG[2] / xSec_MG[2]);
+		} else {
+			cout << red << "WARNING! UNKNOWN MadGraph dataset name, " << datasetname 
+				<< " given. returning lumiWgt = 1 !!!" << clearatt << endl;  
+		}
+	
 	} else 
 	{
 		cout << red << "WARNING! UNKNOWN dataset name, " << datasetname 
@@ -1148,7 +1187,7 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 	const int nBins_mht = 200; const double min_mht =0, max_mht=1000;
 	const int nBins_ht = 140; const double min_ht =0, max_ht=3500;
 	//for ratio plot
-	const double evt_mht_max = 1500, evt_mht_bins = 750;
+	const double evt_mht_max = 1100, evt_mht_bins = 1100;
 	const double evt_ht_max = 4000, evt_ht_bins = 800;
 	const float npassFailHistBins = 14;
 	const float passFailHistBins[] = {50,60,70,80,90,100,110,120,140,160,200,350,500,800,1000};
@@ -1239,8 +1278,8 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 				hist.hv_RecoEvt.sidebandSyst[0] = new TH1D("reco_sidebandSyst1","Reco Events: Sideband Syst1: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
 				hist.hv_RecoEvt.sidebandSyst[1] = new TH1D("reco_sidebandSyst2","Reco Events: Sideband Syst2: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
 			}
-			hist.hv_RecoEvt.sidebandSystFineBin[0] = new TH1D("reco_sidebandSyst1_fineBin","Reco Events: Sideband Syst1 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", 1500, 0, 1500);
-			hist.hv_RecoEvt.sidebandSystFineBin[1] = new TH1D("reco_sidebandSyst2_fineBin","Reco Events: Sideband Syst2 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", 1500, 0, 1500);
+			hist.hv_RecoEvt.sidebandSystFineBin[0] = new TH1D("reco_sidebandSyst1_fineBin","Reco Events: Sideband Syst1 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", evt_mht_bins, 0, evt_mht_max);
+			hist.hv_RecoEvt.sidebandSystFineBin[1] = new TH1D("reco_sidebandSyst2_fineBin","Reco Events: Sideband Syst2 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", evt_mht_bins, 0, evt_mht_max);
 
 			if (passFailBinOption == 1)
 			{
@@ -1248,7 +1287,7 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 			} else {
 				hist.hv_RecoEvt.signal = new TH1D("reco_signal" ,"Reco Events: Signal Region", npassFailHistBins, passFailHistBins);
 			}
-			hist.hv_RecoEvt.signalFineBin = new TH1D("reco_signalFineBin" ," Reco Events: Signal Region", 1500, 0, 1500);
+			hist.hv_RecoEvt.signalFineBin = new TH1D("reco_signalFineBin" ," Reco Events: Signal Region", evt_mht_bins, 0, evt_mht_max);
 
 			hist.hv_RecoEvt.sidebandSyst[0]->Sumw2();
 			hist.hv_RecoEvt.sidebandSyst[1]->Sumw2();
@@ -1318,6 +1357,7 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 					hist.hv_SmearedEvt.pass.push_back( new TH1D(pass_name.str().c_str(), pass_title.str().c_str(), npassFailHistBins, passFailHistBins) ); 
 					hist.hv_SmearedEvt.fail.push_back( new TH1D(fail_name.str().c_str(), fail_title.str().c_str(), npassFailHistBins, passFailHistBins) );
 				}
+
 				hist.hv_SmearedEvt.passFineBin.push_back( new TH1D(passFineBin_name.str().c_str(), passFineBin_title.str().c_str(), evt_mht_bins, 0, evt_mht_max) ); 
 				hist.hv_SmearedEvt.failFineBin.push_back( new TH1D(failFineBin_name.str().c_str(), failFineBin_title.str().c_str(), evt_mht_bins, 0, evt_mht_max) );
 
@@ -1335,8 +1375,8 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 				hist.hv_SmearedEvt.sidebandSyst[0] = new TH1D("smeared_sidebandSyst1"," Smeared Events: Sideband Syst1: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
 				hist.hv_SmearedEvt.sidebandSyst[1] = new TH1D("smeared_sidebandSyst2"," Smeared Events: Sideband Syst2: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
 			}
-			hist.hv_SmearedEvt.sidebandSystFineBin[0] = new TH1D("smeared_sidebandSyst1_fineBin"," Smeared Events:Sideband Syst1 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", 1500, 0, 1500);
-			hist.hv_SmearedEvt.sidebandSystFineBin[1] = new TH1D("smear_sidebandSyst2_fineBin"," Smeared Events:Sideband Syst2 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", 1500, 0, 1500);
+			hist.hv_SmearedEvt.sidebandSystFineBin[0] = new TH1D("smeared_sidebandSyst1_fineBin"," Smeared Events:Sideband Syst1 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", evt_mht_bins, 0, evt_mht_max);
+			hist.hv_SmearedEvt.sidebandSystFineBin[1] = new TH1D("smeared_sidebandSyst2_fineBin"," Smeared Events:Sideband Syst2 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", evt_mht_bins, 0, evt_mht_max);
 
 			if (passFailBinOption == 1)
 			{
@@ -1344,7 +1384,7 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 			} else {
 				hist.hv_SmearedEvt.signal = new TH1D("smeared_signal", " Smeared Events:Signal Region", npassFailHistBins, passFailHistBins);
 			}
-			hist.hv_SmearedEvt.signalFineBin = new TH1D("smeared_signalFineBin", " Smeared Events:Signal Region", 1500, 0, 1500);
+			hist.hv_SmearedEvt.signalFineBin = new TH1D("smeared_signalFineBin", " Smeared Events:Signal Region", evt_mht_bins,0, evt_mht_max);
 
 			hist.hv_SmearedEvt.sidebandSyst[0]->Sumw2();
 			hist.hv_SmearedEvt.sidebandSyst[1]->Sumw2();
@@ -1380,7 +1420,7 @@ void FactorizationBySmearing::GetJetHist(vector<JetHist_t>& Hist, const string j
 		pttitle << htmhtrange << ";#delta #phi [Jet-" << index << ", MHT];Events;";
 
 		JetHist_t hist;
-		hist.h_Jet_pt   = new TH1D(ptname.str().c_str(), pttitle.str().c_str(),   140, 0.0, 3500.0);  
+		hist.h_Jet_pt   = new TH1D(ptname.str().c_str(), pttitle.str().c_str(),   150, 0.0, 1500.0);  
 		hist.h_Jet_eta  = new TH1D(etaname.str().c_str(), etatitle.str().c_str(),  120, -6.0, 6.0);  
 		hist.h_Jet_phi  = new TH1D(phiname.str().c_str(), phititle.str().c_str(),  70, -3.5, 3.5);  
 		hist.h_Jet_dphi  = new TH1D(dphiname.str().c_str(), dphititle.str().c_str(),  70, 0, 3.5);  
