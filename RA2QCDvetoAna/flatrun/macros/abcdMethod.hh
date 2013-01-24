@@ -8,6 +8,9 @@
 #include <vector>
 #include <utility>
 #include "TFile.h"
+#include "TFitResultPtr.h"
+
+using namespace std;
 
 class abcdMethod
 {
@@ -29,10 +32,12 @@ class abcdMethod
 
 		struct Syst_t {
 			TFile* file;
-			std::string legText;
+			string legText;
 			TH1* hist_ratio;
 			TF1* gaus_func;
 			TF1* exp_func;
+			TFitResultPtr gaus_fitResPtr;
+			TFitResultPtr exp_fitResPtr;
 			double gaus_sys;
 			double exp_sys;
 			Predictions_t res_gaus;
@@ -41,18 +46,25 @@ class abcdMethod
 
 		struct input_t {
 			TFile* file;
-			std::string legText;
+			string legText;
 			TH1* hist_ratio;
 			TF1* gaus_func;
 			TF1* exp_func;
-			std::vector< std::pair<float, float> > njetrange;
-			std::vector< std::pair<float, float> > htrange;
-			std::vector< std::pair<float, float> > mhtrange;
-			std::vector< std::vector<TH1* > > hist_control_finebin; 
-			std::vector< std::vector<TH1* > > hist_signal_finebin; 
-			std::vector< std::vector<std::vector< std::pair<abcdMethod::Predictions_t, abcdMethod::Predictions_t> > > > results;  //gaus/exp 
+			TFitResultPtr gaus_fitResPtr;
+			TFitResultPtr exp_fitResPtr;
+			vector< pair<float, float> > njetrange;
+			vector< pair<float, float> > htrange;
+			vector< pair<float, float> > mhtrange;
+			vector< vector<TH1* > > hist_control_finebin; 
+			vector< vector<TH1* > > hist_signal_finebin; 
+			vector< vector<TH1* > > hist_controlsyst1_finebin; 
+			vector< vector<TH1* > > hist_controlsyst2_finebin; 
+		
+			vector< vector<vector< pair<abcdMethod::Predictions_t, abcdMethod::Predictions_t> > > > results;  //gaus/exp 
 			//njet/ht/mht/systs
-			std::vector< std::vector< std::vector<std::vector< abcdMethod::Syst_t > > > > Systs; //holds 6 individual systematics. pred_mean is the only used variable
+			//vector< vector< vector<vector< abcdMethod::Syst_t > > > > Systs; //holds 6 individual systematics. pred_mean is the only used variable
+			//one fit per njet bin
+			vector< abcdMethod::Syst_t > Systs; //holds 6 individual systematics. pred_mean is the only used variable
 		};
 
 
@@ -60,46 +72,53 @@ class abcdMethod
 
 		int Nsyst;
 		bool b_doSystematics;
-		std::string numHistName, denHistName, controlHistName, signalHistName;
-		std::vector<TH1*> vRatioHist; //0=mean, >0 are all systematics
-		TH1* GetRatioHist(TFile* f, const std::string path_to_hist, const bool debug=false);
-		TH1* GetControlHist(TFile* f, const std::string path_to_hist, const bool debug=false);
-		void GetSignalHist(TFile *f, std::vector< std::vector<TH1*> > & signalHists, 
-										std::vector< std::pair<float, float> >& njetrange,
-										std::vector< std::pair<float, float> >& htrange,
-										std::vector< std::pair<float, float> >& mhtrange,
-										const std::string path_to_hist, const bool debug);
-		void GetControlHist(TFile *f, std::vector< std::vector<TH1*> > & controlHists, 
-										std::vector< std::pair<float, float> >& njetrange,
-										std::vector< std::pair<float, float> >& htrange,
-										std::vector< std::pair<float, float> >& mhtrange,
-										const std::string path_to_hist, const bool debug);
-		void GetFits(TH1* ratio_hist, TF1*& gausFunc, TF1*& expFunc, const std::string optTitleText="");
-		void SetSearchBinInfo( std::vector< std::pair<float, float> >& njetrange,
-										std::vector< std::pair<float, float> >& htrange,
-										std::vector< std::pair<float, float> >& mhtrange,
-										std::vector< std::vector<std::vector< std::pair<abcdMethod::Predictions_t, abcdMethod::Predictions_t> > > >& results, 
-										const std::string searchbins);
+		string numHistName, denHistName, controlHistName, signalHistName;
+		string controlsyst1HistName, constrolsyst2HistName;
+		vector<TH1*> vRatioHist; //0=mean, >0 are all systematics
+		TH1* GetRatioHist(TFile* f, const string path_to_hist, const bool debug=false);
+		TH1* GetControlHist(TFile* f, const string path_to_hist, const bool debug=false);
+		void GetSignalHist(TFile *f, vector< vector<TH1*> > & signalHists, 
+										vector< pair<float, float> >& njetrange,
+										vector< pair<float, float> >& htrange,
+										vector< pair<float, float> >& mhtrange,
+										const string path_to_hist, const bool debug);
+		void GetControlHist(TFile *f, vector< vector<TH1*> > & controlHists, 
+										vector< pair<float, float> >& njetrange,
+										vector< pair<float, float> >& htrange,
+										vector< pair<float, float> >& mhtrange,
+										const string path_to_hist, const bool debug);
+		void GetFits(TH1* ratio_hist, 
+							TF1*& gausFunc, TFitResultPtr& gausFitResPtr, 
+							TF1*& expFunc, TFitResultPtr& expFitResPtr,
+							const string optTitleText="");
+		void SetSearchBinInfo( vector< pair<float, float> >& njetrange,
+										vector< pair<float, float> >& htrange,
+										vector< pair<float, float> >& mhtrange,
+										vector< vector<vector< pair<abcdMethod::Predictions_t, abcdMethod::Predictions_t> > > >& results, 
+										const string searchbins);
 		void InitSysts(
-				std::vector< std::vector< std::vector< std::vector< abcdMethod::Syst_t > > > > & systs, 
-				std::vector< std::pair<float, float> >& njetrange,
-				std::vector< std::pair<float, float> >& htrange, 
-				std::vector< std::pair<float, float> >& mhtrange, 
-				const std::string path_to_hist, const bool debug);
+				//vector< vector< vector< vector< abcdMethod::Syst_t > > > > & systs, 
+				vector< abcdMethod::Syst_t > & systs, 
+				vector< pair<float, float> >& njetrange,
+				vector< pair<float, float> >& htrange, 
+				vector< pair<float, float> >& mhtrange, 
+				const string path_to_hist, const bool debug);
 		void PrintRatioCanvas();
 		void PrintDebugCanvas();
-		std::vector<input_t> vg_Inputs;
+		vector<input_t> vg_Inputs;
 		TCanvas *canvas_for_ratios, *canvas_for_debug;
-		std::string epsfile_for_ratios, epsfile_for_debug;
-		void PrintResults(std::vector< std::pair<float, float> >& njetrange,
-										std::vector< std::pair<float, float> >& htrange,
-										std::vector< std::pair<float, float> >& mhtrange,
-					const std::vector< std::vector<std::vector< std::pair<abcdMethod::Predictions_t, abcdMethod::Predictions_t> > > >& results);
-		void  GetPredictions(const float& min_mht, const float& max_mht, const TF1* f1, const TH1* signalHist, const TH1* controlHist, Predictions_t& pred);
+		string epsfile_for_ratios, epsfile_for_debug;
+		void PrintResults(vector< pair<float, float> >& njetrange,
+										vector< pair<float, float> >& htrange,
+										vector< pair<float, float> >& mhtrange,
+					const vector< vector<vector< pair<abcdMethod::Predictions_t, abcdMethod::Predictions_t> > > >& results);
+		void  GetPredictions(const float& min_mht, const float& max_mht, 
+									const TF1* f1, const TFitResultPtr fitResPtr, 
+									const TH1* signalHist, const TH1* controlHist, Predictions_t& pred);
 
 	public:
-		void AddInput(const std::string rootFileName,const std::string path_to_hist, const std::string legendText, 
-							const std::string searchbins, const bool debug=false); 
+		void AddInput(const string rootFileName,const string path_to_hist, const string legendText, 
+							const string searchbins, const bool debug=false); 
 		void DoSystematics(const bool b) { b_doSystematics = b; }
 		void Run();
 };

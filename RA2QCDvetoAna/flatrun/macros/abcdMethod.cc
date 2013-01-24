@@ -1,4 +1,3 @@
-
 #include "abcdMethod.hh"
 #include <iostream>
 #include "TPad.h"
@@ -13,18 +12,30 @@
 #include <algorithm>
 #include "exception"
 #include <cmath>
-//#include "CommonTools.hh"
 #include <memory>
+#include "TMatrixDSym.h"
+#include "TFitResult.h"
 
+string SystName(const int i)
+{
+	switch (i)
+	{
+		case 0: return "UpperTailScaling x 2.0";
+		case 1: return "UpperTailScaling x 0.5";
+		case 2: return "LowerTailScaling x 2.0";
+		case 3: return "LowerTailScaling x 0.5";
+		case 4: return "AdditionalSmearing +10%";
+		case 5: return "AdditionalSmearing -10%";
+		default: return "Unspecified systematic type!!!";
+	}
 
-using namespace std;
+}
 
-
-std::vector<float> 
+vector<float> 
 GetVarBinVector (float down, float up5, float up10, float up20, float up50, 
 					float width1, float width2, float width3, float width4)
 {
-	std::vector<float> result;
+	vector<float> result;
 	float point = down;
 	const unsigned nregion = 4;
 	const float up [] = {up5, up10, up20, up50};
@@ -60,13 +71,13 @@ void NormalizeBinWidth(TH1* hist)
 
 }
 
-std::auto_ptr<TH1> FillVarBinHist (const std::vector<float>& bins, TH1 *input)
+auto_ptr<TH1> FillVarBinHist (const vector<float>& bins, TH1 *input)
 {
 	assert (input != NULL && "requirement failed"); //spec
 	assert (input->GetDimension() == 1 && "requirement failed"); //spec
 	const unsigned nbin = unsigned (input->GetNbinsX ());
 
-	std::auto_ptr<TH1> result (new TH1F (input->GetName(), input->GetTitle(),
+	auto_ptr<TH1> result (new TH1F (input->GetName(), input->GetTitle(),
 						 bins.size() - 1, &bins[0]));
 
 	result->SetBinContent (0, input->GetBinContent (0));
@@ -103,7 +114,7 @@ TH1* MakeVariableBinHist (TH1 *hist, const float xmin, const float xpoint1,
 	assert (hist != NULL && "CommonTools::MakeVariableBinHist:: hist is NULL!");
 	assert (hist->GetDimension() == 1 && "CommonTools::MakeVariableBinHist:: hist is not 1-D");
 	
-  	std::auto_ptr<TH1> result = FillVarBinHist ( 
+  	auto_ptr<TH1> result = FillVarBinHist ( 
 											GetVarBinVector(xmin, xpoint1, xpoint2, 
 															xpoint3, xpoint4, width1, 
 															width2, width3, width4)
@@ -172,17 +183,25 @@ vector<pair<float, float> > GetVals(vector<string> strs, const string sep="-")
 	return bins;
 }
 
-double GetFitFunctionError(TF1* f1, double x) {
-	double err = 0.;
-	Double_t val[1] = { x };
+double GetFitFunctionError(TF1* f1, TFitResultPtr fitResPtr, double val) {
+	TMatrixDSym covMat_ratio1pol2 = fitResPtr->GetCorrelationMatrix();
+//	covMat_ratio1pol2.Print();
 
-	for(Int_t j=0; j<f1->GetNpar(); ++j) 
-	{
-		err += f1->GradientPar(j,val) * f1->GetParError(j);
-		
-		double grad = f1->GradientPar(j,val);
-		double parErr = f1->GetParError(j);
+/*	for(int ir=0; ir<2; ir++){
+		for(int ic=0; ic<2; ic++){
+			std::cout<<"ir : "<<ir<<"  ic : "<<ic<<"  -->  "<<covMat_ratio1pol2(ir, ic)<<std::endl;
+		}
 	}
+	std::cout<<std::endl;
+*/
+//	std::cout<<"\n\nprint out the errors (taking into account of correlation)...??? NOT complete next line!!!!!"<<std::endl;
+	double parErrp0 = fitResPtr->ParError(0), parErrp1 = fitResPtr->ParError(1);
+//	printf("parErrp0 : %9.5e  parErrp1 : %9.5e\n", parErrp0, parErrp1);
+
+	const double err = sqrt( val*val*parErrp1*parErrp1*covMat_ratio1pol2(1, 1)*covMat_ratio1pol2(1, 1) + parErrp0*parErrp0*covMat_ratio1pol2(0, 0)*covMat_ratio1pol2(0, 0) + 2*val*parErrp0*parErrp1*covMat_ratio1pol2(0, 1) );
+	double centralVal = f1->Eval(val);
+
+//	cout << __FUNCTION__ << ": val/err = " << centralVal << "/" << err << endl;
 
 	return err;
 }
@@ -228,13 +247,15 @@ abcdMethod::abcdMethod()
 {
 
 	Nsyst = 6;
-	b_doSystematics = false;
+	b_doSystematics = true;
 	//numHistName = "smeared_failFineBin1";
 	//denHistName = "smeared_signalFineBin";
 	numHistName = "smeared_signal";
 	denHistName = "smeared_fail1";
 	controlHistName = "smeared_failFineBin1";
 	signalHistName = "smeared_signalFineBin";
+	controlsyst1HistName = "smeared_sidebandSyst1_fineBin";
+	//controlsyst2HistName = "smeared_sidebandSyst2_fineBin";
 	
 	canvas_for_ratios = new TCanvas("canvas_for_ratios","Canvas for Ratio Plots");
 	gPad->SetLogy();
@@ -262,6 +283,7 @@ abcdMethod::~abcdMethod()
 	stringstream epsclose, epsclosefordebug;
 	epsclose << epsfile_for_ratios << "]";
 	epsclosefordebug << epsfile_for_debug << "]";
+	canvas_for_ratios->Clear();
 	canvas_for_ratios->Print(epsclose.str().c_str());
 	canvas_for_debug->Print(epsclosefordebug.str().c_str());
 	delete canvas_for_ratios;
@@ -306,8 +328,9 @@ TH1* abcdMethod::GetRatioHist(TFile* f, const string path_to_hist, const bool de
 	}
 
 
-	//const float xmin = 50, xpoint1 = 160, xpoint2 = 200, xpoint3 = 500, xpoint4 = 1100, width1 = 10, width2 = 40, width3 = 150, width4 = 300;
-	const float xmin = 50, xpoint1 = 120, xpoint2 = 200, xpoint3 = 500, xpoint4 = 1100, width1 = 10, width2 = 20, width3 = 150, width4 = 300;
+	//const float xmin = 50, xpoint1 = 120, xpoint2 = 200, xpoint3 = 500, xpoint4 = 1100, width1 = 10, width2 = 20, width3 = 150, width4 = 300;
+	//const float xmin = 50, xpoint1 = 160, xpoint2 = 300, xpoint3 = 400, xpoint4 = 1100, width1 = 10, width2 = 20, width3 = 100, width4 = 350;
+	const float xmin = 50, xpoint1 = 160, xpoint2 = 300, xpoint3 = 400, xpoint4 = 1100, width1 = 10, width2 = 20, width3 = 50, width4 = 50;
 	h_num = MakeVariableBinHist (h_num, xmin, xpoint1, xpoint2, xpoint3, xpoint4, width1, width2, width3, width4);
 	h_den = MakeVariableBinHist (h_den, xmin, xpoint1, xpoint2, xpoint3, xpoint4, width1, width2, width3, width4);
 
@@ -325,13 +348,6 @@ TH1* abcdMethod::GetRatioHist(TFile* f, const string path_to_hist, const bool de
 	TH1* ratio = dynamic_cast<TH1*> (ratio2->Clone("final"));
 	ratio->SetDirectory(0);
 
-	if (debug)
-	{
-		new TCanvas();
-		gPad->SetTitle("ratio hist");
-		ratio->Draw();
-		gPad->SetEditable(0);
-	}
 	return ratio;
 }
 
@@ -352,6 +368,8 @@ void abcdMethod::AddInput(const string rootFileName,const string path_to_hist, c
 	input.hist_ratio = GetRatioHist(input.file, path_to_hist, debug);
 	input.gaus_func = 0;
 	input.exp_func = 0;
+	input.gaus_fitResPtr = 0;
+	input.exp_fitResPtr = 0;
 
 	input.hist_ratio->Print();
 
@@ -376,10 +394,36 @@ void abcdMethod::Run()
 
 	for (unsigned i=0; i < vg_Inputs.size(); ++i)
 	{
-		GetFits(vg_Inputs.at(i).hist_ratio, vg_Inputs.at(i).gaus_func,  vg_Inputs.at(i).exp_func, vg_Inputs.at(i).legText);
+		//one fit per jet bin.
+		stringstream str_njetrange, legText;
+		str_njetrange <<  vg_Inputs.at(i).njetrange.at(0).first << "-" << vg_Inputs.at(i).njetrange.at(0).second << " Jets "; 
+		legText <<  str_njetrange.str() <<  ": Default conditions for 'C'";
+		//GetFits(vg_Inputs.at(i).hist_ratio, vg_Inputs.at(i).gaus_func,  vg_Inputs.at(i).exp_func, vg_Inputs.at(i).legText);
+		GetFits(vg_Inputs.at(i).hist_ratio, 
+					vg_Inputs.at(i).gaus_func,  
+					vg_Inputs.at(i).gaus_fitResPtr,  
+					vg_Inputs.at(i).exp_func, 
+					vg_Inputs.at(i).exp_fitResPtr, 
+					legText.str());
+
+		if (b_doSystematics)
+		{
+			for (int s=0; s <Nsyst; ++s)
+			{
+				stringstream systtype;
+				systtype << str_njetrange.str() << ": " << SystName(s) << " (Syst " << (s+1) << ")";
+				GetFits(vg_Inputs.at(i).Systs.at(s).hist_ratio, 
+						vg_Inputs.at(i).Systs.at(s).gaus_func, 
+						vg_Inputs.at(i).Systs.at(s).gaus_fitResPtr, 
+						vg_Inputs.at(i).Systs.at(s).exp_func,
+						vg_Inputs.at(i).Systs.at(s).exp_fitResPtr,
+						systtype.str() );
+			}
+		}
 
 
-		//GET RESULTS
+
+		//GET RESULTS for each of the search bins
 		for (unsigned jetbin = 0; jetbin < vg_Inputs.at(i).njetrange.size(); ++jetbin)
 		{
 			for (unsigned htbin = 0; htbin < vg_Inputs.at(i).htrange.size(); ++htbin)
@@ -394,6 +438,7 @@ void abcdMethod::Run()
 					GetPredictions(
 							mht_min, mht_max, 
 							vg_Inputs.at(i).gaus_func,	
+							vg_Inputs.at(i).gaus_fitResPtr,	
 							vg_Inputs.at(i).hist_signal_finebin.at(jetbin).at(htbin),
 							vg_Inputs.at(i).hist_control_finebin.at(jetbin).at(htbin),
 							vg_Inputs.at(i).results.at(jetbin).at(htbin).at(mhtbin).first );
@@ -401,6 +446,7 @@ void abcdMethod::Run()
 					GetPredictions(
 							mht_min, mht_max, 
 							vg_Inputs.at(i).exp_func,	
+							vg_Inputs.at(i).exp_fitResPtr,	
 							vg_Inputs.at(i).hist_signal_finebin.at(jetbin).at(htbin),
 							vg_Inputs.at(i).hist_control_finebin.at(jetbin).at(htbin),
 							vg_Inputs.at(i).results.at(jetbin).at(htbin).at(mhtbin).second );
@@ -418,27 +464,33 @@ void abcdMethod::Run()
 							stringstream systtype;
 							systtype << "Syst " << (s+1);
 
-							GetFits(vg_Inputs.at(i).Systs.at(jetbin).at(htbin).at(mhtbin).at(s).hist_ratio, 
-									vg_Inputs.at(i).Systs.at(jetbin).at(htbin).at(mhtbin).at(s).gaus_func, 
-									vg_Inputs.at(i).Systs.at(jetbin).at(htbin).at(mhtbin).at(s).exp_func,
-									systtype.str());
+							GetPredictions(
+									mht_min, mht_max, 
+									//vg_Inputs.at(i).Systs.at(jetbin).at(htbin).at(mhtbin).at(s).gaus_func,	
+									vg_Inputs.at(i).Systs.at(s).gaus_func,	
+									vg_Inputs.at(i).Systs.at(s).gaus_fitResPtr,	
+									vg_Inputs.at(i).hist_signal_finebin.at(jetbin).at(htbin),
+									vg_Inputs.at(i).hist_control_finebin.at(jetbin).at(htbin),
+									//vg_Inputs.at(i).Systs.at(jetbin).at(htbin).at(mhtbin).at(s).res_gaus
+									vg_Inputs.at(i).Systs.at(s).res_gaus
+									);
 
 							GetPredictions(
 									mht_min, mht_max, 
-									vg_Inputs.at(i).Systs.at(jetbin).at(htbin).at(mhtbin).at(s).gaus_func,	
+									//vg_Inputs.at(i).Systs.at(jetbin).at(htbin).at(mhtbin).at(s).exp_func,	
+									vg_Inputs.at(i).Systs.at(s).exp_func,	
+									vg_Inputs.at(i).Systs.at(s).exp_fitResPtr,	
 									vg_Inputs.at(i).hist_signal_finebin.at(jetbin).at(htbin),
 									vg_Inputs.at(i).hist_control_finebin.at(jetbin).at(htbin),
-									vg_Inputs.at(i).Systs.at(jetbin).at(htbin).at(mhtbin).at(s).res_gaus);
+									//vg_Inputs.at(i).Systs.at(jetbin).at(htbin).at(mhtbin).at(s).res_expo
+									vg_Inputs.at(i).Systs.at(s).res_expo
+									);
 
-							GetPredictions(
-									mht_min, mht_max, 
-									vg_Inputs.at(i).Systs.at(jetbin).at(htbin).at(mhtbin).at(s).exp_func,	
-									vg_Inputs.at(i).hist_signal_finebin.at(jetbin).at(htbin),
-									vg_Inputs.at(i).hist_control_finebin.at(jetbin).at(htbin),
-									vg_Inputs.at(i).Systs.at(jetbin).at(htbin).at(mhtbin).at(s).res_expo);
+							//const double alt_pred_gaus =  vg_Inputs.at(i).Systs.at(jetbin).at(htbin).at(mhtbin).at(s).res_gaus.pred_mean;
+							//const double alt_pred_expo =  vg_Inputs.at(i).Systs.at(jetbin).at(htbin).at(mhtbin).at(s).res_expo.pred_mean;
+							const double alt_pred_gaus =  vg_Inputs.at(i).Systs.at(s).res_gaus.pred_mean;
+							const double alt_pred_expo =  vg_Inputs.at(i).Systs.at(s).res_expo.pred_mean;
 
-							const double alt_pred_gaus =  vg_Inputs.at(i).Systs.at(jetbin).at(htbin).at(mhtbin).at(s).res_gaus.pred_mean;
-							const double alt_pred_expo =  vg_Inputs.at(i).Systs.at(jetbin).at(htbin).at(mhtbin).at(s).res_expo.pred_mean;
 
 							c_systTot_gaus2 += pow( fabs(cen_pred_gaus - alt_pred_gaus), 2); 
 							c_systTot_expo2 += pow( fabs(cen_pred_expo - alt_pred_expo), 2); 
@@ -464,6 +516,10 @@ void abcdMethod::Run()
 					vg_Inputs.at(i).results.at(jetbin).at(htbin).at(mhtbin).first.pred_totsysErr = tot_err_gaus;
 					vg_Inputs.at(i).results.at(jetbin).at(htbin).at(mhtbin).second.pred_totsysErr = tot_err_expo;
 
+					//do the sideband selection systematic
+
+
+
 
 				} // mhtbin loop
 
@@ -483,18 +539,17 @@ void abcdMethod::Run()
 
 }
 
-void abcdMethod::GetFits(TH1* ratio_hist, TF1*& gausFit2, TF1*& expFit2, const string optTitleText)
+void abcdMethod::GetFits(TH1* ratio_hist, 
+									TF1*& gausFit2, TFitResultPtr& gausFitResPtr,
+									TF1*& expFit2, TFitResultPtr& expFitResPtr,
+									const string optTitleText)
 {
 
 	if (ratio_hist == NULL)
 	{
 		cout << __FUNCTION__ << ": ratio his is null!" << endl;
 		assert(false);
-	} else {
-		ratio_hist->Print();
 	}
-	//const int maxbin = ratio_hist->GetMaximumBin();
-	//const double max = ratio_hist->GetBinContent(maxbin);
 
 	stringstream newtitle;
 	if (optTitleText.length()>0) newtitle << optTitleText << ";MHT [GeV];Ratio (r);";
@@ -503,14 +558,9 @@ void abcdMethod::GetFits(TH1* ratio_hist, TF1*& gausFit2, TF1*& expFit2, const s
 	canvas_for_ratios->cd();
 	canvas_for_ratios->Clear();
 
-	//new TCanvas();
-	//gPad->SetLogy();
-
 	gStyle->SetOptStat(0);	
-	//new TCanvas();
-	//gPad->SetGridy();
-	//gPad->SetTickx();
-	//gPad->SetLogy();
+	gPad->SetTickx();
+	gPad->SetTicky();
 	ratio_hist->SetLineColor(9);
 	ratio_hist->SetTitle(newtitle.str().c_str());
 	ratio_hist->SetLineWidth(2);
@@ -523,9 +573,10 @@ void abcdMethod::GetFits(TH1* ratio_hist, TF1*& gausFit2, TF1*& expFit2, const s
 
 	//use mean value of the last several bin as the 'C'
 	const double CONST_C = GetAvgVal(ratio_hist, 400);
+	cout << "FOR " << optTitleText << ":CONST_C = " << CONST_C  << endl;
 
 	//do fittings exp and gaus
-	const float C_UPLIMIT = CONST_C+0.00001; //this only to get this values on the stat box
+	//const float C_UPLIMIT = CONST_C+0.00001; //this only to get this values on the stat box
 	const float C_LOLIMIT = CONST_C-0.00001;
 
 	ratio_hist->SetMinimum(C_LOLIMIT/10);
@@ -533,13 +584,13 @@ void abcdMethod::GetFits(TH1* ratio_hist, TF1*& gausFit2, TF1*& expFit2, const s
 	const float fitrange_xmin = 50.0;
 	const float fitrange_xmax = 150.0;
 
-	TF1 *expFit=new TF1("fit_1",expFitFunc,fitrange_xmin,fitrange_xmax,3);
+	TF1 *expFit=new TF1("exp_func",expFitFunc,fitrange_xmin,fitrange_xmax,3);
 	expFit->SetParameter(0,0.09);
 	expFit->SetParameter(1,-0.0002);
 	//expFit->SetParameter(2,CONST_C);
-	expFit->FixParameter(2,CONST_C);
 	//expFit->SetParLimits(2,C_LOLIMIT, C_UPLIMIT);
-	ratio_hist->Fit(expFit,"E0","",fitrange_xmin, fitrange_xmax);
+	expFit->FixParameter(2,CONST_C);
+	expFitResPtr = ratio_hist->Fit(expFit,"E0S","",fitrange_xmin, fitrange_xmax);
 	gPad->Modified();
 	gPad->Update();
 	TPaveStats *e_stats = (TPaveStats*) ratio_hist->FindObject("stats");
@@ -547,36 +598,28 @@ void abcdMethod::GetFits(TH1* ratio_hist, TF1*& gausFit2, TF1*& expFit2, const s
 	TPaveStats *exp_stats = (TPaveStats*) e_stats->Clone("exp_stats");
 
 	//TF1 *expFit2=new TF1("fit_2",expFitFunc,50,1000.0,3);
-	expFit2 = new TF1((*expFit));
-/*	expFit2=new TF1("exp_fit",expFitFunc,50,1000.0,3);
-	expFit2->SetParameter(0,expFit->GetParameter(0));
-	expFit2->SetParameter(1,expFit->GetParameter(1));
-	expFit2->SetParameter(2,expFit->GetParameter(2));
-*/	expFit2->SetLineColor(kRed+1);
+	//expFit2 = new TF1((*expFit));
+	expFit2 = ratio_hist->GetFunction("exp_func");
+	expFit2->SetLineColor(kRed+1);
 	expFit2->SetLineWidth(2);
 	expFit2->SetRange(50,1000);
 
-	TF1 *gausFit=new TF1("fit_3",gausFitFunc,fitrange_xmin, fitrange_xmax,3);
+	TF1 *gausFit=new TF1("gaus_func",gausFitFunc,fitrange_xmin, fitrange_xmax,3);
 	gausFit->SetParameter(0,0.09); 
 	gausFit->SetParameter(1,-0.0002);
 	gausFit->FixParameter(2,CONST_C);
 	//gausFit->SetParameter(2,CONST_C);
 	//gausFit->SetParLimits(2,C_LOLIMIT,C_UPLIMIT);
 	gausFit->SetLineColor(kGreen-2);
-	ratio_hist->Fit(gausFit,"E0","", fitrange_xmin, fitrange_xmax);
+	gausFitResPtr = ratio_hist->Fit(gausFit,"E0S","", fitrange_xmin, fitrange_xmax);
 	gPad->Modified();
 	gPad->Update();
 	TPaveStats *gaus_stats = (TPaveStats*) ratio_hist->FindObject("stats");
 	gaus_stats->SetTextColor(kGreen);
 	//TPaveStats *gaus_stats = (TPaveStats*) g_stats->Clone("gaus_stats");
 
-	//TF1 *gausFit2=new TF1("fit_4",gausFitFunc,50,1000.0,3);
 	gausFit2 = new TF1(*gausFit);
-/*	gausFit2=new TF1("gaus_fit",gausFitFunc,50,1000.0,3);
-	gausFit2->SetParameter(0,gausFit->GetParameter(0)); 
-	gausFit2->SetParameter(1,gausFit->GetParameter(1));
-	gausFit2->SetParameter(2,gausFit->GetParameter(2));
-*/	gausFit2->SetLineColor(kGreen);
+	gausFit2->SetLineColor(kGreen);
 	gausFit2->SetRange(50,1000);
 	gausFit2->SetLineWidth(2);
 
@@ -619,7 +662,7 @@ void abcdMethod::GetFits(TH1* ratio_hist, TF1*& gausFit2, TF1*& expFit2, const s
 	canvas_for_ratios->Modified();
 	canvas_for_ratios->Update();
 	canvas_for_ratios->SetEditable(false);
-	//PrintRatioCanvas();
+	PrintRatioCanvas();
 	canvas_for_ratios->Print(epsfile_for_ratios.c_str());
 	canvas_for_ratios->SetEditable(true);
 
@@ -632,7 +675,9 @@ void abcdMethod::GetFits(TH1* ratio_hist, TF1*& gausFit2, TF1*& expFit2, const s
 }
 
 
-void abcdMethod::GetPredictions(const float& min_mht, const float& max_mht, const TF1* func, const TH1* signalHist, const TH1* controlHist, Predictions_t& pred)
+void abcdMethod::GetPredictions(const float& min_mht, const float& max_mht, 
+									const TF1* func, const TFitResultPtr fitResPtr, 
+									const TH1* signalHist, const TH1* controlHist, Predictions_t& pred)
 {
 	assert(controlHist != NULL && "GetPredictions:: controlHist not found!");
 	assert(func != NULL && "GetPredictions:: function not found!");
@@ -667,15 +712,15 @@ void abcdMethod::GetPredictions(const float& min_mht, const float& max_mht, cons
 			const float binCenter = controlHist->GetBinCenter(bin);
 			if (binCenter >= min_mht && binCenter < max_mht)
 			{
-			 /*cout << std::setprecision(4) << std::setw(5) << bin << std::setw(3) << "[" 
-				<< std::setw(10) << controlHist->GetBinLowEdge(bin) << ", "  << std::setw(10) 
+			 /*cout << setprecision(4) << setw(5) << bin << setw(3) << "[" 
+				<< setw(10) << controlHist->GetBinLowEdge(bin) << ", "  << setw(10) 
 				<< controlHist->GetXaxis()->GetBinUpEdge(bin)<< "]" 
-				<< std::setw(10) << controlHist->GetBinContent(bin) 
-				<< std::setw(10) << f1.Eval(controlHist->GetBinCenter(bin))
-				<< std::setw(10) << controlHist->GetBinContent(bin) * f1.Eval(controlHist->GetBinCenter(bin))
-				<< std::setw(5) << " = " 
-				<< std::setw(10) << signalHist->GetBinWidth(bin)
-				<< std::setw(10) << signalHist->GetBinContent(bin)
+				<< setw(10) << controlHist->GetBinContent(bin) 
+				<< setw(10) << f1.Eval(controlHist->GetBinCenter(bin))
+				<< setw(10) << controlHist->GetBinContent(bin) * f1.Eval(controlHist->GetBinCenter(bin))
+				<< setw(5) << " = " 
+				<< setw(10) << signalHist->GetBinWidth(bin)
+				<< setw(10) << signalHist->GetBinContent(bin)
 				<< endl;
 			*/
 				const float binVal    = controlHist->GetBinContent(bin);
@@ -683,12 +728,12 @@ void abcdMethod::GetPredictions(const float& min_mht, const float& max_mht, cons
 				const float funcVal   = f1.Eval(binCenter);
 				const float expt      = (binVal * funcVal);
 				const float expt_statErr2  = pow(binErr * funcVal, 2);
-				const float expt_fitErr    = binVal * GetFitFunctionError(&f1, binCenter);
+				const float expt_fitErr    = binVal * GetFitFunctionError(&f1, fitResPtr, binCenter);
 				const float binSig         = signalHist->GetBinContent(bin); 
 				const float binSigStatErr2 = pow(signalHist->GetBinError(bin),2); 
 
 				//cout << setprecision(3) << setw(15) << "MHT > " << incMHTBins.at(mhtBin) 
-				//<< setw(20) << binSig  << "&$\\pm$" << binSigStatErr2 << std::endl;
+				//<< setw(20) << binSig  << "&$\\pm$" << binSigStatErr2 << endl;
 
 				res.obs_mean += binSig;
 				res.obs_statErr += binSigStatErr2;
@@ -715,14 +760,15 @@ void abcdMethod::PrintRatioCanvas()
 void abcdMethod::PrintDebugCanvas()
 {
 	cout << "Printing debug canvas.. " << endl;
+	canvas_for_debug->cd();
 	canvas_for_debug->Print(epsfile_for_debug.c_str());
 }
 
 
-void abcdMethod::PrintResults(std::vector< std::pair<float, float> >& njetrange,
-										std::vector< std::pair<float, float> >& htrange,
-										std::vector< std::pair<float, float> >& mhtrange,
-const std::vector< std::vector<std::vector< std::pair<abcdMethod::Predictions_t, abcdMethod::Predictions_t> > > >& results)
+void abcdMethod::PrintResults(vector< pair<float, float> >& njetrange,
+										vector< pair<float, float> >& htrange,
+										vector< pair<float, float> >& mhtrange,
+const vector< vector<vector< pair<abcdMethod::Predictions_t, abcdMethod::Predictions_t> > > >& results)
 {
 	cout <<  "\tNJET""\tHT "
 					<< setw(15) << "MHT"
@@ -737,6 +783,8 @@ const std::vector< std::vector<std::vector< std::pair<abcdMethod::Predictions_t,
 		const float jetmin = njetrange.at(jetbin).first;
 		const float jetmax = njetrange.at(jetbin).second;
 
+		double var_g = 0, var_e = 0;
+
 		for (unsigned htbin = 0; htbin < htrange.size(); ++htbin)
 		{
 
@@ -747,8 +795,8 @@ const std::vector< std::vector<std::vector< std::pair<abcdMethod::Predictions_t,
 				const float mhtmin = mhtrange.at(mhtbin).first;
 				const float mhtmax = mhtrange.at(mhtbin).second;
 
-				const float obs_mean            = results.at(jetbin).at(htbin).at(mhtbin).first.obs_mean;
-				const float obs_statErr         = results.at(jetbin).at(htbin).at(mhtbin).first.obs_statErr;
+				const float obs_mean             = results.at(jetbin).at(htbin).at(mhtbin).first.obs_mean;
+				const float obs_statErr          = results.at(jetbin).at(htbin).at(mhtbin).first.obs_statErr;
 				const float pred_mean_gaus       = results.at(jetbin).at(htbin).at(mhtbin).first.pred_mean;
 				const float pred_statErr_gaus    = results.at(jetbin).at(htbin).at(mhtbin).first.pred_statErr;
 				const float pred_fitErr_gaus     = results.at(jetbin).at(htbin).at(mhtbin).first.pred_fitErr;
@@ -761,7 +809,10 @@ const std::vector< std::vector<std::vector< std::pair<abcdMethod::Predictions_t,
 				const float pred_fitErr_expo     = results.at(jetbin).at(htbin).at(mhtbin).second.pred_fitErr;
 				const float pred_sysErr_expo     = results.at(jetbin).at(htbin).at(mhtbin).second.pred_sysErr;
 				const float pred_totsysErr_expo  = results.at(jetbin).at(htbin).at(mhtbin).second.pred_totsysErr;
-
+				
+				var_g += pow(obs_mean-pred_mean_gaus,2);
+				var_e += pow(obs_mean-pred_mean_expo,2);
+	
 				cout << setprecision(4) 
 					<< "\t" << jetmin << "-" << jetmax 
 					<< "\t" << htmin << "-" << htmax 
@@ -773,20 +824,24 @@ const std::vector< std::vector<std::vector< std::pair<abcdMethod::Predictions_t,
 					<< endl;
 			}
 		}
+		double sig_g = var_g /double (htrange.size()+ mhtrange.size());
+		double sig_e = var_e /double (htrange.size()+ mhtrange.size());
+		cout << "Variation for " << jetmin << "-" << jetmax << ": gaus/exp = " << sig_g << "/" << sig_e << endl; 
+
 	}
 }
 
 void abcdMethod::SetSearchBinInfo( 
-			std::vector< std::pair<float, float> >& njetrange,
-			std::vector< std::pair<float, float> >& htrange,
-			std::vector< std::pair<float, float> >& mhtrange,
-			std::vector< std::vector<std::vector< std::pair<abcdMethod::Predictions_t, abcdMethod::Predictions_t> > > >& results, 
+			vector< pair<float, float> >& njetrange,
+			vector< pair<float, float> >& htrange,
+			vector< pair<float, float> >& mhtrange,
+			vector< vector<vector< pair<abcdMethod::Predictions_t, abcdMethod::Predictions_t> > > >& results, 
 			const string searchbins)
 {
 	string str(searchbins);
 
 	//search for spaces and remove them
-	//str.erase(std::remove_if(str.begin(), str.end(), isspace), str.end());
+	//str.erase(remove_if(str.begin(), str.end(), isspace), str.end());
 	if (str.find(" ") != string::npos)
 	{
 		cout << __FUNCTION__ << ": Input search bins has a space. please remove it!!!" << endl;
@@ -877,9 +932,9 @@ void abcdMethod::SetSearchBinInfo(
 }
 
 void abcdMethod::GetSignalHist(TFile *f, vector< vector<TH1*> > & signalHists, 
-										std::vector< std::pair<float, float> >& njetrange,
-										std::vector< std::pair<float, float> >& htrange,
-										std::vector< std::pair<float, float> >& mhtrange,
+										vector< pair<float, float> >& njetrange,
+										vector< pair<float, float> >& htrange,
+										vector< pair<float, float> >& mhtrange,
 										const string path_to_hist, const bool debug)
 {
 
@@ -932,9 +987,9 @@ void abcdMethod::GetSignalHist(TFile *f, vector< vector<TH1*> > & signalHists,
 //in the smear_signal (should be smeared_signal
 
 void abcdMethod::GetControlHist(TFile *f, vector< vector<TH1*> > & controlHists, 
-										std::vector< std::pair<float, float> >& njetrange,
-										std::vector< std::pair<float, float> >& htrange,
-										std::vector< std::pair<float, float> >& mhtrange,
+										vector< pair<float, float> >& njetrange,
+										vector< pair<float, float> >& htrange,
+										vector< pair<float, float> >& mhtrange,
 										const string path_to_hist, const bool debug)
 {
 
@@ -980,21 +1035,22 @@ void abcdMethod::GetControlHist(TFile *f, vector< vector<TH1*> > & controlHists,
 }
 
 void abcdMethod::InitSysts(
-			std::vector< std::vector< std::vector< std::vector< abcdMethod::Syst_t > > > > & systs, 
-			std::vector< std::pair<float, float> >& njetrange,
-			std::vector< std::pair<float, float> >& htrange,
-			std::vector< std::pair<float, float> >& mhtrange,
-			const std::string path_to_hist, const bool debug)
+			//vector< vector< vector< vector< abcdMethod::Syst_t > > > > & systs, 
+			vector< abcdMethod::Syst_t > & systs, 
+			vector< pair<float, float> >& njetrange,
+			vector< pair<float, float> >& htrange,
+			vector< pair<float, float> >& mhtrange,
+			const string path_to_hist, const bool debug)
 {
 
-	for (unsigned jetbin = 0; jetbin < njetrange.size(); ++jetbin)
-	{
-		vector<vector<vector< Syst_t > > > vSyst_ht;
-		for (unsigned htbin = 0; htbin < htrange.size(); ++htbin)
-		{
-			vector< vector<Syst_t> > vSyst_mht;
-			for (unsigned mhtbin = 0; mhtbin < mhtrange.size(); ++mhtbin)
-			{
+//	for (unsigned jetbin = 0; jetbin < njetrange.size(); ++jetbin)
+//	{
+//		vector<vector<vector< Syst_t > > > vSyst_ht;
+//		for (unsigned htbin = 0; htbin < htrange.size(); ++htbin)
+//		{
+//			vector< vector<Syst_t> > vSyst_mht;
+//			for (unsigned mhtbin = 0; mhtbin < mhtrange.size(); ++mhtbin)
+//			{
 
 				//const string systfilepath("Systematics/Syst");
 				const string systfilepath("Syst");
@@ -1020,6 +1076,8 @@ void abcdMethod::InitSysts(
 					syst.hist_ratio = GetRatioHist(syst.file, path_to_hist, debug);
 					syst.gaus_func = 0;
 					syst.exp_func  = 0;
+					syst.gaus_fitResPtr = 0;
+					syst.exp_fitResPtr  = 0;
 					syst.gaus_sys  = 0;
 					syst.exp_sys   = 0;
 					
@@ -1040,14 +1098,15 @@ void abcdMethod::InitSysts(
 					syst.res_expo.pred_sysErr = large_neg_number;
 					syst.res_expo.pred_totsysErr = large_neg_number;
 
-					vSyst.push_back(syst);
+					systs.push_back(syst);
+//					vSyst.push_back(syst);
 				}
-				vSyst_mht.push_back(vSyst);
-			}
-			vSyst_ht.push_back(vSyst_mht);
-		}
-		systs.push_back(vSyst_ht);
-	} //jet loop
+//				vSyst_mht.push_back(vSyst);
+//			}
+//			vSyst_ht.push_back(vSyst_mht);
+//		}
+//		systs.push_back(vSyst_ht);
+//	} //jet loop
 	
 
 }
