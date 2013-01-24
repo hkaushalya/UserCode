@@ -63,10 +63,13 @@ class FactorizationBySmearing : public NtupleSelector {
 			TH2D *h_DphiMinVsMht;
 			vector<TH1D*> pass;
 			vector<TH1D*> passFineBin;
+			vector<TH1D*> pass_trigPrescales;
 			vector<TH1D*> fail;
+			vector<TH1D*> fail_trigPrescales;
 			vector<TH1D*> failFineBin;
 			TH1D* signal;
 			TH1D* signalFineBin;
+			TH1D* signal_trigPrescales;
 			TH1D* sidebandSyst[2];
 			TH1D* sidebandSystFineBin[2];
 		};
@@ -152,7 +155,7 @@ FactorizationBySmearing::FactorizationBySmearing(
 
 	//HtBins_.push_back(0);
 	HtBins_.push_back(500);
-	HtBins_.push_back(750);
+	HtBins_.push_back(800);
 	HtBins_.push_back(1000);
 	HtBins_.push_back(1250);
 	HtBins_.push_back(1500);
@@ -200,6 +203,12 @@ FactorizationBySmearing::FactorizationBySmearing(
 
 	//List all the triggers to be used for data WITHOUT wildcards (i.e. * )
 
+
+//2012AJuly13 rereco
+//2012Aaug6
+//2012bjULY13reco
+//2012Cprompteco
+//2012C_rereco
 //HLTPathsByName_[0] = HLT_HT*");
 vTriggersToUse.push_back("HLT_HT200_v");
 vTriggersToUse.push_back("HLT_HT250_v");
@@ -216,8 +225,6 @@ vTriggersToUse.push_back("HLT_PFHT350_v");
 vTriggersToUse.push_back("HLT_PFHT650_v");
 vTriggersToUse.push_back("HLT_PFHT700_v");
 vTriggersToUse.push_back("HLT_PFHT750_v");
-
-//need to add triggers for other run periods as well
 
 
 	if (! ready) 
@@ -272,7 +279,7 @@ FactorizationBySmearing::~FactorizationBySmearing() {
 	oFile->Write();
 	oFile->Close();
 
-   if (smearFunc_) delete smearFunc_;
+   if (bRUNNING_ON_MC && smearFunc_) delete smearFunc_;
 }
 
 double FactorizationBySmearing::DeltaPhi(double phi1, double phi2) {
