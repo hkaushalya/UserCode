@@ -33,6 +33,16 @@ static bool sort_using_less_than(double u, double v)
 	   return u < v;
 }
 
+void PrintVector(const vector<double>& v)
+{
+	for (unsigned i=0; i < v.size(); ++i)
+	{
+		cout << v.at(i);
+		if (i+1<v.size()) cout << ",";
+		else cout << endl;
+	}
+}
+
 int main(int argc, char* argv[])
 {
 	//cout << __FUNCTION__ << ": number of arguments = " << argc << endl;
@@ -104,15 +114,23 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 	}
 
 	bRUNNING_ON_MC = true;
+	bDO_TRIG_PRESCALING = false;
+	//sanity check
+	if (bRUNNING_ON_MC && bDO_TRIG_PRESCALING)
+	{
+		cout << __FUNCTION__ << ": Contrdicting settings. Can't run on MC with TriggerPrescaling!! (bRUNNING_ON_MC = " 
+						<< bRUNNING_ON_MC << ", bDO_TRIG_PRESCALING = " << bDO_TRIG_PRESCALING << endl;
+		return;
+	}
 	bDEBUG = false;
 	const double dDATA_LUMI = 10000.0; // 10 fb-1
 	//const double lumiWgt = GetLumiWgt(datasetname, dDATA_LUMI); 
 	const double lumiWgt = 1; 
 	applyDphiCut_        = 1;
 	//unsigned nTries_     = (unsigned) max((double)1000 * NJet50_min_ * 2 , 5000.0) ; //number of pseudo experiments per event
-	//unsigned nTries_     = 5000; //number of pseudo experiments per event
-	unsigned nTries_     = 1; //number of pseudo experiments per event
+	unsigned nTries_     = 5000; //number of pseudo experiments per event
 	if (bDEBUG) nTries_  = 1;
+
 	const double smearingWgt = 1.0/(double)nTries_;
 
 	std::cout << red << "Dataset = " << datasetname << endl;
@@ -126,41 +144,81 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 	{
 		smearFunc_ = new SmearFunction();
 
-		if (systematicVarition>0)
-		{
+		//according to Kristin's config file this is always false
+//		if (systematicVarition>0)
+//		{
 			absoluteTailScaling_ = false;  //false for systematics
-		} else {
-			absoluteTailScaling_ = true; 
-		}
+//		} else {
+//			absoluteTailScaling_ = true; 
+//		}
 		smearFunc_->SetAbsoluteTailScaling(absoluteTailScaling_);
 
-		const float sysVarScale = 2.0; //this is the default 
+//		const float sysVarScale = 2.0; //this is the default 
 		//const float sysVarScale = 5.0;  //this is what is used in 2010 note
-		const float systvarLowFactor = 1.0 / sysVarScale;
-		const float systvarHiFactor  = 1.0 * sysVarScale;
+//		const float systvarLowFactor = 1.0 / sysVarScale;
+//		const float systvarHiFactor  = 1.0 * sysVarScale;
+
+
+		//these are the dafault (or mean)
+		const double ptBinEdges[] = {0, 220, 270, 300, 350, 500, 2200};
+		const double etaBinEdges[]= {0, 0.5, 1.1,  1.7, 2.3, 5.0};
+		const double tailScales[] = {0.953,1.418,1.156,1.305,1.342,1.353,1.096,1.083,1.083,1.195,1.248,1.248,0.965,1.035,1.035,1.035,1.358,1.358,0.938,1.196,1.196,1.196,1.196,1.196,1.069,1.069,1.069,1.069,1.069,1.069};
+		const double additionalSmearing[] = {1.052,1.052,1.052,1.052,1.052,1.052,1.057,1.057,1.057,1.057,1.057,1.057,1.096,1.096,1.096,1.096,1.096,1.096,1.134,1.134,1.134,1.134,1.134,1.134,1.288,1.288,1.288,1.288,1.288,1.288};
+		vector<double> vPtBinEdges(ptBinEdges, ptBinEdges + sizeof(ptBinEdges) / sizeof(double));
+		vector<double> vEtaBinEdges(etaBinEdges, etaBinEdges + sizeof(etaBinEdges) / sizeof(double));
+		vector<double> vTailScales(tailScales, tailScales + sizeof(tailScales) / sizeof(double));
+		vector<double> vAdditionalSmearing(additionalSmearing, additionalSmearing + sizeof(additionalSmearing) / sizeof(double));
+
+		smearFunc_->SetPtBinEdges_scaling(vPtBinEdges);
+		smearFunc_->SetEtaBinEdges_scaling(vEtaBinEdges);
+		smearFunc_->SetLowerTail_scaling(vTailScales);
+		smearFunc_->SetUpperTail_scaling(vTailScales);
+		smearFunc_->SetAdditionalSmear_scaling(vAdditionalSmearing);
+		smearFunc_->UncertaintyName("Mean");
+
+
+		//no vary scaling to do the systemtatics by resetting some
+		//of the scalings.
 
 		switch (systematicVarition)
 		{
-			case 1:
-				smearFunc_->SetUpperTailScalingVariation(systvarLowFactor);
+			case 1: //tailUP
+			{
+				const double tailScales_1[] = {1.236,1.92,1.505,1.655,1.735,1.703,1.47,1.455,1.455,1.52,1.672,1.672,1.298,1.33,1.33,1.33,1.685,1.685,1.224,1.621,1.621,1.621,1.621,1.621,1.839,1.839,1.839,1.839,1.839,1.839};
+				vector<double> vTailScales_1(tailScales_1, tailScales_1 + sizeof(tailScales_1) / sizeof(double));
+				smearFunc_->SetLowerTail_scaling(vTailScales_1);
+				smearFunc_->SetUpperTail_scaling(vTailScales_1);
+				smearFunc_->UncertaintyName("tailUP");
 				break;
-			case 2:
-				smearFunc_->SetUpperTailScalingVariation(systvarHiFactor);
+			}
+
+			case 2: //tailDOWN
+			{
+				const double tailScales_1[] = {0.67,0.916,0.807,0.955,0.949,1.003,0.722,0.711,0.711,0.87,0.824,0.824,0.632,0.74,0.74,0.74,1.031,1.031,0.652,0.771,0.771,0.771,0.771,0.771,0.299,0.299,0.299,0.299,0.299,0.299};
+				vector<double> vTailScales_1(tailScales_1, tailScales_1 + sizeof(tailScales_1) / sizeof(double));
+				smearFunc_->SetLowerTail_scaling(vTailScales_1);
+				smearFunc_->SetUpperTail_scaling(vTailScales_1);
+				smearFunc_->UncertaintyName("tailDOWN");
 				break;
-			case 3:
-				smearFunc_->SetLowerTailScalingVariation(systvarLowFactor);
+			}
+
+			case 3:  //coreUP
+			{
+				const double additionalSmearing_1[] = {1.116,1.116,1.116,1.116,1.116,1.116,1.117,1.117,1.117,1.117,1.117,1.117,1.166,1.166,1.166,1.166,1.166,1.166,1.237,1.237,1.237,1.237,1.237,1.237,1.511,1.511,1.511,1.511,1.511,1.511}; 
+				vector<double> vAdditionalSmearing_1(additionalSmearing_1, additionalSmearing_1 + sizeof(additionalSmearing_1) / sizeof(double));
+				smearFunc_->SetAdditionalSmear_scaling(vAdditionalSmearing_1);
+				smearFunc_->UncertaintyName("coreUP");
 				break;
-			case 4:
-				smearFunc_->SetLowerTailScalingVariation(systvarHiFactor);
+			}
+
+			case 4:  //coreDOWN
+			{
+				const double additionalSmearing_1[] = {0.988,0.988,0.988,0.988,0.988,0.988,0.999,0.999,0.999,0.999,0.999,0.999,0.998,0.998,0.998,0.998,0.998,0.998,1.033,1.033,1.033,1.033,1.033,1.033,1.067,1.067,1.067,1.067,1.067,1.067};
+				vector<double> vAdditionalSmearing_1(additionalSmearing_1, additionalSmearing_1 + sizeof(additionalSmearing_1) / sizeof(double));
+				smearFunc_->SetAdditionalSmear_scaling(vAdditionalSmearing_1);
+				smearFunc_->UncertaintyName("coreDOWN");
 				break;
-			case 5:
-				smearFunc_->SetAdditionalSmearingVariation(0.9);
-				//smearFunc_->SetAdditionalSmearingVariation(0.8); //20% as in 2010 note
-				break;
-			case 6:
-				smearFunc_->SetAdditionalSmearingVariation(1.1);
-				//smearFunc_->SetAdditionalSmearingVariation(1.2); //20% as in 2012 note
-				break;
+			}
 		}
 
 		BookJerDebugHists();
@@ -201,20 +259,29 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		const double evtWeight = t_EvtWeight; //==1 except for Flat QCD sample
 		
 		CreateRecoJetVec(recoJets);
+
+		/******************************************************
+		 * For MC;   recoEvtTotWgt = lumiWgt * evtWeight
+		 * For DATA; recoEvtTotWgt = trigPrescaleWeight
+		 *****************************************************/
 		double recoEvtTotWgt = 1;
 		if (bRUNNING_ON_MC) recoEvtTotWgt = lumiWgt * evtWeight;
 		else 
 		{
 			bool passTrigger = true;
-			recoEvtTotWgt = 1; //temporary
-			//TrigPrescaleWeight(passTrigger, recoEvtTotWgt); 
-			//if (! passTrigger) 
-			//{
-			//	cout << "Failed trigger " << endl;
-			//	continue;   //when running on data accept event passing trigger only
-			//} else {
-			//	cout << "Passed trigger " << endl;
-			//}
+			if (bDO_TRIG_PRESCALING)
+			{
+				TrigPrescaleWeight(passTrigger, recoEvtTotWgt); 
+				if (! passTrigger) 
+				{
+					if (bDEBUG) cout << "Failed trigger " << endl;
+					continue;   //when running on data accept event passing trigger only
+				} else {
+					if (bDEBUG) cout << "Passed trigger " << endl;
+				}
+			} else { 
+				recoEvtTotWgt = 1; //no trigger prescaling is applied
+			}
 		}
 
 		const bool accept_reco_evt = FillHistogram(recoJets,0, recoEvtTotWgt);
@@ -463,7 +530,12 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		  gPad->Print("JERs.eps]");
 		  */
 	}
-	//end job summary
+
+
+	/***********************************************
+	 *  End job summary
+	 **********************************************/
+
 	cout << ">>>>>>> " << __FILE__ << ":" << __FUNCTION__ << ": End Job " << endl;
 	if (bDEBUG) cout << red << " ------ DEBUG MODE ---------- " << clearatt << endl;
 	cout << red <<  "MC Flag  ------------- = " << bRUNNING_ON_MC << clearatt << endl;
@@ -475,6 +547,18 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		cout << "Smear wgt              = " << smearingWgt << endl;
 		cout << "nTries_                = " << nTries_ << endl;
 		cout << "smearedJetPt_          = " << smearedJetPt_ << endl;
+	} else {
+		cout << "bDO_TRIG_PRESCALING    = " << bDO_TRIG_PRESCALING << endl;
+		if (bDO_TRIG_PRESCALING)
+		{
+			cout << "Trigger selection      = ";
+			for (unsigned int i =0; i < vTriggersToUse.size(); ++i)
+			{
+				cout << vTriggersToUse.at(i);
+				if (i+1<vTriggersToUse.size()) cout << "/";
+				else cout << endl;
+			}
+		}
 	}
 	cout << "applyDphiCut_          = " << applyDphiCut_ << endl;
 	//cout << "NJet50_min_            = " << NJet50_min_ << endl;
@@ -498,10 +582,24 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		if (bSystematicMode) {	
 			cout << red << " >>>> SYSTEMATIC MODE <<<< " << endl;
 		}
+		cout << "Uncertainty Mode       = " << smearFunc_->GetUncertaintyName() << endl;
+		vector<double> values;
+		values = smearFunc_->GetPtBinEdges_scaling();
+		cout << "PtBinEdges_scaling     = "; PrintVector(values);
+		values = smearFunc_->GetEtaBinEdges_scaling();
+		cout << "EtaBinEdges_scaling    = "; PrintVector(values);
+		values = smearFunc_->GetLowerTail_scaling();
+		cout << "LowerTail_scaling      = "; PrintVector(values);
+		values = smearFunc_->GetUpperTail_scaling();
+		cout << "UpperTail_scaling      = "; PrintVector(values);
+		values = smearFunc_->GetAdditionalSmear_scaling();
+		cout << "Additional Smearing    = "; PrintVector(values);
+
 		cout << "AbsoluteTailScaling_val= " << absTailScalingFact_val << " (false = systematic mode)" << endl;
 		cout << "LowerTailScaling_val   = " << lowerTailScalingFact_val << endl;
 		cout << "UpperTailScaling_val   = " << upperTailScalingFact_val << endl;
 		cout << "AdditionalSmearing_val = " << additionalSmearingFact_val << endl;
+
 		if (bSystematicMode) {	
 			cout << clearatt << endl;
 		}
