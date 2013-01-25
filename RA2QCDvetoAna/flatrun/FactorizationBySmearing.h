@@ -88,6 +88,7 @@ class FactorizationBySmearing : public NtupleSelector {
 	private:
 		bool bDEBUG;
 		bool bRUNNING_ON_MC;
+		bool bDO_TRIG_PRESCALING;
 		SmearFunction *smearFunc_;
 		double smearedJetPt_;
 		std::vector<double> PtBinEdges_scaling_;
@@ -210,17 +211,19 @@ FactorizationBySmearing::FactorizationBySmearing(
 //2012Cprompteco
 //2012C_rereco
 //HLTPathsByName_[0] = HLT_HT*");
-vTriggersToUse.push_back("HLT_HT200_v");
-vTriggersToUse.push_back("HLT_HT250_v");
-vTriggersToUse.push_back("HLT_HT300_v");
-vTriggersToUse.push_back("HLT_HT350_v");
-vTriggersToUse.push_back("HLT_HT400_v");
-vTriggersToUse.push_back("HLT_HT450_v");
-vTriggersToUse.push_back("HLT_HT500_v");
-vTriggersToUse.push_back("HLT_HT550_v");
-vTriggersToUse.push_back("HLT_HT650_v");
-vTriggersToUse.push_back("HLT_HT750_v");
+//vTriggersToUse.push_back("HLT_HT200_v");
+//vTriggersToUse.push_back("HLT_HT250_v");
+//vTriggersToUse.push_back("HLT_HT300_v");
+//vTriggersToUse.push_back("HLT_HT350_v");
+//vTriggersToUse.push_back("HLT_HT400_v");
+//vTriggersToUse.push_back("HLT_HT450_v");
+//vTriggersToUse.push_back("HLT_HT500_v");
+//vTriggersToUse.push_back("HLT_HT550_v");
+//vTriggersToUse.push_back("HLT_HT650_v");
+//vTriggersToUse.push_back("HLT_HT750_v");
 //HLTPathsByName_[1] = HLT_PFHT*");
+//Kristin confirmed that she is only using HLT_PFHT triggers.
+//No jet triggers are used either. Jan 25th, 2013
 vTriggersToUse.push_back("HLT_PFHT350_v");
 vTriggersToUse.push_back("HLT_PFHT650_v");
 vTriggersToUse.push_back("HLT_PFHT700_v");
