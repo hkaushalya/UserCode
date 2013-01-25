@@ -180,8 +180,6 @@ void SmearFunction::CalculateSmearFunctions() {
                   TH1F* hResponseFit = new TH1F(*smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt));
 						hResponseFit->SetDirectory(0);
 
-						//I am temporily commenting out this part to actually use the original histogram
-						//to generate random sampling. sam: 10-11-2012
                   hResponseFit->Reset();
                   for (int i = 0; i < hResponseFit->GetNbinsX(); ++i) {
                      hResponseFit->SetBinContent(i, fitfunction->Eval(hResponseFit->GetBinCenter(i)));
