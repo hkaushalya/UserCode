@@ -99,25 +99,43 @@ private:
 	unsigned uResFuncCollType_; //default=0 (JetAll), jet Ranked=1
 
 public:
-	vector<double>* GetPtBinEdges() { return &PtBinEdges_; }
-	vector<double>* GetEtaBinEdges() { return &EtaBinEdges_; }
+
+
+	string SmearingFile() const { return smearingfile_; }
+	void SetResFuncColl(const unsigned i);
+	unsigned GetResFuncCollType() const { return uResFuncCollType_; }
 
 	//setters (override default settings)
 	void SetPtBinEdges(const vector<double> ptBins);
 	void SetEtaBinEdges(const vector<double> etaBins);
 
-	void SetAbsoluteTailScaling(const bool b) { absoluteTailScaling_ = b; }
-	bool GetAbsoluteTailScaling() const { return absoluteTailScaling_; }
-	string SmearingFile() const { return smearingfile_; }
-	void SetResFuncColl(const unsigned i);
+	void SetAbsoluteTailScaling        (const bool  b) { absoluteTailScaling_          = b; }
+   void SetAdditionalSmearingVariation(const float v) { AdditionalSmearing_variation_ = v; }
+   void SetLowerTailScalingVariation  (const float v) { LowerTailScaling_variation_   = v; }
+   void SetUpperTailScalingVariation  (const float v) { UpperTailScaling_variation_   = v; }
 
-   double SetAdditionalSmearingVariation(const float v) { AdditionalSmearing_variation_ = v; }
-   double SetLowerTailScalingVariation(const float v) { LowerTailScaling_variation_ = v; }
-   double SetUpperTailScalingVariation(const float v) { UpperTailScaling_variation_ = v; }
+	void SetPtBinEdges_scaling     (const vector<double>& vec) { PtBinEdges_scaling_  = vec; }
+	void SetEtaBinEdges_scaling    (const vector<double>& vec) { EtaBinEdges_scaling_ = vec; }
+	void SetLowerTail_scaling      (const vector<double>& vec) { LowerTailScaling_    = vec; }
+	void SetUpperTail_scaling      (const vector<double>& vec) { UpperTailScaling_    = vec; }
+	void SetAdditionalSmear_scaling(const vector<double>& vec) { AdditionalSmearing_  = vec; }
+
+	vector<double>* GetPtBinEdges()  { return &PtBinEdges_;  }
+	vector<double>* GetEtaBinEdges() { return &EtaBinEdges_; }
+	bool   GetAbsoluteTailScaling() const { return absoluteTailScaling_; }
    double GetAdditionalSmearingVariation() const { return AdditionalSmearing_variation_; }
-   double GetLowerTailScalingVariation() const { return LowerTailScaling_variation_; }
-   double GetUpperTailScalingVariation() const { return UpperTailScaling_variation_; }
-	unsigned GetResFuncCollType() const { return uResFuncCollType_; }
+   double GetLowerTailScalingVariation  () const { return LowerTailScaling_variation_;   }
+   double GetUpperTailScalingVariation  () const { return UpperTailScaling_variation_;   }
+
+	vector<double> GetPtBinEdges_scaling     () const { return PtBinEdges_scaling_;  }
+	vector<double> GetEtaBinEdges_scaling    () const { return EtaBinEdges_scaling_; }
+	vector<double> GetLowerTail_scaling      () const { return LowerTailScaling_;    }
+	vector<double> GetUpperTail_scaling      () const { return UpperTailScaling_;    }
+	vector<double> GetAdditionalSmear_scaling() const { return AdditionalSmearing_;  }
+
+	void UncertaintyName(const string s) { uncertaintyName_ = s; }
+	string GetUncertaintyName() const { return uncertaintyName_; }
+
 };
 
 #endif
