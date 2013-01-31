@@ -88,7 +88,7 @@ class FactorizationBySmearing : public NtupleSelector {
 	private:
 		bool bDEBUG;
 		bool bRUNNING_ON_MC;
-		bool bDO_TRIG_PRESCALING;
+		bool bDO_TRIG_PRESCALING, bDO_TRIG_SELECTION, bDO_PU_WEIGHING;
 		SmearFunction *smearFunc_;
 		double smearedJetPt_;
 		std::vector<double> PtBinEdges_scaling_;
@@ -100,7 +100,7 @@ class FactorizationBySmearing : public NtupleSelector {
 		double LowerTailScaling_variation_;
 		double UpperTailScaling_variation_;
 		bool absoluteTailScaling_;
-		bool applyDphiCut_; 
+		bool bAPPLY_DPHI_CUT; 
 
 		std::vector<double> HtBins_, MhtBins_;
 		vector < pair<unsigned, unsigned> >JetBins_;
