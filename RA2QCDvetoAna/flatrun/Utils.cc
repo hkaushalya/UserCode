@@ -5,6 +5,7 @@
 #include<string>
 #include <iomanip>
 #include "assert.h"
+#include <stdio.h>
 /*hide boost header files from CINT */
 /*#ifndef __CINT__
 include <boost/foreach.hpp>
@@ -12,6 +13,7 @@ include <boost/tokenizer.hpp>
 #endif
 */
 
+using namespace std;
 bool PtAComparator(const TLorentzVector& a,const TLorentzVector& b)
 {
 	return a.Pt() > b.Pt();
@@ -72,4 +74,22 @@ void DumpHist(const TH1* h)
 		cout << bin << "[" << lox << "-" << hix << "] = " << setw(15) << val << setw(15) << err << endl;  
 	}
 
+}
+/* prints a nice progress bar */
+void printProgBar( int percent ){
+  std::string bar;
+
+  for(int i = 0; i < 50; i++){
+    if( i < (percent/2)){
+      bar.replace(i,1,"=");
+    }else if( i == (percent/2)){
+      bar.replace(i,1,">");
+    }else{
+      bar.replace(i,1," ");
+    }
+  }
+
+  std::cout<< "\r" "[" << bar << "] ";
+  std::cout.width( 3 );
+  std::cout<< percent << "%     " << std::flush;
 }
