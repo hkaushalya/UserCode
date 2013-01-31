@@ -5,6 +5,7 @@
 #include <TPostScript.h>
 #include "TRandom.h"
 #include <cstdlib>
+#include <time.h>
 
 using namespace std;
 
@@ -17,9 +18,11 @@ using namespace std;
 
 SmearFunction::SmearFunction() 
 {
-	cout << __FUNCTION__ << ": Setting Random Seed ... ";
+//	cout << __FUNCTION__ << ": Setting Random Seed ... ";
+	//set a new seed for each job. This is good for jobs starting 
+	//more than second apart or so.
 	gRandom->SetSeed();
-	cout << "first rand#" << gRandom->Rndm() << endl;
+//	cout << "first rand#" << gRandom->Rndm() << endl;
 
    // get parameters from config
    LowerTailScaling_variation_   = 1; 
@@ -88,12 +91,23 @@ SmearFunction::SmearFunction()
    //FillSigmaHistsForRebalancing();
  
    // Get correct dimensions for smear functions
+//   ResizeSmearFunctions();
+
+   // Get/scale/fill smear functions
+ //  CalculateSmearFunctions(); 
+}
+//--------------------------------------------------------------------------
+
+void SmearFunction::Init()
+{
+   // Get correct dimensions for smear functions
    ResizeSmearFunctions();
 
    // Get/scale/fill smear functions
    CalculateSmearFunctions(); 
 }
-//--------------------------------------------------------------------------
+
+
 
 //--------------------------------------------------------------------------
 TH1F* SmearFunction::getSmearFunc(int i_flav, int i_jet, int i_eta, int i_Pt) const {
@@ -120,6 +134,10 @@ void SmearFunction::CalculateSmearFunctions() {
    //// open root file/tree and create SmearingFunction histo
    TFile *f1 = new TFile(smearingfile_.c_str(), "READ", "", 0);
   
+  	time_t seconds, seconds2 ,seconds3, seconds4, seconds5;
+	seconds = time (NULL);
+	cout << "t0 = " << seconds << endl;
+
    //// Fetch histos and fit gaussian core
    for (unsigned int i_Pt = 0; i_Pt < PtBinEdges_.size() - 1; ++i_Pt) {
       for (unsigned int i_eta = 0; i_eta < EtaBinEdges_.size() - 1; ++i_eta) {
@@ -256,6 +274,9 @@ void SmearFunction::CalculateSmearFunctions() {
       }
    }
 
+	cout << __FUNCTION__ << ":" << __LINE__ << endl;
+	seconds2 = time (NULL);
+	cout << "t1 = " << seconds2 << endl;
    //// Fit scaled gaussian sigma as function of pt
    for (unsigned int i_flav = 0; i_flav < 2; ++i_flav) {
       for (unsigned int i_jet = 0; i_jet < 3; ++i_jet) {
@@ -285,6 +306,9 @@ void SmearFunction::CalculateSmearFunctions() {
       }
    }
 
+	cout << __FUNCTION__ << ":" << __LINE__ << endl;
+	seconds3 = time (NULL);
+	cout << "t2 = " << seconds3 << endl;
    //// Fit gaussian sigma as function of pt
    for (unsigned int i_flav = 0; i_flav < 2; ++i_flav) {
       for (unsigned int i_jet = 0; i_jet < 3; ++i_jet) {
@@ -313,10 +337,14 @@ void SmearFunction::CalculateSmearFunctions() {
       }
    }
 
+	cout << __FUNCTION__ << ":" << __LINE__ << endl;
+	seconds4 = time (NULL);
+	cout << "t3 = " << seconds4 << endl;
 	
    //// Book and fill histograms for smeared and scaled response functions
    for (unsigned int i_flav = 0; i_flav < 2; ++i_flav) {
       for (unsigned int i_jet = 0; i_jet < 3; ++i_jet) {
+			cout << "pt/eta BinEdges.szie = " << PtBinEdges_.size() << "/" << EtaBinEdges_.size() << endl;
          for (unsigned int i_Pt = 0; i_Pt < PtBinEdges_.size() - 1; ++i_Pt) {
             for (unsigned int i_eta = 0; i_eta < EtaBinEdges_.size() - 1; ++i_eta) {
                char hname[100];
@@ -367,15 +395,17 @@ void SmearFunction::CalculateSmearFunctions() {
                      int i_max = smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->FindBin(1 - A0RMS_ * RMS);
                      double RLowerTail = smearFunc_LowerTail.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->Integral(i_min, i_max);
                      double Rcore = smearFunc_Core.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->Integral(i_min, i_max);
-                     if (RLowerTail > 0)
+                     if (RLowerTail > 0) {
                         LowerTailScale = (LowerTailScale * (RLowerTail + Rcore) - Rcore) / RLowerTail;
+							}
 
                      i_min = smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->FindBin(1 + A0RMS_ * RMS);
                      i_max = smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->FindBin(1 + A1RMS_ * RMS);
                      double RUpperTail = smearFunc_UpperTail.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->Integral(i_min, i_max);
                      Rcore = smearFunc_Core.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->Integral(i_min, i_max);
-                     if (RUpperTail > 0)
+                     if (RUpperTail > 0) {
                         UpperTailScale = (UpperTailScale * (RUpperTail + Rcore) - Rcore) / RUpperTail;
+							}
 
                   }
                   smearFunc_scaled.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->Add(&smearFunc_Core_tmp);
@@ -387,8 +417,8 @@ void SmearFunction::CalculateSmearFunctions() {
                   if (smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetEntries() > 0) {
                      N = smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->Integral();
                   }
-                  //cout << "Too few entries for (i_Pt, i_eta, i_jet, i_flav): " << i_Pt << ", " << i_eta << ", " << i_jet << ", " << i_flav
-                  //     << ", entries = " << smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetEntries() << endl;
+                  cout << "Too few entries for (i_Pt, i_eta, i_jet, i_flav): " << i_Pt << ", " << i_eta << ", " << i_jet << ", " << i_flav
+                       << ", entries = " << smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetEntries() << endl;
                   for (int j = 1; j <= smearFunc_scaled.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetNbinsX(); ++j) {
                      double pt = (PtBinEdges_.at(i_Pt) + PtBinEdges_.at(i_Pt + 1)) / 2;
                      double g = N * TMath::Gaus(smearFunc_scaled.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetBinCenter(j), 1.,
@@ -404,6 +434,12 @@ void SmearFunction::CalculateSmearFunctions() {
       }
    }
 
+	seconds5 = time (NULL);
+	cout << "t2-t0 = "  << (seconds2 - seconds) << endl;
+	cout << "t3-t2 = "  << (seconds3 - seconds2) << endl;
+	cout << "t4-t3 = "  << (seconds4 - seconds3) << endl;
+	cout << "t5-t4 = "  << (seconds5 - seconds4) << endl;
+	cout << __FUNCTION__ << ":" << __LINE__ << endl;
 }
 //--------------------------------------------------------------------------
 
@@ -478,15 +514,39 @@ void SmearFunction::FillSigmaHistsForRebalancing() {
                double MEAN = smearFunc_total.at(i_jet).at(i_eta).at(i_Pt)->GetMean();
                TF1* fitfunction = new TF1("f", "gaus(0)", MEAN - 1 * RMS, MEAN + 1 * RMS);
                fitfunction->SetParameters(smearFunc_total.at(i_jet).at(i_eta).at(i_Pt)->GetMaximum(), MEAN, RMS);
-               smearFunc_total.at(i_jet).at(i_eta).at(i_Pt)->Fit(fitfunction, "LLRQN");
+               smearFunc_total.at(i_jet).at(i_eta).at(i_Pt)->Fit(fitfunction, "LLRQNM");
+
+             //   if( i_jet == 1 ){
+//                   cout << "Fit Prob:" << fitfunction->GetProb() << endl;
+//                   cout << "fitted mean:" << fitfunction->GetParameter(1) << endl;
+//                   cout << "sigma:" << fitfunction->GetParameter(2) << endl;
+//                   cout << "sigma error:" << fitfunction->GetParError(2) << endl;
+//                   cout << "------------------------" << endl;
+//                }
+
+               double SigmaAfterFit = RMS;
+               double SigmaAfterFitError = smearFunc_total.at(i_jet).at(i_eta).at(i_Pt)->GetRMSError();
+               if( fitfunction->GetParameter(2) < RMS ){
+                  SigmaAfterFit = std::abs(fitfunction->GetParameter(2));
+                  SigmaAfterFitError = fitfunction->GetParError(2);
+               }
+
+              //  cout << "SigmaAfterFit:" << SigmaAfterFit << endl;
+//                cout << "SigmaAfterFitError:" << SigmaAfterFitError << endl;
+
                double Pt = SigmaPtHist_scaled_total.at(i_jet).at(i_eta)->GetBinCenter(i_Pt);
                double eta = (EtaBinEdges_.at(i_eta) + EtaBinEdges_.at(i_eta + 1)) / 2;
                double f = GetAdditionalSmearing(Pt, eta);
-               SigmaPtHist_total.at(i_jet).at(i_eta)->SetBinContent(i_Pt + 1, std::abs(fitfunction->GetParameter(2)));
-               SigmaPtHist_total.at(i_jet).at(i_eta)->SetBinError(i_Pt + 1, fitfunction->GetParError(2));
-               SigmaPtHist_scaled_total.at(i_jet).at(i_eta)->SetBinContent(i_Pt + 1, std::abs(fitfunction->GetParameter(2))
-                                                                           * f);
-               SigmaPtHist_scaled_total.at(i_jet).at(i_eta)->SetBinError(i_Pt + 1, fitfunction->GetParError(2) * f);
+//               SigmaPtHist_total.at(i_jet).at(i_eta)->SetBinContent(i_Pt + 1, std::abs(fitfunction->GetParameter(2)));
+//              SigmaPtHist_total.at(i_jet).at(i_eta)->SetBinError(i_Pt + 1, fitfunction->GetParError(2));
+//              SigmaPtHist_scaled_total.at(i_jet).at(i_eta)->SetBinContent(i_Pt + 1, std::abs(fitfunction->GetParameter(2))
+//                                                                           * f);
+//               SigmaPtHist_scaled_total.at(i_jet).at(i_eta)->SetBinError(i_Pt + 1, fitfunction->GetParError(2) * f);
+
+               SigmaPtHist_total.at(i_jet).at(i_eta)->SetBinContent(i_Pt + 1, SigmaAfterFit);
+               SigmaPtHist_total.at(i_jet).at(i_eta)->SetBinError(i_Pt + 1, SigmaAfterFitError);
+               SigmaPtHist_scaled_total.at(i_jet).at(i_eta)->SetBinContent(i_Pt + 1, SigmaAfterFit * f);
+               SigmaPtHist_scaled_total.at(i_jet).at(i_eta)->SetBinError(i_Pt + 1, SigmaAfterFitError * f);
    
             }
          }
@@ -609,6 +669,7 @@ int SmearFunction::GetIndex(const double& x, const std::vector<double>* vec) {
 
 //--------------------------------------------------------------------------
 void SmearFunction::ResizeSmearFunctions() {
+	cout << __FUNCTION__ << ":" << __LINE__ << endl;
 
    smearFunc.resize(2); //// two bins for jet flavour
    for (std::vector<std::vector<std::vector<std::vector<TH1F*> > > >::iterator ht = smearFunc.begin(); ht != smearFunc.end(); ++ht) {
