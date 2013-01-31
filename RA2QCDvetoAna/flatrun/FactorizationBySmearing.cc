@@ -113,28 +113,45 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		cout << "Requested events to process = " << nentries << endl;
 	}
 
-	bRUNNING_ON_MC = true;
-	bDO_TRIG_PRESCALING = false;
+	bAPPLY_DPHI_CUT      = 0;
+	bRUNNING_ON_MC       = true;
+	bDO_TRIG_SELECTION   = false;
+	bDO_TRIG_PRESCALING  = false;
+	bDO_PU_WEIGHING      = false;
 	//sanity check
-	if (bRUNNING_ON_MC && bDO_TRIG_PRESCALING)
+	if (bRUNNING_ON_MC && (bDO_TRIG_PRESCALING || bDO_TRIG_SELECTION) )
 	{
-		cout << __FUNCTION__ << ": Contrdicting settings. Can't run on MC with TriggerPrescaling!! (bRUNNING_ON_MC = " 
-						<< bRUNNING_ON_MC << ", bDO_TRIG_PRESCALING = " << bDO_TRIG_PRESCALING << endl;
+		cout << __FUNCTION__ << ": Contradicting settings. Can't run on MC with TriggerSelection or TriggerPrescaling or vise-versa!! (bRUNNING_ON_MC = " 
+						<< bRUNNING_ON_MC << ", bDO_TRIG_PRESCALING = " << bDO_TRIG_PRESCALING << ", bDO_TRIG_SELECTION = " << bDO_TRIG_SELECTION << endl;
 		return;
 	}
+
+	if (bDO_TRIG_PRESCALING && ! bDO_TRIG_SELECTION)
+	{
+		cout << __FUNCTION__ << ": Contradicting settings. Require trigger selection inorder to get trigger prescaling! " 
+						<< " bDO_TRIG_PRESCALING = " << bDO_TRIG_PRESCALING <<  " / bDO_TRIG_SELECTION = " << bDO_TRIG_SELECTION << endl;
+		return;
+	}
+
+	if (! bRUNNING_ON_MC && bDO_PU_WEIGHING)
+	{
+		cout << __FUNCTION__ << ": Contradicting settings. PU Weighing can be applied only with MC.! " << endl;
+		return;
+	}
+
+
 	bDEBUG = false;
 	const double dDATA_LUMI = 10000.0; // 10 fb-1
 	//const double lumiWgt = GetLumiWgt(datasetname, dDATA_LUMI); 
 	const double lumiWgt = 1; 
-	applyDphiCut_        = 1;
 	//unsigned nTries_     = (unsigned) max((double)1000 * NJet50_min_ * 2 , 5000.0) ; //number of pseudo experiments per event
-	unsigned nTries_     = 5000; //number of pseudo experiments per event
+	unsigned nTries_     = 1000; //number of pseudo experiments per event
 	if (bDEBUG) nTries_  = 1;
 
 	const double smearingWgt = 1.0/(double)nTries_;
 
-	std::cout << red << "Dataset = " << datasetname << endl;
-	if (bRUNNING_ON_MC) std::cout << "Using lumiWgt / smearingWgt = " << lumiWgt << " / " 
+	std::cout << red << "Dataset = " << datasetname << clearatt << endl;
+	if (bRUNNING_ON_MC) std::cout << red << "Using lumiWgt / smearingWgt = " << lumiWgt << " / " 
 				<< smearingWgt << clearatt << std::endl;
 
 	Long64_t nbytes = 0, nb = 0;
@@ -164,6 +181,14 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		const double etaBinEdges[]= {0, 0.5, 1.1,  1.7, 2.3, 5.0};
 		const double tailScales[] = {0.953,1.418,1.156,1.305,1.342,1.353,1.096,1.083,1.083,1.195,1.248,1.248,0.965,1.035,1.035,1.035,1.358,1.358,0.938,1.196,1.196,1.196,1.196,1.196,1.069,1.069,1.069,1.069,1.069,1.069};
 		const double additionalSmearing[] = {1.052,1.052,1.052,1.052,1.052,1.052,1.057,1.057,1.057,1.057,1.057,1.057,1.096,1.096,1.096,1.096,1.096,1.096,1.134,1.134,1.134,1.134,1.134,1.134,1.288,1.288,1.288,1.288,1.288,1.288};
+
+		//debugging
+/*		const double ptBinEdges[] = {0,7000};
+		const double etaBinEdges[] = {0.0, 5.0};
+		const double tailScales[] = {1.0};
+		const double additionalSmearing[] = {1.0};
+*/
+
 		vector<double> vPtBinEdges(ptBinEdges, ptBinEdges + sizeof(ptBinEdges) / sizeof(double));
 		vector<double> vEtaBinEdges(etaBinEdges, etaBinEdges + sizeof(etaBinEdges) / sizeof(double));
 		vector<double> vTailScales(tailScales, tailScales + sizeof(tailScales) / sizeof(double));
@@ -185,26 +210,56 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 			case 1: //tailUP
 			{
 				const double tailScales_1[] = {1.236,1.92,1.505,1.655,1.735,1.703,1.47,1.455,1.455,1.52,1.672,1.672,1.298,1.33,1.33,1.33,1.685,1.685,1.224,1.621,1.621,1.621,1.621,1.621,1.839,1.839,1.839,1.839,1.839,1.839};
+				//const double tailScales_1[] = {2.0};
 				vector<double> vTailScales_1(tailScales_1, tailScales_1 + sizeof(tailScales_1) / sizeof(double));
+
+				//smearFunc_->SetAbsoluteTailScaling(true);
 				smearFunc_->SetLowerTail_scaling(vTailScales_1);
-				smearFunc_->SetUpperTail_scaling(vTailScales_1);
-				smearFunc_->UncertaintyName("tailUP");
+				//smearFunc_->SetUpperTail_scaling(vTailScales_1);
+				//smearFunc_->UncertaintyName("tailUP");
 				break;
 			}
 
+			case 10: //tailUP
+			{
+				//const double tailScales_1[] = {1.236,1.92,1.505,1.655,1.735,1.703,1.47,1.455,1.455,1.52,1.672,1.672,1.298,1.33,1.33,1.33,1.685,1.685,1.224,1.621,1.621,1.621,1.621,1.621,1.839,1.839,1.839,1.839,1.839,1.839};
+				const double tailScales_1[] = {0.5};
+				vector<double> vTailScales_1(tailScales_1, tailScales_1 + sizeof(tailScales_1) / sizeof(double));
+
+				//smearFunc_->SetAbsoluteTailScaling(true);
+				smearFunc_->SetLowerTail_scaling(vTailScales_1);
+				//smearFunc_->SetUpperTail_scaling(vTailScales_1);
+				//smearFunc_->UncertaintyName("tailUP");
+				break;
+			}
+
+
 			case 2: //tailDOWN
 			{
-				const double tailScales_1[] = {0.67,0.916,0.807,0.955,0.949,1.003,0.722,0.711,0.711,0.87,0.824,0.824,0.632,0.74,0.74,0.74,1.031,1.031,0.652,0.771,0.771,0.771,0.771,0.771,0.299,0.299,0.299,0.299,0.299,0.299};
+				//const double tailScales_1[] = {0.67,0.916,0.807,0.955,0.949,1.003,0.722,0.711,0.711,0.87,0.824,0.824,0.632,0.74,0.74,0.74,1.031,1.031,0.652,0.771,0.771,0.771,0.771,0.771,0.299,0.299,0.299,0.299,0.299,0.299};
+				const double tailScales_1[] = {2.0};
 				vector<double> vTailScales_1(tailScales_1, tailScales_1 + sizeof(tailScales_1) / sizeof(double));
-				smearFunc_->SetLowerTail_scaling(vTailScales_1);
+				//smearFunc_->SetLowerTail_scaling(vTailScales_1);
 				smearFunc_->SetUpperTail_scaling(vTailScales_1);
-				smearFunc_->UncertaintyName("tailDOWN");
+				//smearFunc_->UncertaintyName("tailDOWN");
+				break;
+			}
+
+			case 20: //tailDOWN
+			{
+				//const double tailScales_1[] = {0.67,0.916,0.807,0.955,0.949,1.003,0.722,0.711,0.711,0.87,0.824,0.824,0.632,0.74,0.74,0.74,1.031,1.031,0.652,0.771,0.771,0.771,0.771,0.771,0.299,0.299,0.299,0.299,0.299,0.299};
+				const double tailScales_1[] = {0.5};
+				vector<double> vTailScales_1(tailScales_1, tailScales_1 + sizeof(tailScales_1) / sizeof(double));
+				//smearFunc_->SetLowerTail_scaling(vTailScales_1);
+				smearFunc_->SetUpperTail_scaling(vTailScales_1);
+				//smearFunc_->UncertaintyName("tailDOWN");
 				break;
 			}
 
 			case 3:  //coreUP
 			{
-				const double additionalSmearing_1[] = {1.116,1.116,1.116,1.116,1.116,1.116,1.117,1.117,1.117,1.117,1.117,1.117,1.166,1.166,1.166,1.166,1.166,1.166,1.237,1.237,1.237,1.237,1.237,1.237,1.511,1.511,1.511,1.511,1.511,1.511}; 
+				//const double additionalSmearing_1[] = {1.116,1.116,1.116,1.116,1.116,1.116,1.117,1.117,1.117,1.117,1.117,1.117,1.166,1.166,1.166,1.166,1.166,1.166,1.237,1.237,1.237,1.237,1.237,1.237,1.511,1.511,1.511,1.511,1.511,1.511}; 
+				const double additionalSmearing_1[] = {1.10};
 				vector<double> vAdditionalSmearing_1(additionalSmearing_1, additionalSmearing_1 + sizeof(additionalSmearing_1) / sizeof(double));
 				smearFunc_->SetAdditionalSmear_scaling(vAdditionalSmearing_1);
 				smearFunc_->UncertaintyName("coreUP");
@@ -213,13 +268,16 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 
 			case 4:  //coreDOWN
 			{
-				const double additionalSmearing_1[] = {0.988,0.988,0.988,0.988,0.988,0.988,0.999,0.999,0.999,0.999,0.999,0.999,0.998,0.998,0.998,0.998,0.998,0.998,1.033,1.033,1.033,1.033,1.033,1.033,1.067,1.067,1.067,1.067,1.067,1.067};
+				//const double additionalSmearing_1[] = {0.988,0.988,0.988,0.988,0.988,0.988,0.999,0.999,0.999,0.999,0.999,0.999,0.998,0.998,0.998,0.998,0.998,0.998,1.033,1.033,1.033,1.033,1.033,1.033,1.067,1.067,1.067,1.067,1.067,1.067};
+				const double additionalSmearing_1[] = {0.9};
 				vector<double> vAdditionalSmearing_1(additionalSmearing_1, additionalSmearing_1 + sizeof(additionalSmearing_1) / sizeof(double));
 				smearFunc_->SetAdditionalSmear_scaling(vAdditionalSmearing_1);
 				smearFunc_->UncertaintyName("coreDOWN");
 				break;
 			}
 		}
+
+		smearFunc_->Init();
 
 		BookJerDebugHists();
 	}
@@ -237,6 +295,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		if (k > decade)
 		{
 			cout << green <<  10 * k << " % (" << jentry << ")" << clearatt << endl;
+			//printProgBar( (int)100.0 * jentry/ (double) nentries);
 		}
 		decade = k;
 
@@ -257,7 +316,8 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 			continue;
 		} 
 		const double evtWeight = t_EvtWeight; //==1 except for Flat QCD sample
-		
+		const double puWeight  = t_PUWeight;  //PU weight for MC
+	//	cout << "PU weight = " << t_PUWeight << endl;
 		CreateRecoJetVec(recoJets);
 
 		/******************************************************
@@ -265,13 +325,19 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		 * For DATA; recoEvtTotWgt = trigPrescaleWeight
 		 *****************************************************/
 		double recoEvtTotWgt = 1;
-		if (bRUNNING_ON_MC) recoEvtTotWgt = lumiWgt * evtWeight;
-		else 
+		if (bRUNNING_ON_MC) 
+		{
+			recoEvtTotWgt = lumiWgt * evtWeight;
+			if (bDO_PU_WEIGHING) recoEvtTotWgt *= puWeight;
+		} else 
 		{
 			bool passTrigger = true;
-			if (bDO_TRIG_PRESCALING)
+
+			/* select on trigger */
+			if (bDO_TRIG_SELECTION)
 			{
-				TrigPrescaleWeight(passTrigger, recoEvtTotWgt); 
+				double prescaleWgt = 1.0;
+				TrigPrescaleWeight(passTrigger, prescaleWgt); 
 				if (! passTrigger) 
 				{
 					if (bDEBUG) cout << "Failed trigger " << endl;
@@ -279,6 +345,10 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 				} else {
 					if (bDEBUG) cout << "Passed trigger " << endl;
 				}
+
+				/* apply trigger prescale weight */
+				if (bDO_TRIG_PRESCALING) recoEvtTotWgt = prescaleWgt;
+
 			} else { 
 				recoEvtTotWgt = 1; //no trigger prescaling is applied
 			}
@@ -294,12 +364,14 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		{
 			CreateGenJetVec(genJets);
 			++nGenJetEvts;
-			FillHistogram(genJets,1, lumiWgt * evtWeight);
+			//FillHistogram(genJets,1, lumiWgt * evtWeight);
+			FillHistogram(genJets,1, recoEvtTotWgt);
 
 			for (unsigned n = 0; n < nTries_; ++n)
 			{
 				SmearingGenJets(genJets, smearedGenJets);
-				const double totWeight = smearingWgt * lumiWgt * evtWeight;
+				double totWeight = smearingWgt * lumiWgt * evtWeight;
+				if (bDO_PU_WEIGHING) totWeight *= puWeight;
 				const bool accept_smear_evt = FillHistogram(smearedGenJets,2, totWeight);
 				if (accept_smear_evt) {
 					nSmearedJetEvts += totWeight;
@@ -384,6 +456,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 	 ***************************************************************************/
 	TCanvas *c = new TCanvas();
 	gStyle->SetOptStat(0);
+	gErrorIgnoreLevel = kWarning; //supress print messages
 	gPad->Print("samples.eps[");
 
 	for (unsigned jetbin=0; jetbin < JetBins_.size(); ++jetbin)
@@ -548,8 +621,9 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		cout << "nTries_                = " << nTries_ << endl;
 		cout << "smearedJetPt_          = " << smearedJetPt_ << endl;
 	} else {
-		cout << "bDO_TRIG_PRESCALING    = " << bDO_TRIG_PRESCALING << endl;
-		if (bDO_TRIG_PRESCALING)
+		cout << "DO_TRIG_SELECTION     = " << bDO_TRIG_SELECTION << endl;
+		cout << "DO_TRIG_PRESCALING    = " << bDO_TRIG_PRESCALING << endl;
+		if (bDO_TRIG_SELECTION)
 		{
 			cout << "Trigger selection      = ";
 			for (unsigned int i =0; i < vTriggersToUse.size(); ++i)
@@ -560,7 +634,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 			}
 		}
 	}
-	cout << "applyDphiCut_          = " << applyDphiCut_ << endl;
+	cout << red << "bAPPLY_DPHI_CUT          = " << bAPPLY_DPHI_CUT  << clearatt << endl;
 	//cout << "NJet50_min_            = " << NJet50_min_ << endl;
 	//cout << "NJet50_max_            = " << NJet50_max_ << endl;
 	cout << "Jetbins                = "; for (int bin=0; bin < JetBins_.size(); ++bin) { cout << JetBins_.at(bin).first << "-" << JetBins_.at(bin).second << ", "; }; cout << endl; 
@@ -862,10 +936,10 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets,
 
 	/*******************************************************************
 	 * to get all plots passing RA2 cuts.
-	 * disable this (applyDphiCut_==false) to do factorization 
+	 * disable this (bAPPLY_DPHI_CUT==false) to do factorization 
 	 * ratio determination and closure tests 
 	 ******************************************************************/
-	if (applyDphiCut_ && !bPassRA2dphiCut) return false;
+	if (bAPPLY_DPHI_CUT && !bPassRA2dphiCut) return false;
 
 	const float dPhiMin = DelPhiMin(jets,	mhtvec, JetBins_.at(i_JetBin).first);
 
@@ -1632,7 +1706,9 @@ bool FactorizationBySmearing::PassCleaning()
 				&& (bool) t_inconsistentMuons
 				&& (bool) t_ra2EcalBEFilter
 				&& (bool) t_ra2EcalTPFilter
-				&& (bool) t_trackingFailureFilter );
+				&& (bool) t_trackingFailureFilter
+				&& (bool) t_HBHENoiseFilterRA2
+				);
 
 	/*if (! pass) 
 		cout << __FUNCTION__ << ":"
@@ -1665,7 +1741,7 @@ void FactorizationBySmearing::TrigPrescaleWeight(bool &passTrig, double &weight)
 		//cout << __LINE__ << ":: trigtouse[" << j << "] = " << vTriggersToUse.at(j) << endl; 
 		for (unsigned i =0; i < t_firedTrigs->size(); ++i)
 		{
-			cout << __LINE__ << ":: fired[" << t_firedTrigs->size()  << endl; 
+			//cout << __LINE__ << ":: fired[" << t_firedTrigs->size()  << endl; 
 			if (t_firedTrigs->at(i).find(vTriggersToUse.at(j)) != string::npos)
 			{	//found fired trigger
 				if (t_firedTrigsPrescale->at(i) < highestTrigPrescale)
