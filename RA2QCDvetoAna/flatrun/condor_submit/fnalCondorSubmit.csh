@@ -1,7 +1,9 @@
 #!/bin/csh
 
 setenv PYTHONHOME `python-config --prefix` 
-echo "PYTHONHOME : $PYTHONHOME\n"
+#echo "PYTHONHOME : $PYTHONHOME\n"
+
+#echo "fnalCondorSubmit: nARGS = $#argv"
 
 set maxNum=$1
 set perNum=$2
@@ -9,15 +11,15 @@ set fileList=$3
 set systVariation=$4
 
 rm -vrf inputList* run_*
-echo "fnalCondorSubmit::  Inputs ========" 
-echo " maxNum  = ${maxNum}"
-echo " perNum  = ${perNum}"
-echo " systVariation = ${systVariation}"
-echo " filelist= ${fileList}"
+#echo "fnalCondorSubmit::  Inputs ========" 
+#echo " maxNum  = ${maxNum}"
+#echo " perNum  = ${perNum}"
+#echo " systVariation = ${systVariation}"
+#echo " filelist= ${fileList}"
 
-pwd
-ls
-if (-e $fileList ) then
+#pwd
+#ls -l
+if (-e ${PWD}/$fileList ) then
 	cat $fileList
 else	
 	echo "fnalCondorSubmit::  filelist= ${fileList} not found!"
