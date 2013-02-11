@@ -1,6 +1,7 @@
 #! /bin/csh
 
-set systVariation = 0
+#foreach systVariation (0 1 2 3 4 5 6)
+foreach systVariation (0)
 
 if ( $systVariation == 0 ) then
 	set subdir = "Mean"
@@ -9,7 +10,7 @@ else
 endif
 
 set curDir = `pwd`
-set mainDir = "/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/condor_submit/01222013_MG_5kSampling_newHtBins/${subdir}"
+set mainDir = "/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/condor_submit/02062013_MG_500/${subdir}"
 set dirlist = "$mainDir/qcd1 $mainDir/qcd2 $mainDir/qcd3"
 set i = 0
 
@@ -28,8 +29,7 @@ foreach dir ( $dirlist )
 			set fileList =  `ls -1 *.files`
 			echo "$PWD -> $fileList"
 			#./fnalCondorSubmit.csh 4 4 $fileList ${i} 
-			#./fnalCondorSubmit.csh 10 8 $fileList $systVariation 
-			./fnalCondorSubmit.csh 15 5 $fileList $systVariation 
+			./fnalCondorSubmit.csh 37 2 $fileList $systVariation 
 
 			cd $curDir
 			#exit
@@ -38,15 +38,14 @@ foreach dir ( $dirlist )
 			cd $dir
 			set fileList =  `ls -1 *.files`
 			echo "$PWD -> $fileList"
-			#./fnalCondorSubmit.csh 9 9 $fileList $systVariation 
-			./fnalCondorSubmit.csh 15 6 $fileList $systVariation 
+			./fnalCondorSubmit.csh 41 2 $fileList $systVariation 
 			cd $curDir
 		else if ( $i == 3 ) then
 			cp ../input_files/QCD_HT_1000ToInf_MGPythia_v1_lpc1_wFilters_farm.files $dir
 			cd $dir
 			set fileList =  `ls -1 *.files`
 			echo "$PWD -> $fileList"
-			./fnalCondorSubmit.csh 8 4  $fileList $systVariation 
+			./fnalCondorSubmit.csh 16 2  $fileList $systVariation 
 			cd $curDir
 		endif
 
@@ -56,5 +55,7 @@ foreach dir ( $dirlist )
 		echo "A directory named $dir already exists. Skipping.."
 		exit
 	endif 
+
+end
 
 end
