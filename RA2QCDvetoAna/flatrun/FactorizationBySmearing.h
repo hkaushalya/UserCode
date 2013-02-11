@@ -31,7 +31,8 @@ class FactorizationBySmearing : public NtupleSelector {
 		Bool_t   FillChain(TChain *chain, const TString &inputFileList);
 		Long64_t LoadTree(Long64_t entry);
 		void     EventLoop(const char * datasetname, const int evt2Process, const int systVariations);
-		void     BookHistogram(const char *);
+		//void     BookHistogram(const char *);
+		void     BookHistogram(TFile *oFile, const bool mcFlag);
 		double   DeltaPhi(double, double);
 		double   DeltaR(double eta1, double phi1, double eta2, double phi2);
 		double   HT (const std::vector<TLorentzVector>&);
@@ -46,8 +47,6 @@ class FactorizationBySmearing : public NtupleSelector {
 		bool PassCuts(const vector<TLorentzVector>& jets);
 		vector<TLorentzVector> GetPt50Eta2p5Jets(const vector<TLorentzVector>& jets);
 
-		TFile *oFile;
-			
 		struct JetHist_t {
 			TH1D *h_Jet_pt;
 			TH1D *h_Jet_eta;
@@ -55,6 +54,8 @@ class FactorizationBySmearing : public NtupleSelector {
 			TH1D *h_Jet_dphi;
 		};
 		struct CommonHist_t {
+			TH1D *h_evtWeight;
+			TH1D *h_nVtx;
 			TH1D *h_Njet50eta2p5;
 			TH1D *h_Njet30eta5p0;
 			TH1D *h_Mht;      //this Mht/Ht plots are for cut confirmations. Total HT/MHT plots are separately made
@@ -86,9 +87,11 @@ class FactorizationBySmearing : public NtupleSelector {
 
 
 	private:
-		bool bDEBUG;
+		TFile *outRootFile;
+		vector<string> vBadHcalLaserEvts;
+		bool bDEBUG, bNON_STD_MODE;
 		bool bRUNNING_ON_MC;
-		bool bDO_TRIG_PRESCALING, bDO_TRIG_SELECTION, bDO_PU_WEIGHING;
+		bool bDO_TRIG_PRESCALING, bDO_TRIG_SELECTION, bDO_PU_WEIGHING, bDO_GENJET_SMEARING;
 		SmearFunction *smearFunc_;
 		double smearedJetPt_;
 		std::vector<double> PtBinEdges_scaling_;
@@ -116,7 +119,9 @@ class FactorizationBySmearing : public NtupleSelector {
 		void GetHist(TDirectory *dir, Hist_t& hist, 
 					const pair<unsigned, unsigned> njetrange,
 					const pair<unsigned, unsigned> htrange,
-					const pair<unsigned, unsigned> mhtrange);
+					const pair<unsigned, unsigned> mhtrange,
+					const bool mcFlag
+					);
 		void GetJetHist(vector<JetHist_t>& Hist, const string jetcoll
 							, const string htmhtrangelabel	);
 		unsigned GetVectorIndex(const vector<double>& bins, const double& val);
@@ -134,7 +139,9 @@ class FactorizationBySmearing : public NtupleSelector {
 		double GetLumiWgt(const string& datasetname, const double& dataLumi);
 		void DivideByBinWidth(TH1* h);
 		bool PassCleaning();
-		void  TrigPrescaleWeight(bool &failTrig, double &weight) const;
+		void TrigPrescaleWeight(bool &failTrig, double &weight) const;
+		void LoadBadHcalLaserEvents();
+		void PrintEventNumber();
 };
 #endif
 
@@ -154,33 +161,29 @@ FactorizationBySmearing::FactorizationBySmearing(
 
 	Init(tree);
 
+	smearFunc_ = 0;
 	//HtBins_.push_back(0);
-	HtBins_.push_back(500);
-	HtBins_.push_back(800);
+//	HtBins_.push_back(500);
+//	HtBins_.push_back(800);
 	HtBins_.push_back(1000);
-	HtBins_.push_back(1250);
-	HtBins_.push_back(1500);
+//	HtBins_.push_back(1250);
+//	HtBins_.push_back(1500);
 	HtBins_.push_back(8000);
 
-	MhtBins_.push_back(0);
-	//MhtBins_.push_back(200);
+//	MhtBins_.push_back(0);
+	MhtBins_.push_back(200);
 	//MhtBins_.push_back(350);
 	//MhtBins_.push_back(500);
 	MhtBins_.push_back(8000);
 
 	//jet bins: 2, 3-5, 6-7,>=8
-	pair <unsigned, unsigned> jetbin1 (2,2);
-	pair <unsigned, unsigned> jetbin2 (3,5);
-	pair <unsigned, unsigned> jetbin3 (6,7);
-	pair <unsigned, unsigned> jetbin4 (8,1000);
-	//pair <unsigned, unsigned> jetbin4 (4,1000);
-	JetBins_.push_back(jetbin1);	
-	JetBins_.push_back(jetbin2);	
-	JetBins_.push_back(jetbin3);	
-	JetBins_.push_back(jetbin4);	
+	//JetBins_.push_back(make_pair(2,2));	
+//	JetBins_.push_back(make_pair(3,5));	
+//	JetBins_.push_back(make_pair(6,7));	
+//	JetBins_.push_back(make_pair(8,1000));	
+	JetBins_.push_back(make_pair(3,1000));	
 
-	//NJet50_min_  = njet50min;
-	//NJet50_max_  = njet50max;
+	bNON_STD_MODE = false;
 	nRecoJetEvts = 0;
 	nGenJetEvts  = 0;
 	nSmearedJetEvts = 0;
@@ -188,16 +191,24 @@ FactorizationBySmearing::FactorizationBySmearing(
 
 	//sanity check to have at least 1 bin in njet/ht/mht
 	bool ready = true;
-	if (JetBins_.size()<1) { ready = ready && false; cout << __FUNCTION__ << ": Require at least one Jet bin!" << endl; }
-	if (HtBins_.size()<1)  { ready = ready && false; cout << __FUNCTION__ << ": Require at least one Ht bin!" << endl; }
-	if (MhtBins_.size()<1) { ready = ready && false; cout << __FUNCTION__ << ": Require at least one Mht bin!" << endl; }
+	if (JetBins_.size() < 1) { ready = ready && false; cout << __FUNCTION__ << ": Require at least one Jet bin!" << endl; }
+	if (HtBins_.size()  < 2) { ready = ready && false; cout << __FUNCTION__ << ": Require at least one Ht bin!" << endl;  }
+	if (MhtBins_.size() < 2) { ready = ready && false; cout << __FUNCTION__ << ": Require at least one Mht bin!" << endl; }
+
+	outRootFile = new TFile(outFileName, "recreate");
+	if (outRootFile->IsZombie())
+	{
+		cout << __FUNCTION__ << ": Unable to create output root file!" << endl;
+		ready = false;
+	}
+
 	
 	//difference variation of the dPhiMin selections.
 	//make sure the book the correct number of histograms 
 	//when these are changed!!!
 	vDphiVariations.push_back(0.15);
 	vDphiVariations.push_back(0.20);
-	vDphiVariations.push_back(0.25);
+	//vDphiVariations.push_back(0.25);
 	//vDphiVariations.push_back(0.30);
 	//vDphiVariations.push_back(0.35);
 	//vDphiVariations.push_back(0.40);
@@ -224,20 +235,24 @@ FactorizationBySmearing::FactorizationBySmearing(
 //HLTPathsByName_[1] = HLT_PFHT*");
 //Kristin confirmed that she is only using HLT_PFHT triggers.
 //No jet triggers are used either. Jan 25th, 2013
-vTriggersToUse.push_back("HLT_PFHT350_v");
+//vTriggersToUse.push_back("HLT_PFHT350_v");
 vTriggersToUse.push_back("HLT_PFHT650_v");
 vTriggersToUse.push_back("HLT_PFHT700_v");
 vTriggersToUse.push_back("HLT_PFHT750_v");
+//vTriggersToUse.push_back("HLT_PFNoPUHT350_v");
+vTriggersToUse.push_back("HLT_PFNoPUHT650_v");
+vTriggersToUse.push_back("HLT_PFNoPUHT700_v");
+vTriggersToUse.push_back("HLT_PFNoPUHT750_v");
+
 
 
 	if (! ready) 
 	{ 
 		cout << __FUNCTION__ << ": Minimum run conditions failed. returning!!" << endl;
 		assert (false);
-	
 	} 
 
-	BookHistogram(outFileName);
+	//BookHistogram(outFileName);
 }
 
 Bool_t FactorizationBySmearing::FillChain(TChain *chain, const TString &inputFileList) {
@@ -278,11 +293,10 @@ FactorizationBySmearing::~FactorizationBySmearing() {
 
 	if (!fChain) return;
 	delete fChain->GetCurrentFile();
-	oFile->cd();
-	oFile->Write();
-	oFile->Close();
-
-   if (bRUNNING_ON_MC && smearFunc_) delete smearFunc_;
+	outRootFile->cd();
+	outRootFile->Write();
+	outRootFile->Close();
+   if (bRUNNING_ON_MC && bDO_GENJET_SMEARING && smearFunc_ != 0) delete smearFunc_;
 }
 
 double FactorizationBySmearing::DeltaPhi(double phi1, double phi2) {
