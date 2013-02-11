@@ -96,8 +96,10 @@ SmearFunction::SmearFunction()
    // Get/scale/fill smear functions
  //  CalculateSmearFunctions(); 
 }
-//--------------------------------------------------------------------------
 
+/***************************************************************************
+ * This method must be called FIRST after all data members are set.
+ ***************************************************************************/
 void SmearFunction::Init()
 {
    // Get correct dimensions for smear functions
@@ -106,8 +108,6 @@ void SmearFunction::Init()
    // Get/scale/fill smear functions
    CalculateSmearFunctions(); 
 }
-
-
 
 //--------------------------------------------------------------------------
 TH1F* SmearFunction::getSmearFunc(int i_flav, int i_jet, int i_eta, int i_Pt) const {
