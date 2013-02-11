@@ -137,7 +137,8 @@ void haddws() {
    // root > .L haddws.C
    // root > haddws()
 
-   Target = TFile::Open( "qcd_all.root", "RECREATE" );
+  	//Target = TFile::Open( "qcd_all.root", "RECREATE" );
+  	Target = TFile::Open( "qcd_all_19p4fb.root", "RECREATE" );
 
 	vec_pair vFileList;
 	vec_pair_it it;
@@ -161,9 +162,13 @@ void haddws() {
 		2000062, //1400-1800
 		977586 //1800
 	};
-	const float scaleTo = 10000.0; //pb-1
+	//const float scaleTo = 10000.0; //pb-1
+	//const float scaleTo = 12187.518; //pb-1
+	const float scaleTo = 19458.0; //pb-1
 	const int PTbins = 7;
 	double w[PTbins];
+
+	cout << "SCALING TO = " << scaleTo << endl;
 
 	for (int i=0; i<PTbins; ++i)
 	{
