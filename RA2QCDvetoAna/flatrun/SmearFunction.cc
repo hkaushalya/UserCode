@@ -134,9 +134,9 @@ void SmearFunction::CalculateSmearFunctions() {
    //// open root file/tree and create SmearingFunction histo
    TFile *f1 = new TFile(smearingfile_.c_str(), "READ", "", 0);
   
-  	time_t seconds, seconds2 ,seconds3, seconds4, seconds5;
-	seconds = time (NULL);
-	cout << "t0 = " << seconds << endl;
+//  	time_t seconds, seconds2 ,seconds3, seconds4, seconds5;
+//	seconds = time (NULL);
+//	cout << "t0 = " << seconds << endl;
 
    //// Fetch histos and fit gaussian core
    for (unsigned int i_Pt = 0; i_Pt < PtBinEdges_.size() - 1; ++i_Pt) {
@@ -274,9 +274,9 @@ void SmearFunction::CalculateSmearFunctions() {
       }
    }
 
-	cout << __FUNCTION__ << ":" << __LINE__ << endl;
-	seconds2 = time (NULL);
-	cout << "t1 = " << seconds2 << endl;
+//	cout << __FUNCTION__ << ":" << __LINE__ << endl;
+//	seconds2 = time (NULL);
+//	cout << "t1 = " << seconds2 << endl;
    //// Fit scaled gaussian sigma as function of pt
    for (unsigned int i_flav = 0; i_flav < 2; ++i_flav) {
       for (unsigned int i_jet = 0; i_jet < 3; ++i_jet) {
@@ -306,9 +306,9 @@ void SmearFunction::CalculateSmearFunctions() {
       }
    }
 
-	cout << __FUNCTION__ << ":" << __LINE__ << endl;
-	seconds3 = time (NULL);
-	cout << "t2 = " << seconds3 << endl;
+//	cout << __FUNCTION__ << ":" << __LINE__ << endl;
+//	seconds3 = time (NULL);
+//	cout << "t2 = " << seconds3 << endl;
    //// Fit gaussian sigma as function of pt
    for (unsigned int i_flav = 0; i_flav < 2; ++i_flav) {
       for (unsigned int i_jet = 0; i_jet < 3; ++i_jet) {
@@ -337,14 +337,13 @@ void SmearFunction::CalculateSmearFunctions() {
       }
    }
 
-	cout << __FUNCTION__ << ":" << __LINE__ << endl;
-	seconds4 = time (NULL);
-	cout << "t3 = " << seconds4 << endl;
+//	cout << __FUNCTION__ << ":" << __LINE__ << endl;
+//	seconds4 = time (NULL);
+//	cout << "t3 = " << seconds4 << endl;
 	
    //// Book and fill histograms for smeared and scaled response functions
    for (unsigned int i_flav = 0; i_flav < 2; ++i_flav) {
       for (unsigned int i_jet = 0; i_jet < 3; ++i_jet) {
-			cout << "pt/eta BinEdges.szie = " << PtBinEdges_.size() << "/" << EtaBinEdges_.size() << endl;
          for (unsigned int i_Pt = 0; i_Pt < PtBinEdges_.size() - 1; ++i_Pt) {
             for (unsigned int i_eta = 0; i_eta < EtaBinEdges_.size() - 1; ++i_eta) {
                char hname[100];
@@ -417,8 +416,8 @@ void SmearFunction::CalculateSmearFunctions() {
                   if (smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetEntries() > 0) {
                      N = smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->Integral();
                   }
-                  cout << "Too few entries for (i_Pt, i_eta, i_jet, i_flav): " << i_Pt << ", " << i_eta << ", " << i_jet << ", " << i_flav
-                       << ", entries = " << smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetEntries() << endl;
+                  //cout << "Too few entries for (i_Pt, i_eta, i_jet, i_flav): " << i_Pt << ", " << i_eta << ", " << i_jet << ", " << i_flav
+                  //     << ", entries = " << smearFunc.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetEntries() << endl;
                   for (int j = 1; j <= smearFunc_scaled.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetNbinsX(); ++j) {
                      double pt = (PtBinEdges_.at(i_Pt) + PtBinEdges_.at(i_Pt + 1)) / 2;
                      double g = N * TMath::Gaus(smearFunc_scaled.at(i_flav).at(i_jet).at(i_eta).at(i_Pt)->GetBinCenter(j), 1.,
@@ -434,12 +433,13 @@ void SmearFunction::CalculateSmearFunctions() {
       }
    }
 
-	seconds5 = time (NULL);
+/*	seconds5 = time (NULL);
 	cout << "t2-t0 = "  << (seconds2 - seconds) << endl;
 	cout << "t3-t2 = "  << (seconds3 - seconds2) << endl;
 	cout << "t4-t3 = "  << (seconds4 - seconds3) << endl;
 	cout << "t5-t4 = "  << (seconds5 - seconds4) << endl;
 	cout << __FUNCTION__ << ":" << __LINE__ << endl;
+*/
 }
 //--------------------------------------------------------------------------
 
