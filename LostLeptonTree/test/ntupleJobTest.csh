@@ -23,8 +23,28 @@ set jobDir = $1
 set outDir = $2
 
 echo "Test 1: Basic file count ..."
-set nLogFiles = `ls -l ${jobDir}/*.log | wc -l`
-#echo "log files = $nLogFiles"
+#look for log file type automaticall
+# log or stdout
+
+set logFileExt = 'stderr'
+
+set nLogFiles = `ls -l ${jobDir}/*.$logFileExt | wc -l`
+echo "nLogFiles = $nLogFiles"
+
+if ( $nLogFiles < 1 ) then
+	@logFileExt = 'log'
+	@nLogFiles = `ls -l ${jobDir}/*.$logFileExt | wc -l`
+endif
+
+if ( $nLogFiles == 0 ) then
+	echo "Could not find neither of the log file types: log/stdout!"
+	exit 0
+else 
+	echo "nLogFiles of $logFileExt = $nLogFiles"
+endif
+
+echo "Using log files with extension: $logFileExt"
+
 set nRootFiles = `ls -l ${outDir}/*.root | wc -l`
 echo -n "root/log files = $nRootFiles/$nLogFiles"
 if ( $nLogFiles != $nRootFiles ) then
@@ -42,7 +62,6 @@ else
 	echo "File lists found"
 endif
 
-set logFileExt = 'log'
 set filesToProcess = `cat ${jobDir}/*.rtlst | wc -l`
 set SRCopened = `grep "Successfully opened" ${jobDir}/*.$logFileExt | wc -l`
 set SRCclosed = `grep "Closed file" ${jobDir}/*.$logFileExt | wc -l`
