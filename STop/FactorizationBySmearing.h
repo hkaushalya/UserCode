@@ -30,22 +30,26 @@ class FactorizationBySmearing : public NtupleSelector {
 		~FactorizationBySmearing();
 		Bool_t   FillChain(TChain *chain, const TString &inputFileList);
 		Long64_t LoadTree(Long64_t entry);
-		void     EventLoop(const char * datasetname, const int evt2Process, const int systVariations);
+		void     EventLoop(const char * datasetname, const int evt2Process, const unsigned cutmask, const int systVariations);
 		//void     BookHistogram(const char *);
 		void     BookHistogram(TFile *oFile, const bool mcFlag);
 		double   DeltaPhi(double, double);
 		double   DeltaR(double eta1, double phi1, double eta2, double phi2);
 		double   HT (const std::vector<TLorentzVector>&);
 		TLorentzVector MHT(const std::vector<TLorentzVector>&);
-		TVector3 GetMHT(vector<TLorentzVector>);
+		TLorentzVector GetMET(const vector<TLorentzVector>& jets);
 		void CreateRecoJetVec(std::vector<TLorentzVector>& vjets, std::vector<double>& bDisc);
-		void CreateGenJetVec(std::vector<TLorentzVector>& vjets, std::vector<double>& bDisc);
+		void CreateGenJetVec(std::vector<TLorentzVector>& vjets);
 		double JetResolutionHist_Pt_Smear(const double& pt, const double& eta, const int& i);
-		void SmearingGenJets(const vector<TLorentzVector>& jets_gen, std::vector<TLorentzVector> &genJets_smeared, std::vector<double>& bDisc);
+		void SmearingGenJets(const vector<TLorentzVector>& jets_gen, const vector<double>& bDisc_gen, 
+						std::vector<TLorentzVector> &genJets_smeared, std::vector<double>& bDisc_smeared);
+		void SetGenJetBdiscriminators(const vector<TLorentzVector>& jets_reco, std::vector<double>& bDisc_reco,
+									const std::vector<TLorentzVector> &genJets, std::vector<double>& bDisc_gen);
 		int GetIndex(const double& x, const std::vector<double>* vec);
 		double GetHFProb(const double& pt, const double& eta, const int& i_jet);
 		bool PassCuts(const vector<TLorentzVector>& jets);
 		vector<TLorentzVector> GetPt50Eta2p5Jets(const vector<TLorentzVector>& jets);
+		void Print4vec(const TLorentzVector& tl1, const TLorentzVector& tl2) const;
 
 		struct JetHist_t {
 			TH1D *h_Jet_pt;
@@ -62,6 +66,15 @@ class FactorizationBySmearing : public NtupleSelector {
  			TH1D *h_Ht;
 			TH1D *h_DphiMin;
 			TH2D *h_DphiMinVsMht;
+			TH1D *h_nbjets;
+			TH1D *h_bjetMass;
+			TH1D *h_bjetPt;
+			TH1D *h_M123;
+			TH1D *h_M23OverM123;
+			TH1D *h_MT2;
+			TH1D *h_MTb;
+			TH1D *h_MTt;
+			TH1D *h_MTb_p_MTt;
 			vector<TH1D*> pass;
 			vector<TH1D*> passFineBin;
 			vector<TH1D*> pass_trigPrescales;
@@ -106,7 +119,9 @@ class FactorizationBySmearing : public NtupleSelector {
 		double LowerTailScaling_variation_;
 		double UpperTailScaling_variation_;
 		bool absoluteTailScaling_;
-		bool bAPPLY_DPHI_CUT; 
+		bool bAPPLY_DPHI_CUT, bAPPLY_NJET_CUT, bAPPLY_MET_CUT, bAPPLY_TRIPLET_CUT, bAPPLY_TOPMASS_CUT, bAPPLY_TOPPLUSBJET_CUT, bAPPLY_MT2_CUT; 
+		unsigned uMinNjet70Eta2p4_, uMinNjet50Eta2p4_, uMinNjet30Eta2p4_, uMinTriplets_;
+		double dMinMet_, dMinTopMass_, dMaxTopMass_, dMinTopPlusBjetMass_, dMinMt2_;
 		unsigned nBadEcalLaserEvts;
 
 		std::vector<double> HtBins_, MhtBins_;
@@ -130,7 +145,8 @@ class FactorizationBySmearing : public NtupleSelector {
 							, const string htmhtrangelabel	);
 		unsigned GetVectorIndex(const vector<double>& bins, const double& val);
 		unsigned GetVectorIndex(const vector< pair<unsigned, unsigned> >& binEdges, const unsigned& val);
-		bool FillHistogram(const vector<TLorentzVector>& jets, const int jetcoll, const double& wgt=1.0);
+		bool FillHistogram(const vector<TLorentzVector>& jets, const vector<double>& bDisc, 
+						const TLorentzVector& reco_uncl_met, const int& jetcoll, const double& wgt=1.0);
 		int CountJets(const std::vector<TLorentzVector>& vjets, 
 			const double minPt, const double maxEta);		
 		void FillJetHistogram(const vector<TLorentzVector>& jets, 
@@ -140,6 +156,7 @@ class FactorizationBySmearing : public NtupleSelector {
 		bool PassDphiCut(const vector<TLorentzVector>& jets, 
 					const TLorentzVector& mht, const unsigned njet50min, 
 					const float& cut1, const float& cut2, const float& cut3);
+		bool PassBaselineSelection(const vector<TLorentzVector>& jets, const TLorentzVector met_vec);
 		double GetLumiWgt(const string& datasetname, const double& dataLumi);
 		void DivideByBinWidth(TH1* h);
 		bool PassCleaning();
@@ -149,6 +166,9 @@ class FactorizationBySmearing : public NtupleSelector {
 		void PrintEventNumber() const;
 		bool PassHOfilter();
    	void TripletSelector(std::vector<TLorentzVector> & , const std::vector<double> bDisc, std::vector<TLorentzVector> & , std::vector<TLorentzVector> & , std::vector<TLorentzVector> & , double & , double & );
+   	void MTMT2(const TLorentzVector & MET, const std::vector<TLorentzVector> & triplet,
+						const std::vector<TLorentzVector> & rSystem, const std::vector<TLorentzVector> & bJetsInR, 
+						double & MT2, double & MTt, double& MTb);
 };
 #endif
 

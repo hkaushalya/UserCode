@@ -4,7 +4,7 @@
 
 
 #include "Basic_Mt2_332_Calculator.h"
-#include "recipeAUX/OxbridgeMT2/interface/Mt2Units.h"
+#include "Mt2Units.h"
 #include "Minuit2/MnUserParameterState.h"
 #include "Minuit2/MnMigrad.h"
 #include "Minuit2/MnSimplex.h"

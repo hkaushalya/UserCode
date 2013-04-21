@@ -11,7 +11,7 @@ CXXFLAGS   += $(ROOTCFLAGS)
 LIBS        = $(ROOTLIBS)
 
 NGLIBS      = $(ROOTGLIBS)
-NGLIBS     += -lMinuit
+NGLIBS     += -lMinuit2
 GLIBS     = $(filter-out -lNew -lz , $(NGLIBS))
 
 #INCLUDEDIR  = ./include/
@@ -20,7 +20,7 @@ GLIBS     = $(filter-out -lNew -lz , $(NGLIBS))
 #OUTLIB      = ./lib/
 
 
-.SUFFIXES: .cc,.C,.cxx,.hh,.h
+.SUFFIXES: .cc,.C,.cpp,.cxx,.hh,.h
 #.PREFIXES: ./lib/
 
 all: runsmear
@@ -29,12 +29,44 @@ runsmear: FactorizationBySmearing.cc \
 	NtupleSelector.o \
         mydict.o \
 	SmearFunction.o \
-	Utils.o 
+	Utils.o \
+	ChengHanBisect_Mt2_332_Calculator.o
 	$(CXX) $(CXXFLAGS) -o runsmear *.o $(GLIBS) $ $<
 	touch runsmear
 
 NtupleSelector.o: NtupleSelector.cc
 	$(CXX) $(CXXFLAGS) -c -o NtupleSelector.o $<
+
+ChengHanBisect_Mt2_332_Calculator.o: ChengHanBisect_Mt2_332_Calculator.cpp \
+	SolutionType.h \
+	Mt2Units.h \
+	Mt2Util.h \
+	Mt2_332_Calculator.h \
+	Mt2Calculator.o \
+	mt2_bisect.o \
+	Mt2Vectors.o \
+	Mt2TwoVector.o \
+	Mt2LorentzTransverseVector.o \
+	Basic_Mt2_332_Calculator.o
+	$(CXX) $(CXXFLAGS) -c -o ChengHanBisect_Mt2_332_Calculator.o $<
+
+mt2_bisect.o: mt2_bisect.cpp
+	$(CXX) $(CXXFLAGS) -c -o mt2_bisect.o $<
+
+Mt2Vectors.o: Mt2Vectors.cpp
+	$(CXX) $(CXXFLAGS) -c -o Mt2Vectors.o $<
+
+Mt2TwoVectors.o: Mt2TwoVectors.cpp
+	$(CXX) $(CXXFLAGS) -c -o Mt2TwoVectors.o $<
+
+Mt2LorentzTransverseVector.o: Mt2LorentzTransverseVector.cpp
+	$(CXX) $(CXXFLAGS) -c -o Mt2LorentzTransverseVector.o $<
+
+Basic_Mt2_332_Calculator.o: Basic_Mt2_332_Calculator.cpp
+	$(CXX) $(CXXFLAGS) -c -o Basic_Mt2_332_Calculator.o $<
+
+Mt2Calculator.o: Mt2Calculator.cpp
+	$(CXX) $(CXXFLAGS) -c -o Mt2Calculator.o $<
 
 SmearFunction.o: SmearFunction.cc
 	$(CXX) $(CXXFLAGS) -c -o SmearFunction.o $<

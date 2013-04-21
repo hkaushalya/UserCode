@@ -3,8 +3,8 @@
 // Authors: Christopher Lester and Alan Barr
 
 
-#include "recipeAUX/OxbridgeMT2/interface/ChengHanBisect_Mt2_332_Calculator.h"
-#include "recipeAUX/OxbridgeMT2/interface/Mt2Units.h"
+#include "ChengHanBisect_Mt2_332_Calculator.h"
+#include "Mt2Units.h"
 
 #include "mt2_bisect.h"
 

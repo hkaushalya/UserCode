@@ -5,7 +5,7 @@
 #ifndef ChengHanBisect_Mt2_332_Calculator_H
 #define ChengHanBisect_Mt2_332_Calculator_H
 
-#include "recipeAUX/OxbridgeMT2/interface/Mt2_332_Calculator.h"
+#include "Mt2_332_Calculator.h"
 #include <vector>
 
 /** Adapted from http://daneel.physics.ucdavis.edu/~zhenyuhan/mt2.html
