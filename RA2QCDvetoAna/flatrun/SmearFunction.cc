@@ -25,11 +25,11 @@ SmearFunction::SmearFunction()
 //	cout << "first rand#" << gRandom->Rndm() << endl;
 
    // get parameters from config
-   LowerTailScaling_variation_   = 1; 
-   UpperTailScaling_variation_   = 1; 
-   AdditionalSmearing_variation_ = 1; 
-	absoluteTailScaling_          = true;  //false for systematics
-   NRebin_                       = 1; 
+   LowerTailScaling_variation_   = 1.0; 
+   UpperTailScaling_variation_   = 1.0; 
+   AdditionalSmearing_variation_ = 1.0; 
+	absoluteTailScaling_          = false;  //false for systematics
+   NRebin_                       = 1.0; 
 
    //bprobabilityfile_ = "bprobfile.root";
    	
@@ -77,7 +77,8 @@ SmearFunction::SmearFunction()
 	EtaBinEdges_.push_back(4.1); 
 	EtaBinEdges_.push_back(5.0);
 
-   smearingfile_ = "/share/store/users/samantha/CMSSW_DEV/525/FlatSmearingCode/optimize/test2/submit/MCJetResolution_Summer12_QCD_Pt_15to3000_TuneZ2_Flat_8TeV_pythia6_withCHS_withoutPUReweighting.root";
+   smearingfile_ = "/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/input_files/MCJetResolutions_Summer12_DR53X_QCD_Pt_15to3000_TuneZ2star_Flat_8TeV_pythia6_withCHS_withoutPUReweighting.root";
+   //smearingfile_ = "/share/store/users/samantha/CMSSW_DEV/525/FlatSmearingCode/optimize/test2/submit/MCJetResolution_Summer12_QCD_Pt_15to3000_TuneZ2_Flat_8TeV_pythia6_withCHS_withoutPUReweighting.root";
    //smearingfile_        = "/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/MCJetResolution_Summer12_QCD_Pt_15to3000_TuneZ2_Flat_8TeV_pythia6_withCHS_withPUReweighting_fineLowPtBins_pixelcorr.root";
 
 	PtBinEdges_scaling_.push_back(0);    PtBinEdges_scaling_.push_back(7000);
