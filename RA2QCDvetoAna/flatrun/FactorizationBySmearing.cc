@@ -51,7 +51,8 @@ int main(int argc, char* argv[])
 	if (argc <= 3) {
 		cerr <<"Please give 3 arguments " << "runList " << " " << "outputFileName" << " " << "# of evts  nJet50Min  nJet50Max" << endl;
 		cerr <<" Valid configurations are " << std::endl;
-		cerr << " ./optimize runlist_ttjets.txt isoplots.root qcd.files 100 2 5" << std::endl;
+		cerr << " ./optimize filelist.txt out.root nevts2process[-1 = all] smearingSyst[0=mean, 1-6 systs]" << std::endl;
+		cerr << "Eg:  ./optimize filelist.txt out.root 100" << std::endl;
 		return -1;
 	}
 
@@ -114,13 +115,28 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		cout << "Requested events to process = " << nentries << endl;
 	}
 
-	bNON_STD_MODE        = true;
-	bAPPLY_DPHI_CUT      = 0;
-	bRUNNING_ON_MC       = true;
-	bDO_TRIG_SELECTION   = false;
-	bDO_TRIG_PRESCALING  = false;
-	bDO_PU_WEIGHING      = true;
-	bDO_GENJET_SMEARING  = false;
+	const double dDATA_LUMI = 19458.0; //used in MC lumi weighing
+	bNON_STD_MODE        = 0;  //not using HO filter
+	sNON_STD_MODE_EXPLAIN = "Excluding trig wgt>1000 by setting it to 1!";
+	bRUNNING_ON_MC       = 0; 
+	bDO_TRIG_SELECTION   = 1;   //DATA
+	bDO_TRIG_PRESCALING  = 1;   //DATA
+	bAPPLY_DPHI_CUT      = 0; 
+	bDO_PU_WEIGHING      = false;  //MC
+	bDO_LUMI_WEIGHING    = false;  //MC 
+	bDO_GENJET_SMEARING  = 0;  //MC
+	uNTRIES              = 5000; //number of pseudo experiments per event
+	bDEBUG               = false;
+
+
+	//* overide above with for std run settings for ease
+	const bool bUseStdDataSettings = 0;
+	const bool bUseStdMCSettings   = 0;
+ 	
+	/*if (bUseStdMCSettings) { bRUNNING_ON_MC = 1; bDO_PU_WEIGHING = 1; bDO_LUMI_WEIGHING = 0; bDO_GENJET_SMEARING = 0; }
+	else if (bUseStdDataSettings) { bRUNNING_ON_MC = 0; bDO_TRIG_SELECTION = 1; bDO_TRIG_PRESCALING = 0; }
+	*/
+
 	//sanity check
 	if (bRUNNING_ON_MC && (bDO_TRIG_PRESCALING || bDO_TRIG_SELECTION) )
 	{
@@ -142,19 +158,26 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		return;
 	}
 
+	if (! bRUNNING_ON_MC && bDO_LUMI_WEIGHING)
+	{
+		cout << __FUNCTION__ << ": Contradicting settings. Lumi Weighing can be applied only with MC.! " << endl;
+		return;
+	}
 
 
-	bDEBUG = false;
-	const double dDATA_LUMI = 10000.0; // 10 fb-1
-	//const double lumiWgt = GetLumiWgt(datasetname, dDATA_LUMI); 
-	const double lumiWgt = 1; 
-	unsigned nTries_     = 1000; //number of pseudo experiments per event
-	if (bDEBUG) nTries_  = 1;
+	double dMC_lumiWgt = 1.0; 
+	if (bRUNNING_ON_MC && bDO_LUMI_WEIGHING)
+	{
+		dMC_lumiWgt = GetLumiWgt(datasetname, dDATA_LUMI);
+	}
+	const double dMC_LUMI_WGT = dMC_lumiWgt; 
 
-	const double smearingWgt = 1.0/(double)nTries_;
+	if (bDEBUG) uNTRIES  = 1;
+
+	const double smearingWgt = 1.0/(double)uNTRIES;
 
 	std::cout << red << "Dataset = " << datasetname << clearatt << endl;
-	if (bRUNNING_ON_MC) std::cout << red << "Using lumiWgt / smearingWgt = " << lumiWgt << " / " 
+	if (bRUNNING_ON_MC) std::cout << red << "Using dMC_LUMI_WGT / smearingWgt = " << dMC_LUMI_WGT << " / " 
 				<< smearingWgt << clearatt << std::endl;
 	
 	//book histograms
@@ -166,6 +189,10 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 	if (bRUNNING_ON_MC && bDO_GENJET_SMEARING)
 	{
 		smearFunc_ = new SmearFunction();
+		//Pythia
+		//smearFunc_->SetSmearingFile("/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/input_files/MCJetResolutions_Summer12_DR53X_QCD_Pt_15to3000_TuneZ2star_Flat_8TeV_pythia6_withCHS_withoutPUReweighting.root");
+		//MG
+		smearFunc_->SetSmearingFile("/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/input_files/MCJetResolutions_Summer12_DR53X_QCD_HT_100ToInf_TuneZ2star_8TeV_madgraph_withCHS_withoutPUReweighting.root");
 
 		//according to Kristin's config file this is always false
 //		if (systematicVarition>0)
@@ -288,11 +315,17 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		BookJerDebugHists();
 	}
 
-	if (! bRUNNING_ON_MC) LoadBadHcalLaserEvents();
+	if (! bRUNNING_ON_MC) 
+	{
+		LoadBadHcalLaserEvents();
+		LoadBadEcalLaserEvents();
+	}
 
 	vector<TLorentzVector> recoJets, genJets, smearedGenJets;
 
 	unsigned nProcessed = 0, nCleaningFailed = 0, nBadHcalLaserEvts = 0;
+	unsigned nHOfilterFailed = 0;
+	nBadEcalLaserEvts = 0;
 	nSmearedJetEvts = 0.0; nRecoJetEvts = 0.0; nGenJetEvts = 0.0;
 
 
@@ -322,6 +355,17 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 			cout << red << "===================== run/ls/evt= " << t_EvtRun << " / " 
 				<<  t_EvtLS << " / " <<  t_EvtEvent << clearatt  << endl;
 		
+		/* preselection cuts */
+		if (t_NVertices < 1) continue;  //at least one good vertex
+
+		
+		CreateRecoJetVec(recoJets);
+		if (! PassHOfilter())
+		{
+			++nHOfilterFailed;
+			continue;
+		}
+		
 		if (! PassCleaning()) 
 		{
 			++nCleaningFailed;
@@ -329,7 +373,6 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 			continue;
 		}
 		
-
 		//reject hcal laser bad events in data
 		if (! bRUNNING_ON_MC) 
 		{
@@ -345,16 +388,15 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		const double evtWeight = t_EvtWeight; //==1 except for Flat QCD sample
 		const double puWeight  = t_PUWeight;  //PU weight for MC
 	//	cout << "PU weight = " << t_PUWeight << endl;
-		CreateRecoJetVec(recoJets);
 
 		/******************************************************
-		 * For MC;   recoEvtTotWgt = lumiWgt * evtWeight
+		 * For MC;   recoEvtTotWgt = dMC_LUMI_WGT * evtWeight
 		 * For DATA; recoEvtTotWgt = trigPrescaleWeight
 		 *****************************************************/
 		double recoEvtTotWgt = 1;
 		if (bRUNNING_ON_MC) 
 		{
-			recoEvtTotWgt = lumiWgt * evtWeight;
+			recoEvtTotWgt = dMC_LUMI_WGT * evtWeight;
 			if (bDO_PU_WEIGHING) recoEvtTotWgt *= puWeight;
 		} else 
 		{
@@ -371,12 +413,20 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 					continue;   //when running on data accept event passing trigger only
 				} else {
 					if (bDEBUG) cout << "Passed trigger " << endl;
-					cout << "Passed Trigger:"; 
-					PrintEventNumber();
+					//cout << "Passed Trigger:"; 
+					//PrintEventNumber();
 				}
 
 				/* apply trigger prescale weight */
-				if (bDO_TRIG_PRESCALING) recoEvtTotWgt = prescaleWgt;
+				if (bDO_TRIG_PRESCALING) 
+				{
+					//NON STD MODE TO CHECK EFFECT OF THIS LARGE PRESCALED EVENTS ON THE FINAL PREDICTIONS 03262013
+					if (prescaleWgt>500.0) 
+					{
+						prescaleWgt ==1.0;
+					}
+					recoEvtTotWgt = prescaleWgt;
+				}
 			}
 		}
 
@@ -394,10 +444,10 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 
 			if (bDO_GENJET_SMEARING)
 			{
-				for (unsigned n = 0; n < nTries_; ++n)
+				for (unsigned n = 0; n < uNTRIES; ++n)
 				{
 					SmearingGenJets(genJets, smearedGenJets);
-					double totWeight = smearingWgt * lumiWgt * evtWeight;
+					double totWeight = smearingWgt * dMC_LUMI_WGT * evtWeight;
 					if (bDO_PU_WEIGHING) totWeight *= puWeight;
 					const bool accept_smear_evt = FillHistogram(smearedGenJets,2, totWeight);
 					if (accept_smear_evt) {
@@ -640,24 +690,27 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 
 	cout << ">>>>>>> " << __FILE__ << ":" << __FUNCTION__ << ": End Job " << endl;
 	if (bDEBUG) cout << red << " ------ DEBUG MODE ---------- " << clearatt << endl;
-	if (bNON_STD_MODE) cout << red << "      !!!!!!! NOT STD MODE !!!!!!    " << clearatt << endl;
+	if (bNON_STD_MODE) 
+	{
+		cout << red << "      !!!!!!! NOT STD MODE !!!!!! : " << sNON_STD_MODE_EXPLAIN << clearatt << endl;
+	}
 	cout << red <<  "MC Flag  ------------- = " << bRUNNING_ON_MC << clearatt << endl;
 	cout << "Entries found/proces'd = " << entriesFound << " / " << nProcessed << endl;
 	cout << "Cleaning Failed Evts   = " << nCleaningFailed << endl;
+	cout << "HO filter Failed Evts  = " << nHOfilterFailed << endl;
 	cout << "Bad Hcal Laser Evts    = " << nBadHcalLaserEvts << endl;
+	cout << "Bad Ecal Laser Evts    = " << nBadEcalLaserEvts << endl;
 	cout << "---------- Settings ----------------" << endl;
 	if (bRUNNING_ON_MC) {
 		cout << red <<  "PU weight applied?     = " << bDO_PU_WEIGHING << clearatt << endl;
-		cout << "Lumi wgt               = " << lumiWgt << endl;
-		if (bDO_GENJET_SMEARING) 
+		if (dMC_LUMI_WGT != 1) 
 		{
-			cout << "Smear wgt              = " << smearingWgt << endl;
-			cout << "nTries_                = " << nTries_ << endl;
-			cout << "smearedJetPt_          = " << smearedJetPt_ << endl;
+			cout << "Data Lumi scaled to    = " << dDATA_LUMI << endl;
+			cout << "Lumi wgt               = " << dMC_LUMI_WGT << endl;
 		}
 	} else {
-		cout << "DO_TRIG_SELECTION     = " << bDO_TRIG_SELECTION << endl;
-		cout << "DO_TRIG_PRESCALING    = " << bDO_TRIG_PRESCALING << endl;
+		cout << "DO_TRIG_SELECTION      = " << bDO_TRIG_SELECTION << endl;
+		cout << "DO_TRIG_PRESCALING     = " << bDO_TRIG_PRESCALING << endl;
 		if (bDO_TRIG_SELECTION)
 		{
 			cout << "Trigger selection      = ";
@@ -670,22 +723,24 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		}
 	}
 	cout << red << "bAPPLY_DPHI_CUT        = " << bAPPLY_DPHI_CUT  << clearatt << endl;
-	//cout << "NJet50_min_            = " << NJet50_min_ << endl;
-	//cout << "NJet50_max_            = " << NJet50_max_ << endl;
 	cout << "Jetbins                = "; for (int bin=0; bin < JetBins_.size(); ++bin) { cout << JetBins_.at(bin).first << "-" << JetBins_.at(bin).second << ", "; }; cout << endl; 
 	cout << "Htbins                 = "; for (int bin=0; bin < HtBins_.size(); ++bin) { cout << HtBins_.at(bin) << ", "; }; cout << endl; 
 	cout << "Mhtbins                = "; for (int bin=0; bin < MhtBins_.size(); ++bin) { cout << MhtBins_.at(bin) << ", "; }; cout << endl; 
 	cout << "nReco/nGen/nSm Evts    = " << nRecoJetEvts << "/" << nGenJetEvts << "/" << nSmearedJetEvts << endl;
-	cout << "---- Smearing Function Settings ----" << endl;
 	
 	if (bRUNNING_ON_MC && bDO_GENJET_SMEARING)
 	{
+		cout << red << "---- Smearing Function Settings ----" << clearatt << endl;
+		cout << "Sampling (nTries_)     = " << uNTRIES << endl;
+		cout << "Smear wgt              = " << smearingWgt << endl;
+		cout << "smearedJetPt_          = " << smearedJetPt_ << endl;
+
 		const bool  absTailScalingFact_val   = smearFunc_->GetAbsoluteTailScaling();
 		const float lowerTailScalingFact_val = smearFunc_->GetLowerTailScalingVariation();
 		const float upperTailScalingFact_val = smearFunc_->GetUpperTailScalingVariation();
 		const float additionalSmearingFact_val   = smearFunc_->GetAdditionalSmearingVariation();
 
-		const bool bSystematicMode = (absTailScalingFact_val != true || lowerTailScalingFact_val != 1 
+		const bool bSystematicMode = (lowerTailScalingFact_val != 1 
 				|| upperTailScalingFact_val != 1 || additionalSmearingFact_val != 1);
 
 		if (bSystematicMode) {	
@@ -717,7 +772,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 	}
 
 	cout << "---- Actual Event Counts in Reco (Smeared) MHT hist ---- " << endl;
-	cout << setw(8) << "jet bin" << setw(12) << "ht bin" << setw(12) << "mht bin" << setw(10) << "Reco" << setw(10) << "Smear"  << setw(15) << "Smear/Reco" << endl; 
+	cout << setw(8) << "jet bin" << setw(10) << "ht bin" << setw(12) << "mht bin" << setw(10) << "Reco" << setw(10) << "Smear"  << setw(15) << "Smear/Reco" << endl; 
 	for (unsigned jetbin=0; jetbin < JetBins_.size(); ++jetbin)
 	{
 		stringstream jetbin_range;
@@ -725,11 +780,11 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		for (unsigned htbin=0; htbin < HtBins_.size() -1 ; ++htbin)
 		{
 			stringstream htbin_range;
-			htbin_range << HtBins_.at(htbin) << "-" << setw(6) << HtBins_.at(htbin+1); 
+			htbin_range << HtBins_.at(htbin) << "-" << setw(5) << HtBins_.at(htbin+1); 
 			for (unsigned mhtbin=0; mhtbin < MhtBins_.size() -1 ; ++mhtbin)
 			{
 				stringstream mhtbin_range;
-				mhtbin_range << setw(6) << MhtBins_.at(mhtbin) << "-" << setw(6) << MhtBins_.at(mhtbin+1); 
+				mhtbin_range << setw(6) << MhtBins_.at(mhtbin) << "-" << setw(5) << MhtBins_.at(mhtbin+1); 
 				double int_smear = 0; 
 				if (bRUNNING_ON_MC) int_smear = (Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.h_Mht)->Integral();
 				const double int_reco = (Hist.at(jetbin).at(htbin).at(mhtbin).hv_RecoEvt.h_Mht)->Integral();
@@ -737,7 +792,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 				if (bRUNNING_ON_MC) ratio = int_reco>0 ? int_smear/int_reco : 0 ;
 				
 				cout << setprecision(1);
-				cout << fixed << setw(8) << jetbin_range.str() << setw(12) << htbin_range.str() 
+				cout << fixed << setw(6) << jetbin_range.str() << setw(12) << htbin_range.str() 
 						<< setw(12) << mhtbin_range.str() << setw(10) << int_reco << setw(10) << int_smear  << setw(15) << ratio << endl; 
 			}
 		}
@@ -972,6 +1027,7 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets,
 	if (discard) return discard;
 
 	const bool bPassRA2dphiCut = PassDphiCut(jets, mhtvec, JetBins_.at(i_JetBin).first, 0.5, 0.5, 0.3);
+//	if (bPassRA2dphiCut) cout << "bPassRA2dphiCut = " << bPassRA2dphiCut << endl;
 
 	/*******************************************************************
 	 * to get all plots passing RA2 cuts.
@@ -981,7 +1037,7 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets,
 	if (bAPPLY_DPHI_CUT && !bPassRA2dphiCut) return false;
 
 	//for MC scale debugging to compare with R+S inverted dphi plots 
-	if (bNON_STD_MODE && bPassRA2dphiCut) return 0;
+	//if (bNON_STD_MODE && bPassRA2dphiCut) return 0;
 
 	const float dPhiMin = DelPhiMin(jets,	mhtvec, JetBins_.at(i_JetBin).first);
 
@@ -1010,7 +1066,11 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets,
 
 	if (jetcoll == 0) //reco hists
 	{ 
-		cout << "Reco Event Accepted: "; PrintEventNumber();
+		//if (wgt>1)
+		//{
+		//	cout << "Reco Event Accepted: nj/ht/mht/wgt(" << njet50eta2p5 << "/" << ht << "/" << mht << "/" << wgt << ") :"; 
+		//	PrintEventNumber();
+		//}
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_Mht->Fill(mht, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_Ht->Fill(ht, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_Njet50eta2p5->Fill(njet50eta2p5, wgt);
@@ -1123,6 +1183,11 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets,
 		assert (false);
 	}
 	
+	if (jetcoll == 0 && mht>1000)
+	{
+		cout << "njet/ht/mht=" << njet50eta2p5 << "/" << ht << "/" << mht;
+		PrintEventNumber();
+	}
 	return true;
 }
 void FactorizationBySmearing::FillJetHistogram(const vector<TLorentzVector>& jets, 
@@ -1331,7 +1396,7 @@ double FactorizationBySmearing::GetLumiWgt(const string& datasetname, const doub
 
 	double lumiWgt = 1;
 
-	if (datasetname.find("pythia") != string::npos)
+	if (datasetname.find("pythia") != string::npos && datasetname.find("MG") == string::npos)
 	{
 		if (datasetname.find("QCD_Pt_300to470") != string::npos) 
 		{
@@ -1386,6 +1451,25 @@ double FactorizationBySmearing::GetLumiWgt(const string& datasetname, const doub
 				<< " given. returning lumiWgt = 1 !!!" << clearatt << endl;  
 		}
 	
+	} else if (datasetname.find("ZJets_400_HT_inf") != string::npos )
+	{
+		lumiWgt = dataLumi/ (1006922.0/6.26); //NNLO
+		cout << "Lumi weight of " << lumiWgt << " for ZJets_400_HT_inf is using for dataset " << datasetname << endl;
+
+	} else if (datasetname.find("TT_CT10") != string::npos )
+	{
+		lumiWgt = dataLumi/ (21693253/234.0); //NNLO
+		cout << "Lumi weight of " << lumiWgt << " for TT_CT10 is using for dataset " << datasetname << endl;
+
+	} else if (datasetname.find("WJetsToLNu_HT-400ToInf") != string::npos )
+	{
+		lumiWgt = dataLumi/ (4971837/30.08); //NNLO
+		cout << "Lumi weight of " << lumiWgt << " for WJetsToLNu_HT-400ToInf is using for dataset " << datasetname << endl;
+
+	} else if (datasetname.find("WJetsToLNu_HT-300To400") != string::npos )
+	{
+		lumiWgt = dataLumi/ (1028198/30.08); //NNLO
+		cout << "Lumi weight of " << lumiWgt << " for WJetsToLNu_HT-300To400 is using for dataset " << datasetname << endl;
 	} else 
 	{
 		cout << red << "WARNING! UNKNOWN dataset name, " << datasetname 
@@ -1398,7 +1482,6 @@ double FactorizationBySmearing::GetLumiWgt(const string& datasetname, const doub
 /********************************************************************
  *  BOOK HISTOGRAMS
  *******************************************************************/
-//void FactorizationBySmearing::BookHistogram(const char *outFileName)
 void FactorizationBySmearing::BookHistogram(TFile *oFile, const bool mcFlag)
 {
 	//oFile = new TFile(outFileName, "recreate");
@@ -1461,11 +1544,13 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 	const int nBins_mht = 200; const double min_mht = 0, max_mht = 1500;
 	const int nBins_ht  = 100; const double min_ht  = 0, max_ht  = 5000;
 	//for ratio plot
-	const double evt_mht_max = 1100, evt_mht_bins = 1100;
+	//const double evt_mht_max = 1100, evt_mht_bins = 1100;
+	const double evt_mht_max = 1100, evt_mht_bins = 550;
 	const double evt_ht_max  = 4000, evt_ht_bins  = 800;
 	const float npassFailHistBins  = 14;
 	const float passFailHistBins[] = {50,60,70,80,90,100,110,120,140,160,200,350,500,800,1000};
-	const float npassFail_min = 50, npassFail_max = 1050, npassFail_nbins = 100;
+	//const float npassFail_min = 50, npassFail_max = 1050, npassFail_nbins = 100;
+	const float npassFail_min = 50, npassFail_max = 1550, npassFail_nbins = 150;
 	const int passFailBinOption = 1;
 
 	//for evtWeight hist 
@@ -1796,7 +1881,16 @@ bool FactorizationBySmearing::PassCleaning()
 				&& (bool) t_HBHENoiseFilterRA2
 				);
 
-	/*if (! pass) 
+			stringstream strevt;
+			strevt << t_EvtRun << ":" << t_EvtLS << ":" << t_EvtEvent;
+			bool badEcalLaser = false;
+			if (find(vBadEcalLaserEvts.begin(), vBadEcalLaserEvts.end(), strevt.str()) != vBadEcalLaserEvts.end())
+			{
+				badEcalLaser = true;
+				++nBadEcalLaserEvts;
+			}
+
+/*	if (! pass) 
 		cout << __FUNCTION__ << ":"
 			<< t_beamHaloFilter << "/"
 			<< t_eeBadScFilter << "/"
@@ -1806,10 +1900,11 @@ bool FactorizationBySmearing::PassCleaning()
 			<< t_inconsistentMuons << "/"
 			<< t_ra2EcalBEFilter << "/"
 			<< t_ra2EcalTPFilter << "/"
-			<< t_trackingFailureFilter
+			<< t_trackingFailureFilter << "/"
+			<< t_HBHENoiseFilterRA2
 			<< endl;
 */
-	return pass;
+	return (pass && ! badEcalLaser);
 }
 
 void FactorizationBySmearing::TrigPrescaleWeight(bool &passTrig, double &weight) const
@@ -1823,6 +1918,7 @@ void FactorizationBySmearing::TrigPrescaleWeight(bool &passTrig, double &weight)
 	unsigned highestTrigPrescale = 999999;
 	bool fired = false;
 	int nFiredTrigs = 0;
+	string highestTrigPrescale_name("");
 	for (unsigned j =0; j < vTriggersToUse.size(); ++j)
 	{
 		//cout << __LINE__ << ":: trigtouse[" << j << "] = " << vTriggersToUse.at(j) << endl; 
@@ -1835,8 +1931,9 @@ void FactorizationBySmearing::TrigPrescaleWeight(bool &passTrig, double &weight)
 				{
 					fired = true;
 					++nFiredTrigs;
-					cout << __LINE__ << ":: fired[" << i << "] = " << t_firedTrigs->at(i) << "->" << t_firedTrigsPrescale->at(i) << endl; 
 					highestTrigPrescale = t_firedTrigsPrescale->at(i);
+					highestTrigPrescale_name = t_firedTrigs->at(i);
+					//cout << __LINE__ << ":: fired[" << i << "] = " << t_firedTrigs->at(i) << "->" << t_firedTrigsPrescale->at(i) << endl; 
 				}
 			}
 		}
@@ -1847,8 +1944,12 @@ void FactorizationBySmearing::TrigPrescaleWeight(bool &passTrig, double &weight)
 	{
 		weight = (double) highestTrigPrescale;
 		//if (nFiredTrigs>1) cout << ">>>>>>>>>>>> LOOK HERE <<<<<<<<<<<<" << endl;
-		//if (weight>10) cout << ">>>>>>>>>>>> LOOK HERE <<<<<<<<<<<<" << endl;
-		cout << "\t" << __LINE__ << ": selected prescale = " << highestTrigPrescale << endl;  
+		//if (weight>1) 
+		//{
+			//cout << ">>>>>>>>>>>> LOOK HERE <<<<<<<<<<<<" << endl;
+			//cout << "\t" << __LINE__ << ": selected trig/prescale = " << highestTrigPrescale_name << "/" << highestTrigPrescale << ":";
+			//PrintEventNumber();
+		//}
 	}
 
 }
@@ -1876,7 +1977,7 @@ void FactorizationBySmearing::LoadBadHcalLaserEvents()
 			}
 		}
 		cout << __FUNCTION__ << ": Read " << nLines << " lines of data from AllBadHCALLaser.txt" << endl;
-		cout << vBadHcalLaserEvts.size() << endl;
+		//cout << vBadHcalLaserEvts.size() << endl;
 	} else {
 		cout << __FUNCTION__ << ":AllBadHCALLaser.txt file not found!!!" << endl;
 		assert (false);
@@ -1884,8 +1985,159 @@ void FactorizationBySmearing::LoadBadHcalLaserEvents()
 
 }
 
-void FactorizationBySmearing::PrintEventNumber()
+void FactorizationBySmearing::LoadBadEcalLaserEvents()
+{
+	//these are several bad events found to fail ecalLaserFilter
+	vBadEcalLaserEvts.push_back("196453:734:630436469");
+	vBadEcalLaserEvts.push_back("195552:192:318100959");
+	vBadEcalLaserEvts.push_back("195552:721:975903831");
+	vBadEcalLaserEvts.push_back("195552:1253:1444299746");
+	vBadEcalLaserEvts.push_back("194912:1147:1612156042");
+	vBadEcalLaserEvts.push_back("194912:743:1160203093");
+	vBadEcalLaserEvts.push_back("196495:118:27004272");
+	vBadEcalLaserEvts.push_back("194424:199:266603387");
+	vBadEcalLaserEvts.push_back("194428:240:250267732");
+	vBadEcalLaserEvts.push_back("196364:533:513663352");
+	vBadEcalLaserEvts.push_back("195398:1345:1069637397");
+	vBadEcalLaserEvts.push_back("205158:462:644937029");
+	vBadEcalLaserEvts.push_back("205339:226:301238193");
+	vBadEcalLaserEvts.push_back("203994:112:115834698");
+	vBadEcalLaserEvts.push_back("207515:1012:1413733443");
+	vBadEcalLaserEvts.push_back("208487:331:537336833");
+	vBadEcalLaserEvts.push_back("190895:80:49855369");
+	vBadEcalLaserEvts.push_back("191721:6:2368465");
+}
+
+
+void FactorizationBySmearing::PrintEventNumber() const
 {
 	cout << "Run/Ls/Evt = " << t_EvtRun << " / " 
 		<<  t_EvtLS << " / " <<  t_EvtEvent << endl;
+}
+
+/********************************************************************
+ *				C O N S T R U C T O R
+ *******************************************************************/
+FactorizationBySmearing::FactorizationBySmearing(
+				const TString &inputFileList, 
+				const char *outFileName
+				) {
+
+	TChain *tree = new TChain("treeMaker/tree");  
+
+	if ( ! FillChain(tree, inputFileList) ) {
+		std::cerr << "Cannot get the tree " << std::endl;
+		assert(false);
+	}
+
+	Init(tree);
+
+	smearFunc_ = 0;
+	//HtBins_.push_back(0);
+	HtBins_.push_back(500);
+	HtBins_.push_back(800);
+	HtBins_.push_back(1000);
+	HtBins_.push_back(1250);
+	HtBins_.push_back(1500);
+	HtBins_.push_back(8000);
+
+	MhtBins_.push_back(0);
+/*	MhtBins_.push_back(200);
+	MhtBins_.push_back(300);
+	MhtBins_.push_back(450);
+	MhtBins_.push_back(600);
+*/	//MhtBins_.push_back(0);
+	//MhtBins_.push_back(200);
+	//MhtBins_.push_back(500);
+	MhtBins_.push_back(8000);
+
+	//jet bins: 2, 3-5, 6-7,>=8
+	//JetBins_.push_back(make_pair(2,2));	
+	JetBins_.push_back(make_pair(3,5));	
+	JetBins_.push_back(make_pair(6,7));	
+	JetBins_.push_back(make_pair(8,1000));	
+	//JetBins_.push_back(make_pair(3,1000));	
+
+	bNON_STD_MODE = false;
+	nRecoJetEvts  = 0;
+	nGenJetEvts   = 0;
+	nSmearedJetEvts     = 0;
+	nVectorInexWarnings = 0;
+	uNTRIES = 1;  //default for testing
+
+	//sanity check to have at least 1 bin in njet/ht/mht
+	bool ready = true;
+	if (JetBins_.size() < 1) { ready = ready && false; cout << __FUNCTION__ << ": Require at least one Jet bin!" << endl; }
+	if (HtBins_.size()  < 2) { ready = ready && false; cout << __FUNCTION__ << ": Require at least one Ht bin!" << endl;  }
+	if (MhtBins_.size() < 2) { ready = ready && false; cout << __FUNCTION__ << ": Require at least one Mht bin!" << endl; }
+
+	outRootFile = new TFile(outFileName, "recreate");
+	if (outRootFile->IsZombie())
+	{
+		cout << __FUNCTION__ << ": Unable to create output root file!" << endl;
+		ready = false;
+	}
+
+	
+	//difference variation of the dPhiMin selections.
+	//make sure the book the correct number of histograms 
+	//when these are changed!!!
+	vDphiVariations.push_back(0.15);
+	vDphiVariations.push_back(0.20);
+	//vDphiVariations.push_back(0.25);
+	//vDphiVariations.push_back(0.30);
+	//vDphiVariations.push_back(0.35);
+	//vDphiVariations.push_back(0.40);
+
+	//List all the triggers to be used for data WITHOUT wildcards (i.e. * )
+
+
+//2012AJuly13 rereco
+//2012Aaug6
+//2012bjULY13reco
+//2012Cprompteco
+//2012C_rereco
+//HLTPathsByName_[0] = HLT_HT*");
+//vTriggersToUse.push_back("HLT_HT200_v");
+//vTriggersToUse.push_back("HLT_HT250_v");
+//vTriggersToUse.push_back("HLT_HT300_v");
+//vTriggersToUse.push_back("HLT_HT350_v");
+//vTriggersToUse.push_back("HLT_HT400_v");
+//vTriggersToUse.push_back("HLT_HT450_v");
+//vTriggersToUse.push_back("HLT_HT500_v");
+//vTriggersToUse.push_back("HLT_HT550_v");
+//vTriggersToUse.push_back("HLT_HT650_v");
+//vTriggersToUse.push_back("HLT_HT750_v");
+//HLTPathsByName_[1] = HLT_PFHT*");
+//Kristin confirmed that she is only using HLT_PFHT triggers.
+//No jet triggers are used either. Jan 25th, 2013
+vTriggersToUse.push_back("HLT_PFHT350_v");
+vTriggersToUse.push_back("HLT_PFHT650_v");
+vTriggersToUse.push_back("HLT_PFHT700_v");
+vTriggersToUse.push_back("HLT_PFHT750_v");
+vTriggersToUse.push_back("HLT_PFNoPUHT350_v");
+vTriggersToUse.push_back("HLT_PFNoPUHT650_v");
+vTriggersToUse.push_back("HLT_PFNoPUHT700_v");
+vTriggersToUse.push_back("HLT_PFNoPUHT750_v");
+
+
+
+	if (! ready) 
+	{ 
+		cout << __FUNCTION__ << ": Minimum run conditions failed. returning!!" << endl;
+		assert (false);
+	} 
+
+	//BookHistogram(outFileName);
+}
+
+bool FactorizationBySmearing::PassHOfilter()
+{
+
+	for (int i=0; i < t_PFJetE->size(); ++i)
+	{
+		const float hofrac = t_PFJetHOEne->at(i)/t_PFJetE->at(i);
+		if (hofrac>0.4) return false;  //fail
+	}
+	return true;
 }

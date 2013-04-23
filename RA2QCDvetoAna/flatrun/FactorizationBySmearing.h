@@ -88,12 +88,15 @@ class FactorizationBySmearing : public NtupleSelector {
 
 	private:
 		TFile *outRootFile;
-		vector<string> vBadHcalLaserEvts;
+		vector<string> vBadHcalLaserEvts, vBadEcalLaserEvts;
 		bool bDEBUG, bNON_STD_MODE;
+		string sNON_STD_MODE_EXPLAIN;
 		bool bRUNNING_ON_MC;
 		bool bDO_TRIG_PRESCALING, bDO_TRIG_SELECTION, bDO_PU_WEIGHING, bDO_GENJET_SMEARING;
+		bool bDO_LUMI_WEIGHING;
 		SmearFunction *smearFunc_;
 		double smearedJetPt_;
+		unsigned uNTRIES;
 		std::vector<double> PtBinEdges_scaling_;
 		std::vector<double> EtaBinEdges_scaling_;
 		std::vector<double> AdditionalSmearing_;
@@ -104,6 +107,7 @@ class FactorizationBySmearing : public NtupleSelector {
 		double UpperTailScaling_variation_;
 		bool absoluteTailScaling_;
 		bool bAPPLY_DPHI_CUT; 
+		unsigned nBadEcalLaserEvts;
 
 		std::vector<double> HtBins_, MhtBins_;
 		vector < pair<unsigned, unsigned> >JetBins_;
@@ -141,119 +145,14 @@ class FactorizationBySmearing : public NtupleSelector {
 		bool PassCleaning();
 		void TrigPrescaleWeight(bool &failTrig, double &weight) const;
 		void LoadBadHcalLaserEvents();
-		void PrintEventNumber();
+		void LoadBadEcalLaserEvents();
+		void PrintEventNumber() const;
+		bool PassHOfilter();
 };
 #endif
 
 #ifdef FactorizationBySmearing_cxx
 
-FactorizationBySmearing::FactorizationBySmearing(
-				const TString &inputFileList, 
-				const char *outFileName
-				) {
-
-	TChain *tree = new TChain("treeMaker/tree");  
-
-	if( ! FillChain(tree, inputFileList) ) {
-		std::cerr << "Cannot get the tree " << std::endl;
-		assert(false);
-	}
-
-	Init(tree);
-
-	smearFunc_ = 0;
-	//HtBins_.push_back(0);
-//	HtBins_.push_back(500);
-//	HtBins_.push_back(800);
-	HtBins_.push_back(1000);
-//	HtBins_.push_back(1250);
-//	HtBins_.push_back(1500);
-	HtBins_.push_back(8000);
-
-//	MhtBins_.push_back(0);
-	MhtBins_.push_back(200);
-	//MhtBins_.push_back(350);
-	//MhtBins_.push_back(500);
-	MhtBins_.push_back(8000);
-
-	//jet bins: 2, 3-5, 6-7,>=8
-	//JetBins_.push_back(make_pair(2,2));	
-//	JetBins_.push_back(make_pair(3,5));	
-//	JetBins_.push_back(make_pair(6,7));	
-//	JetBins_.push_back(make_pair(8,1000));	
-	JetBins_.push_back(make_pair(3,1000));	
-
-	bNON_STD_MODE = false;
-	nRecoJetEvts = 0;
-	nGenJetEvts  = 0;
-	nSmearedJetEvts = 0;
-	nVectorInexWarnings = 0;
-
-	//sanity check to have at least 1 bin in njet/ht/mht
-	bool ready = true;
-	if (JetBins_.size() < 1) { ready = ready && false; cout << __FUNCTION__ << ": Require at least one Jet bin!" << endl; }
-	if (HtBins_.size()  < 2) { ready = ready && false; cout << __FUNCTION__ << ": Require at least one Ht bin!" << endl;  }
-	if (MhtBins_.size() < 2) { ready = ready && false; cout << __FUNCTION__ << ": Require at least one Mht bin!" << endl; }
-
-	outRootFile = new TFile(outFileName, "recreate");
-	if (outRootFile->IsZombie())
-	{
-		cout << __FUNCTION__ << ": Unable to create output root file!" << endl;
-		ready = false;
-	}
-
-	
-	//difference variation of the dPhiMin selections.
-	//make sure the book the correct number of histograms 
-	//when these are changed!!!
-	vDphiVariations.push_back(0.15);
-	vDphiVariations.push_back(0.20);
-	//vDphiVariations.push_back(0.25);
-	//vDphiVariations.push_back(0.30);
-	//vDphiVariations.push_back(0.35);
-	//vDphiVariations.push_back(0.40);
-
-	//List all the triggers to be used for data WITHOUT wildcards (i.e. * )
-
-
-//2012AJuly13 rereco
-//2012Aaug6
-//2012bjULY13reco
-//2012Cprompteco
-//2012C_rereco
-//HLTPathsByName_[0] = HLT_HT*");
-//vTriggersToUse.push_back("HLT_HT200_v");
-//vTriggersToUse.push_back("HLT_HT250_v");
-//vTriggersToUse.push_back("HLT_HT300_v");
-//vTriggersToUse.push_back("HLT_HT350_v");
-//vTriggersToUse.push_back("HLT_HT400_v");
-//vTriggersToUse.push_back("HLT_HT450_v");
-//vTriggersToUse.push_back("HLT_HT500_v");
-//vTriggersToUse.push_back("HLT_HT550_v");
-//vTriggersToUse.push_back("HLT_HT650_v");
-//vTriggersToUse.push_back("HLT_HT750_v");
-//HLTPathsByName_[1] = HLT_PFHT*");
-//Kristin confirmed that she is only using HLT_PFHT triggers.
-//No jet triggers are used either. Jan 25th, 2013
-//vTriggersToUse.push_back("HLT_PFHT350_v");
-vTriggersToUse.push_back("HLT_PFHT650_v");
-vTriggersToUse.push_back("HLT_PFHT700_v");
-vTriggersToUse.push_back("HLT_PFHT750_v");
-//vTriggersToUse.push_back("HLT_PFNoPUHT350_v");
-vTriggersToUse.push_back("HLT_PFNoPUHT650_v");
-vTriggersToUse.push_back("HLT_PFNoPUHT700_v");
-vTriggersToUse.push_back("HLT_PFNoPUHT750_v");
-
-
-
-	if (! ready) 
-	{ 
-		cout << __FUNCTION__ << ": Minimum run conditions failed. returning!!" << endl;
-		assert (false);
-	} 
-
-	//BookHistogram(outFileName);
-}
 
 Bool_t FactorizationBySmearing::FillChain(TChain *chain, const TString &inputFileList) {
 
