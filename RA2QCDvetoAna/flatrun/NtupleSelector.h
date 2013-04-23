@@ -41,6 +41,7 @@ public :
    vector<double>  *t_PFJetEta;
    vector<double>  *t_PFJetPhi;
    vector<double>  *t_PFJetE;
+   vector<double>  *t_PFJetHOEne;
    Int_t           t_NJetsPt30Eta2p5;
    Int_t           t_NJetsPt30Eta5p0;
    Int_t           t_NJetsPt50Eta2p5;
@@ -80,6 +81,7 @@ public :
    TBranch        *b_t_PFJetEta;   //!
    TBranch        *b_t_PFJetPhi;   //!
    TBranch        *b_t_PFJetE;   //!
+   TBranch        *b_t_PFJetHOEne;   //!
    TBranch        *b_t_NJetsPt30Eta2p5;   //!
    TBranch        *b_t_NJetsPt30Eta5p0;   //!
    TBranch        *b_t_NJetsPt50Eta2p5;   //!
@@ -143,6 +145,7 @@ void NtupleSelector::Init(TTree *tree)
    t_PFJetEta = 0;
    t_PFJetPhi = 0;
    t_PFJetE = 0;
+   t_PFJetHOEne = 0;
    t_genJetPt = 0;
    t_genJetEta = 0;
    t_genJetPhi = 0;
@@ -169,6 +172,7 @@ void NtupleSelector::Init(TTree *tree)
    fChain->SetBranchAddress("t_PFJetEta", &t_PFJetEta, &b_t_PFJetEta);
    fChain->SetBranchAddress("t_PFJetPhi", &t_PFJetPhi, &b_t_PFJetPhi);
    fChain->SetBranchAddress("t_PFJetE", &t_PFJetE, &b_t_PFJetE);
+   fChain->SetBranchAddress("t_PFJetHOEne", &t_PFJetHOEne, &b_t_PFJetHOEne);
    fChain->SetBranchAddress("t_NJetsPt30Eta2p5", &t_NJetsPt30Eta2p5, &b_t_NJetsPt30Eta2p5);
    fChain->SetBranchAddress("t_NJetsPt30Eta5p0", &t_NJetsPt30Eta5p0, &b_t_NJetsPt30Eta5p0);
    fChain->SetBranchAddress("t_NJetsPt50Eta2p5", &t_NJetsPt50Eta2p5, &b_t_NJetsPt50Eta2p5);
