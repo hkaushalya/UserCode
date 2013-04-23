@@ -103,6 +103,7 @@ public:
 
 
 	string SmearingFile() const { return smearingfile_; }
+	void SetSmearingFile(const string name) { smearingfile_ = name; }
 	void SetResFuncColl(const unsigned i);
 	unsigned GetResFuncCollType() const { return uResFuncCollType_; }
 
