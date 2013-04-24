@@ -191,7 +191,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 	bDO_PU_WEIGHING      = false;  //MC
 	bDO_LUMI_WEIGHING    = false;  //MC 
 	bDO_GENJET_SMEARING  = 1;  //MC
-	uNTRIES              = 10; //number of pseudo experiments per event
+	uNTRIES              = 1; //number of pseudo experiments per event
 	bDEBUG               = false;
 
 
@@ -2444,367 +2444,354 @@ bool FactorizationBySmearing::PassHOfilter()
 }
 
 
-void FactorizationBySmearing::TripletSelector(std::vector<TLorentzVector> & jets, const vector<double> bDiscriminator, std::vector<TLorentzVector> & triplet, std::vector<TLorentzVector> & rSystem, std::vector<TLorentzVector> & bJet, double & M23OverM123, double & M123)
+void FactorizationBySmearing::TripletSelector(const std::vector<TLorentzVector> & jets, 
+			const vector<double> bDiscriminator, std::vector<TLorentzVector> & triplet, 
+			std::vector<TLorentzVector> & rSystem, std::vector<TLorentzVector> & bJet, 
+			double & M23OverM123, double & M123)
 {
 
+	/* one thing, whenever you calculate a MET in TLorentzVector
+	 * set the mass of it to be Zero (force it)
+	 * because the mass of MET is used for MT2 calculation.
+	 * and you know the default MET in CMS has mass zero
+	 * when you modify it, you probably can end up with a non-zero met mass
+	 * so you have to force it to be zero manually
+	 */
 
-/*
- * one thing, whenever you calculate a MET in TLorentzVector
- *set the mass of it to be Zero (force it)
- *because the mass of MET is used for MT2 calculation.
- *and you know the default MET in CMS has mass zero
- *when you modify it, you probably can end up with a non-zero met mass
- *so you have to force it to be zero manually
- */
+	const double Rmin_ = 0.85 * 80.385/173.5;
+	const double Rmax_ = 1.25 * 80.385/173.5;
+	const double arctanmin_ = 0.2;
+	const double arctanmax_ = 1.3;
+	const double m23OverM123Cut_ = 0.35;
+	const double topMass_   = 173.5;
 
+	const double mTop_  = 173.5;
+	const double mWMin_ =  50.0;
+	const double mWMax_ = 120.0;
 
-	//to be moved up
-  double  tripletJetPtCut_, tripletDRCut_, bJetPtCut_, bJetEtaCut_, bJetDisc_, bJetDiscCut_;
-  double  Rmin_, Rmax_, arctanmin_, arctanmax_, m23OverM123Cut_, topMass_, mTop_, mWMin_, mWMax_;
+	const double tripletJetPtCut_ = 30.0;
+	const double tripletDRCut_    = 1.5;
 
-    Rmin_ = 0.85 * 80.385/173.5;
-    Rmax_ = 1.25 * 80.385/173.5;
-    arctanmin_ = 0.2;
-    arctanmax_ = 1.3;
-    m23OverM123Cut_ = 0.35;
-    topMass_ = 173.5;
+	const double bJetPtCut_   = 30;
+	const double bJetEtaCut_  = 2.4;
+	//    bJetDisc = "combinedSecondaryVertexBJetTags";
+	const double bJET_DISC_CUT_ = 0.679;
 
-    mTop_ = 173.5;
-    mWMin_ = 50;
-    mWMax_ = 120;
+	double highPt  = 0;
+	double highCSV = -1;
+	unsigned highPtIndex  = -1;
+	unsigned highCSVIndex = -1;
 
-    tripletJetPtCut_ = 30;
-    tripletDRCut_ = 1.5;
+	vector<TLorentzVector> bJets;
 
-    bJetPtCut_ = 30;
-    bJetEtaCut_ = 2.4;
-//    bJetDisc = "combinedSecondaryVertexBJetTags";
-    bJetDiscCut_ = 0.679;
-
-   double highPt = 0;
-   double highCSV = -1;
-   double pt;
-   double csv;
-   double disc;
-   unsigned highPtIndex;
-   unsigned highCSVIndex;
-   
-   vector<TLorentzVector> bJets;
-
-
-   for( unsigned i = 0; i<jets.size(); i++)
-   {
-      //disc = jets[i].bDiscriminator(bJetDisc_.c_str()); //???
-      disc = bDiscriminator.at(i);
-      if(jets[i].Pt() < bJetPtCut_ || abs(jets[i].Eta()) > bJetEtaCut_ || 
-         disc < bJetDiscCut_) continue;
-      bJets.push_back(jets[i]);
-   }
+	for (unsigned i = 0; i<jets.size(); i++)
+	{
+		const double disc = bDiscriminator.at(i);
+		if ( jets[i].Pt() < bJetPtCut_ 
+			|| abs(jets[i].Eta()) > bJetEtaCut_ 
+			|| disc < bJET_DISC_CUT_) 
+		{
+			continue;
+		}
+		bJets.push_back(jets[i]);
+	}
 	// cou << __LINE__ << ": bJets = " << bJets.size() << endl;
-   
-   if( bJets.size() == 0)
-   {
-      for( unsigned i = 0; i < jets.size(); i++)
-      {
-/*         csv = jets[i].bDiscriminator(bJetDisc_.c_str());
-         cout<<"ETA: "<<jets[i].Eta()<<" PHI: "<<jets[i].phi()<<" PT: "<<jets[i].Pt()<<" CSV: "<<csv<<endl;
-*/
-         if(abs(jets[i].Eta()) > bJetEtaCut_) continue;
-         
-         pt = jets[i].Pt();
-         //csv = jets[i].bDiscriminator(bJetDisc_.c_str());   //????
-         csv = bDiscriminator.at(i);   //????
-         
-         if(pt > highPt)
-         {
-            highPt = pt;
-            highPtIndex = i;
-         }
-         if(csv > highCSV)
-         {
-            highCSV = csv;
-            highCSVIndex = i;
-         }
-      }
-   }
-   if(highCSV != -1 && highCSV != -10)
-      bJets.push_back(jets[highCSVIndex]);
 
-         
-   
-   TLorentzVector p41(0,0,0,0);
-   TLorentzVector p42(0,0,0,0);
-   TLorentzVector p43(0,0,0,0);
-   
-   bool bJetPass = false;
-   bool bJetInTrip = false;
-   bool bJetOutTrip = false;
-   bool passDijet = false;
-   bool passM23OverM123 = false;
-   bool atLeastOnePassed = false;
-   bool skipFailedM23OverM123 = false;
+	//if no b-jet is found based on bDiscrminator cut
+	//use the jet with highest CSV value at the b-jet.
+	if (bJets.size() == 0)
+	{
+		for (unsigned i = 0; i < jets.size(); i++)
+		{
+			/*         csv = jets[i].bDiscriminator(bJetDisc_.c_str());
+						  cout<<"ETA: "<<jets[i].Eta()<<" PHI: "<<jets[i].phi()<<" PT: "<<jets[i].Pt()<<" CSV: "<<csv<<endl;
+						  */
+			if (abs(jets[i].Eta()) > bJetEtaCut_) continue;
 
-   unsigned selectedIndex = 0;
-   unsigned rank = 5;
+//			const double pt  = jets[i].Pt();
+			const double csv = bDiscriminator.at(i);   //????
+
+/*			if (pt > highPt)
+			{
+				highPt = pt;
+				highPtIndex = i;
+			}
+*/			if (csv > highCSV)
+			{
+				highCSV = csv;
+				highCSVIndex = i;
+			}
+		}
+	} //if no bjet is found
+
+	if (highCSV != -1 && highCSV != -10)
+	{
+		bJets.push_back(jets[highCSVIndex]);
+	}
+
+	TLorentzVector p41(0,0,0,0);
+	TLorentzVector p42(0,0,0,0);
+	TLorentzVector p43(0,0,0,0);
+
+	bool bJetPass              = false;
+	bool bJetInTrip            = false;
+	bool bJetOutTrip           = false;
+	bool passDijet             = false;
+	bool passM23OverM123       = false;
+	bool atLeastOnePassed      = false;
+	bool skipFailedM23OverM123 = false;
+
+	unsigned selectedIndex = 0;
+	unsigned rank          = 5;
 	const double LN = -9999.99; 
-   double bJetEta = LN;
-   double bJetPhi = LN;
-   double m123 = LN ;
-   double m12 = LN;
-   double m13 = LN ;
-   double m23 = LN;
-   double dTopMin = 999999;
+	double bJetEta  = LN;
+	double bJetPhi  = LN;
+	double m123     = LN ;
+	double m12      = LN;
+	double m13      = LN ;
+	double m23      = LN;
+	double dTopMin  = 999999;
 
 
-   vector<double> m123s;
-   vector<double> m12s;
-   vector<double> m13s;
-   vector<double> m23s;
-   vector<vector<int> > bJetInRIndices;
+	vector<double> m123s;
+	vector<double> m12s;
+	vector<double> m13s;
+	vector<double> m23s;
+	vector<vector<int> > bJetInRIndices;
 
-   vector<bool> bJetsBehave;
-   vector<bool> passesDijetCuts;
-   vector<bool> passesM23OverM123Cut;
+	vector<bool> bJetsBehave;
+	vector<bool> passesDijetCuts;
+	vector<bool> passesM23OverM123Cut;
 
-   auto_ptr<vector<bool> > selectedPassDijetCuts(new vector<bool>());
-   auto_ptr<vector<TLorentzVector> > selectedTriplet(new vector<TLorentzVector>());
-   auto_ptr<vector<TLorentzVector> > selectedRSystem(new vector<TLorentzVector>());
-   auto_ptr<vector<TLorentzVector> > selectedBJets(new vector<TLorentzVector>());
-   auto_ptr<vector<int> > selectedTripletIndex(new vector<int>());
-   auto_ptr<vector<int> > selectedBJetsIndex(new vector<int>());
-   auto_ptr<vector<double> > selectedM123(new vector<double>());
-   auto_ptr<vector<double> > selectedM12(new vector<double>());
-   auto_ptr<vector<double> > selectedM13(new vector<double>());
-   auto_ptr<vector<double> > selectedM23(new vector<double>());
-   auto_ptr<double>  selectedM23OverM123(new double());
-   auto_ptr<vector<bool> > hasBJet(new vector<bool>());
-   auto_ptr<vector<bool> > passDijetCuts(new vector<bool>());
-   auto_ptr<vector<bool> > passM23OverM123Cut(new vector<bool>());
-
-
-   vector<vector<int> > indices;
+	auto_ptr<vector<bool> > selectedPassDijetCuts(new vector<bool>());
+	auto_ptr<vector<TLorentzVector> > selectedTriplet(new vector<TLorentzVector>());
+	auto_ptr<vector<TLorentzVector> > selectedRSystem(new vector<TLorentzVector>());
+	auto_ptr<vector<TLorentzVector> > selectedBJets(new vector<TLorentzVector>());
+	auto_ptr<vector<int> > selectedTripletIndex(new vector<int>());
+	auto_ptr<vector<int> > selectedBJetsIndex(new vector<int>());
+	auto_ptr<vector<double> > selectedM123(new vector<double>());
+	auto_ptr<vector<double> > selectedM12(new vector<double>());
+	auto_ptr<vector<double> > selectedM13(new vector<double>());
+	auto_ptr<vector<double> > selectedM23(new vector<double>());
+	auto_ptr<double>  selectedM23OverM123(new double());
+	auto_ptr<vector<bool> > hasBJet(new vector<bool>());
+	auto_ptr<vector<bool> > passDijetCuts(new vector<bool>());
+	auto_ptr<vector<bool> > passM23OverM123Cut(new vector<bool>());
 
 
-   for(int i = 0; i < int(jets.size()); i++)
-   {
-      for(int j = i+1; j < int(jets.size()); j++)
-      {
-         for(int k = j+1; k < int(jets.size()); k++)
-         {
+	vector<vector<int> > indices;
 
-            TLorentzVector tempLor = jets[i] + jets[j] + jets[k];
-/*            double dR1 = deltaR( jets[i].Eta(), jets[i].phi(),
-                                 tempLor.Eta(), tempLor.phi());
-            double dR2 = deltaR( jets[j].Eta(), jets[j].phi(),
-                                 tempLor.Eta(), tempLor.phi());
-            double dR3 = deltaR( jets[k].Eta(), jets[k].phi(),
-                                 tempLor.Eta(), tempLor.phi());
-*/				const double dR1 = tempLor.DeltaR(jets[i]);
+	for (int i = 0; i < int(jets.size()); i++)
+	{
+		for (int j = i+1; j < int(jets.size()); j++)
+		{
+			for (int k = j+1; k < int(jets.size()); k++)
+			{
+
+				TLorentzVector tempLor = jets[i] + jets[j] + jets[k];
+				/*            double dR1 = deltaR( jets[i].Eta(), jets[i].phi(),
+								  tempLor.Eta(), tempLor.phi());
+								  double dR2 = deltaR( jets[j].Eta(), jets[j].phi(),
+								  tempLor.Eta(), tempLor.phi());
+								  double dR3 = deltaR( jets[k].Eta(), jets[k].phi(),
+								  tempLor.Eta(), tempLor.phi());
+								  */				
+				const double dR1 = tempLor.DeltaR(jets[i]);
 				const double dR2 = tempLor.DeltaR(jets[j]);
 				const double dR3 = tempLor.DeltaR(jets[k]);
-	
-            if(dR1 > tripletDRCut_) continue;
-            if(dR2 > tripletDRCut_) continue;
-            if(dR3 > tripletDRCut_) continue;
-            
-            vector<int> tempVec;     
-            tempVec.push_back(i);
-            tempVec.push_back(j);
-            tempVec.push_back(k);
-            indices.push_back(tempVec);
-         }
-      }
-   }
+
+				if (dR1 > tripletDRCut_) continue;
+				if (dR2 > tripletDRCut_) continue;
+				if (dR3 > tripletDRCut_) continue;
+
+				vector<int> tempVec;     
+				tempVec.push_back(i);
+				tempVec.push_back(j);
+				tempVec.push_back(k);
+				indices.push_back(tempVec);
+			}
+		}
+	}
 
 
-   for(unsigned i = 0; i < indices.size(); i++)
-   {
-//      cout<<indices[i][0]<<" "<<indices[i][1]<<" "<<indices[i][2]<<" "<<endl;
-      bJetPass = true;
-      passDijet = false;
-      passM23OverM123 = false;
+	for (unsigned i = 0; i < indices.size(); i++)
+	{
+		//      cout<<indices[i][0]<<" "<<indices[i][1]<<" "<<indices[i][2]<<" "<<endl;
+		bJetPass  = true;
+		passDijet = false;
+		passM23OverM123 = false;
 
-      vector<int> tempBJetIndices;
-      if(indices[i].size() != 3) 
-         cout<<indices[i].size()<<endl;
+		vector<int> tempBJetIndices;
+		if (indices[i].size() != 3) 
+			cout<<indices[i].size()<<endl;
 
-      p41 = jets[indices[i][0]];
-      p42 = jets[indices[i][1]];
-      p43 = jets[indices[i][2]];
-      
-      m123 = (p41 + p42 + p43).M();
-      m12 = (p41 + p42).M();
-      m13 = (p41 + p43).M();
-      m23 = (p42 + p43).M();
+		p41 = jets[indices[i][0]];
+		p42 = jets[indices[i][1]];
+		p43 = jets[indices[i][2]];
 
-      //Check if the bjet(s) is in the right place
+		m123 = (p41 + p42 + p43).M();
+		m12 = (p41 + p42).M();
+		m13 = (p41 + p43).M();
+		m23 = (p42 + p43).M();
 
-      if( bJets.size() == 0)
-      {
-         bJetPass = false;
-      }
-      else if( bJets.size() == 1)
-      {         
-         bJetEta = bJets[0].Eta();
-         bJetPhi = bJets[0].Phi();
-         //if( (deltaR(p41.Eta(), p41.phi(), bJetEta, bJetPhi) < 0.01)   || 
-           //  (deltaR(p42.Eta(), p42.phi(), bJetEta, bJetPhi) < 0.01)   || 
-            // (deltaR(p43.Eta(), p43.phi(), bJetEta, bJetPhi) < 0.01) )
-         if( p41.DeltaR(bJets.at(0)) < 0.01 || 
-             p42.DeltaR(bJets.at(0)) < 0.01 || 
-             p43.DeltaR(bJets.at(0)) < 0.01 )
-         {
-            bJetPass = false;
-         }
-
-         else
-         {
-            tempBJetIndices.push_back(0);
-         }
-      }
-      else if( bJets.size() >= 2)
-      {
-         bJetInTrip = false;
-         bJetOutTrip = false;
-         for (unsigned j = 0; j < bJets.size(); j++)
-         {
-            //bJetEta = bJets[j].Eta();
-            //bJetPhi = bJets[j].Phi();
- //           if( (deltaR(p41.Eta(), p41.phi(), bJetEta, bJetPhi) < 0.01)  || 
- //               (deltaR(p42.Eta(), p42.phi(), bJetEta, bJetPhi) < 0.01)  || 
-  //              (deltaR(p43.Eta(), p43.phi(), bJetEta, bJetPhi) < 0.01) )
-				if( p41.DeltaR(bJets.at(j)) < 0.01 || 
-					 p42.DeltaR(bJets.at(j)) < 0.01 || 
-					 p43.DeltaR(bJets.at(j)) < 0.01 )
+		//Check if the bjet(s) is in the right place
+		if ( bJets.size() == 0)
+		{
+			bJetPass = false;
+		} else if ( bJets.size() == 1)
+		{         
+			bJetEta = bJets[0].Eta();
+			bJetPhi = bJets[0].Phi();
+			//if( (deltaR(p41.Eta(), p41.phi(), bJetEta, bJetPhi) < 0.01)   || 
+			//  (deltaR(p42.Eta(), p42.phi(), bJetEta, bJetPhi) < 0.01)   || 
+			// (deltaR(p43.Eta(), p43.phi(), bJetEta, bJetPhi) < 0.01) )
+			if (  p41.DeltaR(bJets.at(0)) < 0.01
+				|| p42.DeltaR(bJets.at(0)) < 0.01
+				|| p43.DeltaR(bJets.at(0)) < 0.01 )
+			{
+				bJetPass = false;
+			} else
+			{
+				tempBJetIndices.push_back(0); //why is this 0?
+			}
+		} else if( bJets.size() >= 2)
+		{
+			bJetInTrip = false;
+			bJetOutTrip = false;
+			for (unsigned j = 0; j < bJets.size(); j++)
+			{
+				//bJetEta = bJets[j].Eta();
+				//bJetPhi = bJets[j].Phi();
+				//           if( (deltaR(p41.Eta(), p41.phi(), bJetEta, bJetPhi) < 0.01)  || 
+				//               (deltaR(p42.Eta(), p42.phi(), bJetEta, bJetPhi) < 0.01)  || 
+				//              (deltaR(p43.Eta(), p43.phi(), bJetEta, bJetPhi) < 0.01) )
+				if (  p41.DeltaR(bJets.at(j)) < 0.01 
+					|| p42.DeltaR(bJets.at(j)) < 0.01 
+					|| p43.DeltaR(bJets.at(j)) < 0.01 )
 				{
 					bJetInTrip = true;
-            }
-            else
-            {
-               tempBJetIndices.push_back(j);
-               bJetOutTrip = true;
-            }
-         }
+				} else
+				{
+					tempBJetIndices.push_back(j);
+					bJetOutTrip = true;
+				}
+			}
 
-         if( !bJetInTrip || !bJetOutTrip)
-            bJetPass = false;
+			
+			if ( !bJetInTrip || !bJetOutTrip)
+				bJetPass = false;
 
-      }
+		}
 
-      
-      //check if it passes the dijetmass cuts
-      
-      if(arctanmin_ < atan(m13/m12) && atan(m13/m12) < arctanmax_ && 
-         Rmin_ < m23/m123 && m23/m123 < Rmax_) 
-         passDijet = true;
 
-      if(Rmin_*Rmin_ * (1+m13*m13/(m12*m12))  < 1 - m23*m23/(m123*m123) &&
-         Rmax_*Rmax_ * (1+m13*m13/(m12*m12))  > 1 - m23*m23/(m123*m123))
-         passDijet = true;
+		//check if it passes the dijetmass cuts
 
-      if(Rmin_*Rmin_ * (1+m12*m12/(m13*m13))  < 1 - m23*m23/(m123*m123) &&
-         Rmax_*Rmax_ * (1+m12*m12/(m13*m13))  > 1 - m23*m23/(m123*m123)) 
-         passDijet = true;
+		if(arctanmin_ < atan(m13/m12) && atan(m13/m12) < arctanmax_ && 
+				Rmin_ < m23/m123 && m23/m123 < Rmax_) 
+			passDijet = true;
 
-      if(m23/m123 > m23OverM123Cut_) 
-         passM23OverM123 = true;
+		if(Rmin_*Rmin_ * (1+m13*m13/(m12*m12))  < 1 - m23*m23/(m123*m123) &&
+				Rmax_*Rmax_ * (1+m13*m13/(m12*m12))  > 1 - m23*m23/(m123*m123))
+			passDijet = true;
 
-      passesDijetCuts.push_back(passDijet);
-      passesM23OverM123Cut.push_back(passM23OverM123);    
-      bJetsBehave.push_back(bJetPass);
-      bJetInRIndices.push_back(tempBJetIndices);
+		if(Rmin_*Rmin_ * (1+m12*m12/(m13*m13))  < 1 - m23*m23/(m123*m123) &&
+				Rmax_*Rmax_ * (1+m12*m12/(m13*m13))  > 1 - m23*m23/(m123*m123)) 
+			passDijet = true;
 
-      m123s.push_back(m123);
-      m12s.push_back(m12);
-      m13s.push_back(m13);
-      m23s.push_back(m23);
+		if(m23/m123 > m23OverM123Cut_) 
+			passM23OverM123 = true;
 
-      hasBJet->push_back(bJetPass);
-      passDijetCuts->push_back(passDijet);
-      passM23OverM123Cut->push_back(passM23OverM123);
-   }
+		passesDijetCuts.push_back(passDijet);
+		passesM23OverM123Cut.push_back(passM23OverM123);    
+		bJetsBehave.push_back(bJetPass);
+		bJetInRIndices.push_back(tempBJetIndices);
 
-   
-   //Choose the selected triplet
+		m123s.push_back(m123);
+		m12s.push_back(m12);
+		m13s.push_back(m13);
+		m23s.push_back(m23);
 
-   for(unsigned i = 0; i < indices.size(); i++)
-   {
-      if(!passesDijetCuts[i] || !bJetsBehave[i]) continue;
-      
-      //Preferentially pick ones that pass the m23/m123 cut
-      if(passesM23OverM123Cut[i])
-      {
-         if(!skipFailedM23OverM123) 
-            dTopMin = 999999;
-         
-         skipFailedM23OverM123 = true;
-         
-         if(abs(m123s[i] - topMass_) < dTopMin)
-         {
-            atLeastOnePassed = true;
-            selectedIndex = i;
-            dTopMin = abs(m123s[i] - topMass_);
-         }
-      }
-      
-      //Only consider these if you don't have a triplet passing m23/m123 
-      if(!skipFailedM23OverM123)
-      {
-         if(abs(m123s[i] - topMass_) < dTopMin)
-         {
-            atLeastOnePassed = true;
-            selectedIndex = i;
-            dTopMin = abs(m123s[i] - topMass_);
-         }
-      }
-   }
-   
-   if(atLeastOnePassed)
-   {
-      
-      //Jet::Constituents tripletConsts;  //not used
-      TLorentzVector tripletP4(0, 0, 0, 0);
-  //    Candidate::Point tripletVertex = jets[indices[selectedIndex][0]].vertex();
-      for( int i = 0; i < int(jets.size()); i++)
-      {
-         if( i == indices[selectedIndex][0] || 
-             i == indices[selectedIndex][1] || 
-             i == indices[selectedIndex][2])
-         {
-            
-            //tripletP4 = tripletP4 + jets[i].p4();
-            tripletP4 = tripletP4 + jets[i];
-            //for(unsigned j = 0; j < jets[i].numberOfDaughters(); j++)  //not used!
-              // tripletConsts.push_back(jets[i].daughterPtr(j));
-            
-         }
-         else
-         {
-            //rSystem.push_back(reco::Jet(jets[i].p4(), jets[i].vertex()));
-            rSystem.push_back(jets.at(i));
-         }
-      }
-      
+		hasBJet->push_back(bJetPass);
+		passDijetCuts->push_back(passDijet);
+		passM23OverM123Cut->push_back(passM23OverM123);
+	}
+
+
+	//Choose the selected triplet
+
+	for(unsigned i = 0; i < indices.size(); i++)
+	{
+		if(!passesDijetCuts[i] || !bJetsBehave[i]) continue;
+
+		//Preferentially pick ones that pass the m23/m123 cut
+		if(passesM23OverM123Cut[i])
+		{
+			if(!skipFailedM23OverM123) 
+				dTopMin = 999999;
+
+			skipFailedM23OverM123 = true;
+
+			if(abs(m123s[i] - topMass_) < dTopMin)
+			{
+				atLeastOnePassed = true;
+				selectedIndex = i;
+				dTopMin = abs(m123s[i] - topMass_);
+			}
+		}
+
+		//Only consider these if you don't have a triplet passing m23/m123 
+		if(!skipFailedM23OverM123)
+		{
+			if(abs(m123s[i] - topMass_) < dTopMin)
+			{
+				atLeastOnePassed = true;
+				selectedIndex = i;
+				dTopMin = abs(m123s[i] - topMass_);
+			}
+		}
+	}
+
+	if(atLeastOnePassed)
+	{
+
+		TLorentzVector tripletP4(0, 0, 0, 0);
+		for( int i = 0; i < int(jets.size()); i++)
+		{
+			if( i == indices[selectedIndex][0] || 
+					i == indices[selectedIndex][1] || 
+					i == indices[selectedIndex][2])
+			{
+
+				tripletP4 = tripletP4 + jets[i];
+
+			}
+			else
+			{
+				//rSystem.push_back(reco::Jet(jets[i].p4(), jets[i].vertex()));
+				rSystem.push_back(jets.at(i));
+			}
+		}
+
 		//so how would I creat a jet that asscoaited with the original vertex as the 
 		//3 jets used to create it??
 		//NEED TO CHECK THIS! use sum of p4 for now
-      //triplet.push_back(reco::Jet(tripletP4, tripletVertex));
-      triplet.push_back(tripletP4);
-      for(unsigned i = 0; i < bJetInRIndices[selectedIndex].size(); i++)
-      {
-         bJet.push_back(bJets[bJetInRIndices[selectedIndex][i]]);
-      }
+		//triplet.push_back(reco::Jet(tripletP4, tripletVertex));
+		triplet.push_back(tripletP4);
+		for(unsigned i = 0; i < bJetInRIndices[selectedIndex].size(); i++)
+		{
+			bJet.push_back(bJets[bJetInRIndices[selectedIndex][i]]);
+		}
 
-      M123 = m123s[selectedIndex];
-      M23OverM123 = m23s[selectedIndex]/m123s[selectedIndex];
-      
+		M123 = m123s[selectedIndex];
+		M23OverM123 = m23s[selectedIndex]/m123s[selectedIndex];
 
-   }
-   else
-   {
-      M123 = -1;
-      M23OverM123 = -1;
-   }
+
+	}
+	else
+	{
+		M123 = -1;
+		M23OverM123 = -1;
+	}
 
 }
 /* This will mathc the RECO jets to gen jets and assign the CSV of RECO jet
