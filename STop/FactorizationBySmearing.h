@@ -165,7 +165,7 @@ class FactorizationBySmearing : public NtupleSelector {
 		void LoadBadEcalLaserEvents();
 		void PrintEventNumber() const;
 		bool PassHOfilter();
-   	void TripletSelector(std::vector<TLorentzVector> & , const std::vector<double> bDisc, std::vector<TLorentzVector> & , std::vector<TLorentzVector> & , std::vector<TLorentzVector> & , double & , double & );
+   	void TripletSelector(const std::vector<TLorentzVector> & , const std::vector<double> bDisc, std::vector<TLorentzVector> & , std::vector<TLorentzVector> & , std::vector<TLorentzVector> & , double & , double & );
    	void MTMT2(const TLorentzVector & MET, const std::vector<TLorentzVector> & triplet,
 						const std::vector<TLorentzVector> & rSystem, const std::vector<TLorentzVector> & bJetsInR, 
 						double & MT2, double & MTt, double& MTb);
