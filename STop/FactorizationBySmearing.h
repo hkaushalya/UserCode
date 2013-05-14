@@ -43,13 +43,14 @@ class FactorizationBySmearing : public NtupleSelector {
 		double JetResolutionHist_Pt_Smear(const double& pt, const double& eta, const int& i);
 		void SmearingGenJets(const vector<TLorentzVector>& jets_gen, const vector<double>& bDisc_gen, 
 						std::vector<TLorentzVector> &genJets_smeared, std::vector<double>& bDisc_smeared);
-		void SetGenJetBdiscriminators(const vector<TLorentzVector>& jets_reco, std::vector<double>& bDisc_reco,
+		void SetGenJetBdiscriminators(const vector<TLorentzVector>& jets_reco, const std::vector<double>& bDisc_reco,
 									const std::vector<TLorentzVector> &genJets, std::vector<double>& bDisc_gen);
 		int GetIndex(const double& x, const std::vector<double>* vec);
 		double GetHFProb(const double& pt, const double& eta, const int& i_jet);
 		bool PassCuts(const vector<TLorentzVector>& jets);
 		vector<TLorentzVector> GetPt50Eta2p5Jets(const vector<TLorentzVector>& jets);
 		void Print4vec(const TLorentzVector& tl1, const TLorentzVector& tl2) const;
+		void Print4vec(const TLorentzVector& tl1) const;
 
 		struct JetHist_t {
 			TH1D *h_Jet_pt;
@@ -119,7 +120,7 @@ class FactorizationBySmearing : public NtupleSelector {
 		double LowerTailScaling_variation_;
 		double UpperTailScaling_variation_;
 		bool absoluteTailScaling_;
-		bool bAPPLY_DPHI_CUT, bAPPLY_NJET_CUT, bAPPLY_MET_CUT, bAPPLY_TRIPLET_CUT, bAPPLY_TOPMASS_CUT, bAPPLY_TOPPLUSBJET_CUT, bAPPLY_MT2_CUT; 
+		bool bAPPLY_DPHI_CUT, bAPPLY_NJET_CUT, bAPPLY_MET_CUT, bAPPLY_TRIPLET_CUT, bAPPLY_TOPMASS_CUT, bAPPLY_TOPPLUSBJET_CUT, bAPPLY_MT2_CUT, bAPPLY_BJET_CUT; 
 		unsigned uMinNjet70Eta2p4_, uMinNjet50Eta2p4_, uMinNjet30Eta2p4_, uMinTriplets_;
 		double dMinMet_, dMinTopMass_, dMaxTopMass_, dMinTopPlusBjetMass_, dMinMt2_;
 		unsigned nBadEcalLaserEvts;
@@ -127,7 +128,7 @@ class FactorizationBySmearing : public NtupleSelector {
 		std::vector<double> HtBins_, MhtBins_;
 		vector < pair<unsigned, unsigned> >JetBins_;
 		vector<vector<vector<Hist_t> > > Hist; //for each njet/HT/MHT bins
-		std::vector<float> vDphiVariations;
+		std::vector<double> vDphiVariations;
 		double nRecoJetEvts, nGenJetEvts, nSmearedJetEvts, nVectorInexWarnings;
 		vector<string> vTriggersToUse; 
 
@@ -151,11 +152,11 @@ class FactorizationBySmearing : public NtupleSelector {
 			const double minPt, const double maxEta);		
 		void FillJetHistogram(const vector<TLorentzVector>& jets, 
 				vector<JetHist_t> hist, const int jetcoll, const TLorentzVector& mhtvec, const double& wgt=1.0); 
-		float DelPhiMin(const vector<TLorentzVector>& jets, 
+		double DelPhiMin(const vector<TLorentzVector>& jets, 
 					const TLorentzVector& mhtVec, const unsigned& njet50min);
 		bool PassDphiCut(const vector<TLorentzVector>& jets, 
 					const TLorentzVector& mht, const unsigned njet50min, 
-					const float& cut1, const float& cut2, const float& cut3);
+					const double& cut1, const double& cut2, const double& cut3);
 		bool PassBaselineSelection(const vector<TLorentzVector>& jets, const TLorentzVector met_vec);
 		double GetLumiWgt(const string& datasetname, const double& dataLumi);
 		void DivideByBinWidth(TH1* h);
