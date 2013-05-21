@@ -148,6 +148,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 {
 	if (fChain == 0) return;
 
+	topt  = new topTagger::type3TopTagger();
 
 	bAPPLY_NJET_CUT        =  1 & cutmask;
 	bAPPLY_MET_CUT         =  2 & cutmask;
@@ -157,13 +158,21 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 	bAPPLY_MT2_CUT         = 32 & cutmask;
 	bAPPLY_BJET_CUT        = 64 & cutmask;
 	bAPPLY_DPHI_CUT        = 128 & cutmask;
+	bAPPLY_INVERT_DPHI_CUT = 256 & cutmask;
 	
+	if (bAPPLY_DPHI_CUT && bAPPLY_INVERT_DPHI_CUT)
+	{
+		cout << __FUNCTION__ << ": Conflicting cuts require!! bAPPLY_DPHI_CUT=" << bAPPLY_DPHI_CUT << " and bAPPLY_INVERT_DPHI_CUT=" << bAPPLY_INVERT_DPHI_CUT << endl; 
+		assert(false);
+	}
+
 	uMinNjet70Eta2p4_ = 2; uMinNjet50Eta2p4_ = 4; uMinNjet30Eta2p4_ = 5;
-	dMinMet_ = 175.0;
+	dMinMet_   = 175.0;
 	uMinTriplets_ = 1;
 	dMinTopMass_ = 80.0; dMaxTopMass_ = 270.0;
 	dMinTopPlusBjetMass_ = 500.0;
-	dMinMt2_ = 300.0;
+	dMinMt2_   = 300.0;
+	nreco = 0, ngen = 0, nsmear = 0;
 
 
 	/*****************************************************
@@ -192,7 +201,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 	bDO_PU_WEIGHING      = false;  //MC
 	bDO_LUMI_WEIGHING    = false;  //MC 
 	bDO_GENJET_SMEARING  = 1;  //MC
-	uNTRIES              = 1; //number of pseudo experiments per event
+	uNTRIES              = 100; //number of pseudo experiments per event
 	bDEBUG               = false;
 
 
@@ -258,6 +267,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		smearFunc_ = new SmearFunction();
 		//Pythia
 		smearFunc_->SetSmearingFile("/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/input_files/MCJetResolutions_Summer12_DR53X_QCD_Pt_15to3000_TuneZ2star_Flat_8TeV_pythia6_withCHS_withoutPUReweighting.root");
+		//smearFunc_->SetSmearingFile("MCJetResolutions_Summer12_DR53X_QCD_Pt_15to3000_TuneZ2star_Flat_8TeV_pythia6_withCHS_withoutPUReweighting.root");
 		//MG
 		//smearFunc_->SetSmearingFile("/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/input_files/MCJetResolutions_Summer12_DR53X_QCD_HT_100ToInf_TuneZ2star_8TeV_madgraph_withCHS_withoutPUReweighting.root");
 
@@ -416,7 +426,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 
 		++nProcessed;
 
-//		if (bDEBUG) 
+		if (bDEBUG) 
 			cout << red << "===================== run/ls/evt= " << t_EvtRun << " / " 
 				<<  t_EvtLS << " / " <<  t_EvtEvent << clearatt  << endl;
 
@@ -501,9 +511,9 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		pfmetvec.SetVectMag(pfmetv,0);
 		TLorentzVector reco_mhtvec(MHT(recoJets));	
 		const TLorentzVector reco_uncl_met_vec = pfmetvec - reco_mhtvec;  
-		cout << __FUNCTION__ << setw(18) << ":  pfmet/x/y/phi= " << pfmetvec.Pt() << "/"<< pfmetvec.Px() << "/" << pfmetvec.Py() << "/"<< pfmetvec.Pz() << "/" << pfmetvec.Phi() << endl;
-		cout << __FUNCTION__ << setw(18) << ":unclmet/x/y/phi= " << reco_uncl_met_vec.Pt() << "/"<< pfmetvec.Px() << "/" << pfmetvec.Py() << "/" << pfmetvec.Pz() << "/"<< pfmetvec.Phi() << endl;
-
+/*		cout << __FUNCTION__ << setprecision(1) << fixed << setw(18) << ":  pfmet/eta/phi/M= " << pfmetvec.Pt() << "/"<< pfmetvec.Eta() << "/" << pfmetvec.Phi() << "/"<< pfmetvec.M() << endl;
+		cout << __FUNCTION__ << setprecision(1) << fixed << setw(18) << ":unclmet/eta/phi/M= " << reco_uncl_met_vec.Pt() << "/"<< pfmetvec.Eta() << "/" << pfmetvec.Phi() << "/" << pfmetvec.M() << endl;
+*/
 		const bool accept_reco_evt = FillHistogram(recoJets, bDiscrminators_reco, reco_uncl_met_vec, 0, recoEvtTotWgt);
 		if (accept_reco_evt) 
 		{
@@ -620,7 +630,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 	hist2print.push_back("MTb");
 	hist2print.push_back("MTt");
 	hist2print.push_back("MTb_p_MTt");
-	hist2print.push_back("bjetPt");
+	//hist2print.push_back("bjetPt");
 	hist2print.push_back("bjetMass");
 	hist2print.push_back("dphimin");
 	hist2print.push_back("njet30eta5p0");
@@ -636,119 +646,73 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		{
 			for (unsigned mhtbin=0; mhtbin < MhtBins_.size() -1 ; ++mhtbin)
 			{
-				
-				stringstream reco_hist_name, gen_hist_name, smear_hist_name;
-				//reco_hist_name << "reco_" << hist2print.at(ihist);
-				TH1* hrecomht = (TH1*) Hist.at(jetbin).at(htbin).at(mhtbin).hv_RecoEvt.h_Mht->Clone("reco_mht");
-				hrecomht->SetDirectory(0);
-				TH1* hsmearmht = (TH1*) Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.h_Mht->Clone("smear_mht");
-				hsmearmht->SetDirectory(0);
-				TH1* hrecodphimin = (TH1*) Hist.at(jetbin).at(htbin).at(mhtbin).hv_RecoEvt.h_DphiMin->Clone("reco_dphimin");
-				hrecodphimin->SetDirectory(0);
-				TH1* hsmeardphimin = (TH1*) Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.h_DphiMin->Clone("smear_dphimin");
-				hsmeardphimin->SetDirectory(0);
-
-				hsmearmht->SetLineColor(kRed);
-				hsmearmht->SetMarkerColor(kRed);
-				hsmearmht->SetMarkerStyle(24);
-				hsmearmht->SetLineWidth(2);
-				hrecomht->SetLineWidth(2);
-				hrecomht->SetMarkerStyle(kPlus);
-				hrecomht->GetXaxis()->SetRangeUser(0,300);
-				hsmearmht->GetXaxis()->SetRangeUser(0,300);
-
-				stringstream recomhtleg,smearmhtleg;
-				const double sum_recomht = hrecomht->Integral(1, hrecomht->GetNbinsX()+1);
-				const double sum_smearmht = hsmearmht->Integral(1, hsmearmht->GetNbinsX()+1);
-				recomhtleg << "reco (" << sum_recomht << ")";
-				smearmhtleg << "smeared (" << sum_smearmht << ")";
-
-				TLegend *l2 = new TLegend(0.6,0.6,0.9,0.9);
-				l2->AddEntry(hrecomht, recomhtleg.str().c_str());
-				l2->AddEntry(hsmearmht, smearmhtleg.str().c_str());
-
-				hrecomht->DrawCopy();
-				hsmearmht->DrawCopy("same");
-				l2->Draw();
-				gPad->Print("samples.eps");
-
-				//njets
-				TH1* hreconjet50 = (TH1*) Hist.at(jetbin).at(htbin).at(mhtbin).hv_RecoEvt.h_Njet50eta2p5->Clone("reco_njet50");
-				hreconjet50->SetDirectory(0);
-				TH1* hsmearnjet50 = (TH1*) Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedEvt.h_Njet50eta2p5->Clone("smear_njet50");
-				hsmearnjet50->SetDirectory(0);
-				stringstream reconjet50leg, smnjet50leg;
-				const double sum_reconj = hreconjet50->Integral(1,hreconjet50->GetNbinsX()+1);
-				const double sum_smearnj= hsmearnjet50->Integral(1, hsmearnjet50->GetNbinsX()+1);
-				reconjet50leg << "reco (" << sum_reconj << ")";
-				smnjet50leg << "smeared (" << sum_smearnj << ")";
-
-				//cout << red << "mht reco/smear  = " << sum_recomht << " / " << sum_smearmht << endl; 
-				//cout << "nj50 reco/smear = " << sum_reconj << " / " << sum_smearnj  << clearatt << endl; 
-
-				hreconjet50->SetLineWidth(2);
-				hsmearnjet50->SetLineWidth(2);
-				hsmearnjet50->SetLineColor(kRed);
-				hreconjet50->SetMarkerStyle(kPlus);
-				hsmearnjet50->SetMarkerColor(kRed);
-				hsmearnjet50->SetMarkerStyle(24);
-
-				TLegend *l3 = new TLegend(0.6,0.6,0.9,0.9);
-				l3->AddEntry(hreconjet50, reconjet50leg.str().c_str());
-				l3->AddEntry(hsmearnjet50, smnjet50leg.str().c_str());
-
-				gPad->SetLogy(1);
-				hreconjet50->DrawCopy();
-				hsmearnjet50->DrawCopy("same");
-				l3->Draw();
-				gPad->Print("samples.eps");
-				gPad->SetLogy(0);
-
-				for (unsigned i=0; i < 3 ; ++i)
+				for (unsigned ihist=0; ihist < hist2print.size(); ++ihist)
 				{
-					TH1* hrecojetpt = (TH1*) Hist.at(jetbin).at(htbin).at(mhtbin).hv_RecoJets.at(i).h_Jet_pt->Clone("reco_jet");
-					hrecojetpt->SetDirectory(0);
-					TH1* hgenjetpt = (TH1*) Hist.at(jetbin).at(htbin).at(mhtbin).hv_GenJets.at(i).h_Jet_pt->Clone("gen_jet");
-					hgenjetpt->SetDirectory(0);
-					TH1* hsmearjetpt = (TH1*) Hist.at(jetbin).at(htbin).at(mhtbin).hv_SmearedJets.at(i).h_Jet_pt->Clone("smear_jet");
-					hsmearjetpt->SetDirectory(0);
+					stringstream path, reco_hist_name, gen_hist_name, smear_hist_name;
+					stringstream reco_hist, gen_hist, smear_hist;
+					const unsigned njetmin = JetBins_.at(jetbin).first;
+					const unsigned njetmax = JetBins_.at(jetbin).second;
+					const double htmin  = HtBins_.at(htbin);
+					const double htmax  = HtBins_.at(htbin+1);
+					const double mhtmin = MhtBins_.at(mhtbin);
+					const double mhtmax = MhtBins_.at(mhtbin+1);
+					stringstream folder;
+					folder << "Hist/Njet" << njetmin << "to" << njetmax << "HT" << htmin << "to" << htmax
+						<<  "MHT" << mhtmin << "to" << mhtmax << "/";
+					//cout << "folder = " << folder.str() << endl;
 
-					hrecojetpt->SetLineWidth(2);
-					hgenjetpt->SetLineWidth(2);
-					hsmearjetpt->SetLineWidth(2);
-					hgenjetpt->SetLineColor(kBlue);
-					hsmearjetpt->SetLineColor(kRed);
-					hrecojetpt->SetMarkerStyle(kPlus);
-					hgenjetpt->SetMarkerStyle(22);
-					hsmearjetpt->SetMarkerStyle(24);
-					hrecojetpt->SetMarkerColor(kBlack);
-					hgenjetpt->SetMarkerColor(kBlue);
-					hsmearjetpt->SetMarkerColor(kRed);
+					reco_hist_name << folder.str() << "reco_" << hist2print.at(ihist) << "_copy";
+					reco_hist << folder.str() << "reco_" << hist2print.at(ihist);
+					smear_hist_name << folder.str() << "smeared_" << hist2print.at(ihist) << "_copy";
+					smear_hist << folder.str() << "smeared_" << hist2print.at(ihist);
+					gen_hist_name << folder.str() << "gen_" << hist2print.at(ihist) << "_copy";
+					gen_hist << folder.str() << "gen_" << hist2print.at(ihist);
 
-					hrecojetpt->DrawCopy();
-					//hgenjetpt->DrawCopy("same");
-					hsmearjetpt->DrawCopy("same");
+					TH1* hreco = (TH1*) (outRootFile->Get(reco_hist.str().c_str()));
+					if (hreco == NULL) { cout << "hreco = " << reco_hist.str() << " was not found!" << endl; assert(false); } 
+					hreco->SetDirectory(0);
+					TH1* hsmear = (TH1*) (outRootFile->Get(smear_hist.str().c_str()));
+					if (hsmear == NULL) { cout << "hsmear = " << smear_hist.str() << " was not found!" << endl; assert(false); } 
+					hsmear->SetDirectory(0);
+					TH1* hgen = (TH1*) (outRootFile->Get(gen_hist.str().c_str()));
+					//->Clone(gen_hist_name.str().c_str()));
+					if (hgen == NULL) { cout << "hgen = " << gen_hist.str() << " was not found!" << endl; assert(false); } 
+					hgen->SetDirectory(0);
 
-					stringstream recoleg, genleg, smearleg;
-					recoleg << "reco (" << hrecojetpt->Integral(1, hrecojetpt->GetNbinsX()+1) << ")";
-					//genleg << "gen (" << hgenjetpt->Integral() << ")";
-					smearleg << "smeared (" << hsmearjetpt->Integral(1, hsmearjetpt->GetNbinsX()+1) << ")";
+					hgen->SetLineColor(kBlue);
+					hgen->SetMarkerColor(kBlue);
+					hgen->SetMarkerStyle(24);
+					hgen->SetLineWidth(2);
+					hsmear->SetLineColor(kRed);
+					hsmear->SetMarkerColor(kRed);
+					hsmear->SetMarkerStyle(24);
+					hsmear->SetLineWidth(2);
+					hreco->SetLineWidth(2);
+					hreco->SetMarkerStyle(kDot);
+					hreco->SetLineColor(kBlack);
+					hreco->SetMarkerColor(kBlack);
+					//hreco->GetXaxis()->SetRangeUser(0,300);
+					//hsmear->GetXaxis()->SetRangeUser(0,300);
 
-					TLegend *l = new TLegend(0.6,0.6,0.9,0.9);
-					l->AddEntry(hrecojetpt, recoleg.str().c_str());
-					//l->AddEntry(hgenjetpt, genleg.str().c_str());
-					l->AddEntry(hsmearjetpt, smearleg.str().c_str());
-					l->Draw();
+					stringstream recoleg,smearleg, genleg;
+					const double sum_reco  = hreco->Integral(1, hreco->GetNbinsX()+1);
+					const double sum_smear = hsmear->Integral(1, hsmear->GetNbinsX()+1);
+					const double sum_gen   = hgen->Integral(1, hgen->GetNbinsX()+1);
+					recoleg << "reco (" << sum_reco << ")";
+					smearleg << "smeared (" << sum_smear << ")";
+					genleg << "gen (" << sum_gen << ")";
+
+					TLegend *l2 = new TLegend(0.6,0.6,0.9,0.9);
+					l2->AddEntry(hreco, recoleg.str().c_str());
+					l2->AddEntry(hgen, genleg.str().c_str());
+					l2->AddEntry(hsmear, smearleg.str().c_str());
+
+					hreco->DrawCopy();
+					hgen->DrawCopy("same");
+					hsmear->DrawCopy("same");
+					l2->Draw();
 					gPad->Print("samples.eps");
 
-					TH1* hsmearjetpt_copy = (TH1*) hsmearjetpt->Clone("smear_jet_copy");
-					hsmearjetpt_copy->SetDirectory(0);
-					hsmearjetpt_copy->Divide(hrecojetpt);
-					hsmearjetpt_copy->SetTitle("Smeared Gen/Reco");
-					hsmearjetpt_copy->Draw();
-					//gPad->Print("samples.eps");
-
-					delete l;
 				}
 			}
 		}
@@ -756,14 +720,16 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 	gPad->Print("samples.eps]");
 
 
-	vector<double> ptBins;
+/*	Uncomment to dump the reconstructed resolutions functions */ 
+/*
+ 	vector<double> ptBins;
 	vector<double> etaBins;
 	if (bRUNNING_ON_MC && bDO_GENJET_SMEARING) 
 	{
 		ptBins  = *(smearFunc_->GetPtBinEdges());
 		etaBins = *(smearFunc_->GetEtaBinEdges());
 
-		/*TCanvas *c1 = new TCanvas("c1");
+		TCanvas *c1 = new TCanvas("c1");
 		  gStyle->SetOptStat(11111);
 		  gPad->Print("JERs.eps[");
 
@@ -776,9 +742,8 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		  }
 		  }
 		  gPad->Print("JERs.eps]");
-		  */
 	}
-
+*/
 
 	/***********************************************
 	 *  End job summary
@@ -798,7 +763,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 	cout << "Bad Ecal Laser Evts    = " << nBadEcalLaserEvts << endl;
 	cout << "TOP candidates Found   = " << topsFound << endl;
 	cout << "---------- Settings ----------------" << endl;
-	cout << "Cut Mask               = " << cutmask  << " (jet=1, met=2, triplet=4, topmass=8, top+bjet=16, mt2=32, bjet(>=1)=64, dphi=128)" << endl;
+	cout << "Cut Mask               = " << cutmask  << " (jet=1, met=2, triplet=4, topmass=8, top+bjet=16, mt2=32, bjet(>=1)=64, dphi=128, invdphi=256)" << endl;
 	cout << "Cuts Enabled           = "; 
 	stringstream cutlist;
 	if (bAPPLY_NJET_CUT) cutlist << "NJET(70/50/30>=" << uMinNjet70Eta2p4_ << "/" << uMinNjet50Eta2p4_ << "/" << uMinNjet30Eta2p4_ << "), ";
@@ -808,6 +773,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 	if (bAPPLY_TOPPLUSBJET_CUT) cutlist << "TOP+0.5*BJET(>" << dMinTopPlusBjetMass_ << "), ";
 	if (bAPPLY_MT2_CUT) cutlist << "MT2(>" << dMinMt2_ << "), ";
 	if (bAPPLY_DPHI_CUT) cutlist << "DPHI(.5,.5,.3)";
+	if (bAPPLY_INVERT_DPHI_CUT) cutlist << "INVERTED DPHI(.5,.5,.3)";
 	if (bAPPLY_BJET_CUT) cutlist << "BJET>=1";
 	cutlist << endl;
 
@@ -835,6 +801,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		}
 	}
 	cout << red << "bAPPLY_DPHI_CUT        = " << bAPPLY_DPHI_CUT  << clearatt << endl;
+	cout << red << "bAPPLY_INVERT_DPHI_CUT = " << bAPPLY_INVERT_DPHI_CUT  << clearatt << endl;
 	cout << "Jetbins                = "; for (int bin=0; bin < JetBins_.size(); ++bin) { cout << JetBins_.at(bin).first << "-" << JetBins_.at(bin).second << ", "; }; cout << endl; 
 	cout << "Htbins                 = "; for (int bin=0; bin < HtBins_.size(); ++bin) { cout << HtBins_.at(bin) << ", "; }; cout << endl; 
 	cout << "Mhtbins                = "; for (int bin=0; bin < MhtBins_.size(); ++bin) { cout << MhtBins_.at(bin) << ", "; }; cout << endl; 
@@ -918,8 +885,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 					ratio_gen2reco = int_reco>0 ? int_gen/int_reco   : 0.0;
 				}
 				
-				cout << setprecision(1);
-				cout << fixed << setw(6) << jetbin_range.str() << setw(12) << htbin_range.str() 
+				cout <<setprecision(1) << fixed << setw(6) << jetbin_range.str() << setw(12) << htbin_range.str() 
 						<< setw(12) << mhtbin_range.str() 
 						<< setw(10) << int_reco 
 						<< setw(10) << int_gen 
@@ -930,6 +896,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 			}
 		}
 	}
+	cout << "nreco/ngen/nsmear = " << nreco << "/" << ngen << "/" << nsmear << endl;
 	if (nVectorInexWarnings>0)
 	{
 		cout << "---- ERROR/WARNING SUMMARY ---------" << endl;
@@ -996,8 +963,8 @@ void FactorizationBySmearing::CreateRecoJetVec(std::vector<TLorentzVector>& vjet
 		tl.SetPtEtaPhiE( (*t_PFJetPt)[i], (*t_PFJetEta)[i],
 							  (*t_PFJetPhi)[i], (*t_PFJetE)[i]   );
 		vjets.push_back(tl);
-		//bDisc.push_back( (*t_PFJetBTag)[i]);
-		bDisc.push_back(1.0);
+		bDisc.push_back( (*t_PFJetBTag)[i]);
+		//bDisc.push_back(1.0);
 	}
 
 	//std::sort(vjets.begin(), vjets.end(), PtAComparator);
@@ -1151,24 +1118,67 @@ int FactorizationBySmearing::GetIndex(const double& x, const std::vector<double>
 }
 */
 
-void FactorizationBySmearing::DumpJets(const vector<TLorentzVector>& jets)
+void FactorizationBySmearing::DumpJets(const vector<TLorentzVector>& jets) const
 {
 	cout << setw(3) << "#" 
-			<< setw(15) << "Pt>5" 
-			<< setw(15) << "eta"  
-			<< setw(15) << "phi" << endl;  
+			<< setw(15) << "Pt>10" 
+			<< setw(15) << "Eta"  
+			<< setw(15) << "Phi" 
+			<< setw(15) << "M" 
+			<< endl;  
 	for (unsigned i=0; i < jets.size(); i++)
 	{
-		if (jets.at(i).Pt()>5.0)
+		if (jets.at(i).Pt()>10.0)
 		{
-		cout << setw(3) << i 
-			<< setw(15) << jets.at(i).Pt() 
-			<< setw(15) << jets.at(i).Eta() 
-			<< setw(15) << jets.at(i).Phi() << endl;  
+			cout << setprecision(1)  << fixed
+				<< setw(3) << i 
+				<< setw(15) << jets.at(i).Pt() 
+				<< setw(15) << jets.at(i).Eta() 
+				<< setw(15) << jets.at(i).Phi() 
+				<< setw(15) << jets.at(i).M() 
+				<< endl;  
 		}
 	}
 }
 
+
+void FactorizationBySmearing::DumpJetsAndCSV(const vector<TLorentzVector>& jets, const vector<double>& csv, 
+							const TLorentzVector& met) const
+{
+	cout << setw(3) << "#" 
+			<< setw(15) << "Pt>10" 
+			<< setw(15) << "Eta"  
+			<< setw(15) << "Phi" 
+			<< setw(15) << "M" 
+			<< setw(15) << "CSV" 
+			<< setw(15) << "dphi(met)" 
+			<< endl;  
+	for (unsigned i=0; i < jets.size(); i++)
+	{
+		if (jets.at(i).Pt()>10.0)
+		{
+			cout << setprecision(1)  << fixed
+				<< setw(3) << i 
+				<< setw(15) << jets.at(i).Pt() 
+				<< setw(15) << jets.at(i).Eta() 
+				<< setw(15) << jets.at(i).Phi() 
+				<< setw(15) << jets.at(i).M() 
+				<< setw(15) << csv.at(i) 
+				<< setw(15) << fabs(jets.at(i).DeltaPhi(met))
+				<< endl;  
+		}
+	}
+}
+
+void FactorizationBySmearing::DumpJet(const TLorentzVector& jet) const
+{
+	cout << " jet pt/eta/phi/m=" <<setprecision(1)  << fixed
+		<< setw(15) << jet.Pt() 
+		<< setw(15) << jet.Eta() 
+		<< setw(15) << jet.Phi() 
+		<< setw(15) << jet.M() 
+		<< endl;  
+}
 
 bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, const vector<double>& bDisc, 
 				const TLorentzVector& reco_uncl_met_vec, const int& jetcoll, const double& wgt)
@@ -1178,27 +1188,29 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
 	//2=smeared
 	
 	//debug only
+/*	cout << endl;
 	if (jetcoll==1) 
 	{
-		cout << __FUNCTION__ << ":: ------------------------------- gen jets" << endl;
+		cout << __FUNCTION__ << ":: ------------------------------------------------------------ GEN Jets" << endl;
+		++ngen;
 	} else if (jetcoll==2)
 	{
-		cout << __FUNCTION__ << ":: ******************************* smeared jets" << endl;
+		cout << __FUNCTION__ << ":: ************************************************************ SMEARED Jets" << endl;
+		++nsmear;
 	} else if (jetcoll==0)
 	{
-		cout << __FUNCTION__ << ":: ============================================================= reco jets" << endl;
+		cout << __FUNCTION__ << ":: ============================================================= RECO Jets" << endl;
+		++nreco;
+		//DumpJets(jets);
 	}
-		DumpJets(jets);
-
-
+*/
+	//calcualte MET 
 	const TLorentzVector clus_metvec(MHT(jets));  
 
 	TVector3 mv3 = reco_uncl_met_vec.Vect() + clus_metvec.Vect();
 	mv3.SetZ(0);
 	TLorentzVector tot_metvec(0,0,0,0);
 	tot_metvec.SetVectMag(mv3,0);
-
-	if (tot_metvec.Pt()<175.0)cout << __FUNCTION__ << ":jc=" << jetcoll << setw(18) << ":met/x/y/z/phi= " << tot_metvec.Pt() << "/"<< tot_metvec.Px() << "/" << tot_metvec.Py() << "/" << tot_metvec.Pz() << "/" << tot_metvec.Phi() << endl;
 
 //	const double mht        = mhtvec.Pt(); 
 	const double met        = tot_metvec.Pt(); 
@@ -1218,60 +1230,104 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
 		if (pt>70.0) ++njet_pt70;
 	}
 
+
+//	DumpJetsAndCSV(jets, bDisc, tot_metvec);
+
 	//top tagger stuff
 
-	const double tripletJetPtCut_ = 10.0; //I have in ntuples reco jets pt>30 and all gen jets pt>0. increasing   
+	const double bJET_DISC_CUT_ = 0.679;
+	//for Reco one must use 30 gev cut but for gen-jet smearing we need to use much smaller like 10 GeV !! (Chris -05/15/2013)
+	const double tripletJetPtCut_ = 30.0; //I have in ntuples reco jets pt>30 and all gen jets pt>0. increasing   
 														// increasing this causes smeared results to be lower!!! 05-13-2013
 	vector<TLorentzVector> Jets_thisTry_PtCut;
+	std::vector<TLorentzVector> bJet;
 	for(unsigned jet_i = 0; jet_i < jets.size(); jet_i++)
 	{
 		if(jets.at(jet_i).Pt() > tripletJetPtCut_)
 		{
 			Jets_thisTry_PtCut.push_back(jets.at(jet_i));
+
+			//for b-jet counting need to cut on eta/pt/bdisc
+			if (fabs(jets.at(jet_i).Eta())<2.4 && bDisc.at(jet_i) > bJET_DISC_CUT_) {
+				bJet.push_back(jets.at(jet_i));
+			}
 		}
 	}
 
-	std::vector<TLorentzVector> triplet;
+	std::vector<TLorentzVector> triplet;  //this is the top, holds the fat jet
 	std::vector<TLorentzVector> rSystem;
-	std::vector<TLorentzVector> bJet;
 
-	double M23OverM123 = -9999.99;
-	double M123        = -9999.99; 
+//	double M23OverM123 = -9999.99;
+//	double M123        = -9999.99; 
 
-	TripletSelector(Jets_thisTry_PtCut, bDisc, triplet, rSystem, bJet, M23OverM123, M123);
+	topt->processEvent(Jets_thisTry_PtCut, bDisc, tot_metvec);
+	//TripletSelector(Jets_thisTry_PtCut, bDisc, triplet, rSystem, bJet, M23OverM123, M123);
+
+	//cout << "triplet size = " << triplet.size() << endl;
+	//DumpJets(triplet);
+	//cout << "rSystem size = " << rSystem.size() << endl;
+	//DumpJets(rSystem);
+	//cout << "bjet    size = " << bJet.size() << endl;
+	//DumpJets(bJet);
+	//cout << "------------------------------" << endl;
+
 
 	//M123 mass of the top
-	double MT2 = 0, MTt =0 , MTb=0; 
-   MTMT2(tot_metvec,triplet,rSystem,bJet,MT2,MTt,MTb);
-
+	const double MT2  = (double)(topt->MT2);
+	const double MTt  = (double)(topt->mTbestTopJet);
+	const double MTb  = (double)(topt->mTbJet);
+	const double M123 = (double)(topt->bestTopJetMass);
+	const int bestTriplIndex = (int)(topt->bestTopJetIdx);
+	
+// MTMT2(tot_metvec,triplet,rSystem,bJet,MT2,MTt,MTb);
 	bool pass_topselection = true;
 	const double MTb_p_MTt = MTb + 0.5 * MTt;
+
 
 	//now apply cuts
 	const bool pass_njetcut       = (njet_pt70>=2 && njet_pt50>=4 && njet_pt30>=5) ? true : false;           // 0000001 = 1
 	const bool pass_metcut        = (tot_metvec.Pt()>175.0 ) ? true : false;                                 // 0000010 = 2
-	const bool pass_tripletcut    = (triplet.size()>=1) ? true : false;                                      // 0000100 = 4
+	//const bool pass_tripletcut    = (triplet.size()>=1) ? true : false;                                      // 0000100 = 4
+	const bool pass_tripletcut    = (bestTriplIndex != -1) ? true : false;                                      // 0000100 = 4
 	const bool pass_topmasscut    = (M123>80.0 && M123<270.0 ) ? true : false;                               // 0001000 = 8
 	const bool pass_top_plus_bjet = (MTb_p_MTt> 500.0) ? true : false;                                       // 0010000 = 16
 	const bool pass_mt2cut        = (MT2>300.0) ? true : false;                                              // 0100000 = 32
 	const bool pass_minbjet_cut   = bJet.size() >=1 ? true : false;                                          //         = 64
 	const bool pass_dphicut       = PassDphiCut(jets, tot_metvec, 3, 0.5, 0.5, 0.3);                         // 1000000 = 128
 
-	cout << __FUNCTION__ << ":jetcoll=" << jetcoll << " :Failed ";
+
+/*	if (jetcoll==0 || jetcoll == 1)
+	{
+		//	cout << "bestTopJetIdx  = " << bestTopJetIdx << endl;
+		cout << setprecision(1) << fixed << "tot_met_vec : pt/eta/phi/M= " << tot_metvec.Pt() << "/"<< tot_metvec.Eta() << "/" << tot_metvec.Phi() << "/"<< tot_metvec.M() << endl;
+		cout << setprecision(1) << fixed << "bestTopJetMass   = " << M123 << endl;
+		//	cout << "mTbestTopJet   = " << mTbestTopJet << endl;
+		cout << setprecision(1)  << fixed<< "mTbJet           = " << MTb << endl;
+		cout << setprecision(1)  << fixed<< "MT2              = " << MT2 << endl;
+		cout << setprecision(1)  << fixed<< "mTt(bestTopJet?) =            = " << MTt << endl;
+		//	cout << "mTbestWJet     = " << mTbestWJet << endl;
+		//	cout << "mTbestbJet     = " << mTbestbJet << endl;
+		cout << setprecision(1)  << fixed<< "linearCombmTbJetPlusmTbestTopJet (mTbJet+0.5*mTbestTopJet) = " << MTb_p_MTt << endl;
+	}
+*/
+
+/*	cout << __FUNCTION__ << ":jetcoll=" << jetcoll << " :Failed ";
 	if (! pass_njetcut ) cout << "njet /";
 	if (! pass_dphicut ) cout << "dphi /";
 	if (! pass_tripletcut ) cout << "triplet /";
 	if (! pass_minbjet_cut ) cout << "bjet>=1 /";
 	cout << endl;
-	
-	if (bAPPLY_NJET_CUT && ! pass_njetcut ) return 0;
-	if (bAPPLY_MET_CUT  && ! pass_metcut ) return 0;
-	if (bAPPLY_TRIPLET_CUT && ! pass_tripletcut ) return 0;
-	if (bAPPLY_TOPMASS_CUT && ! pass_topmasscut ) return 0;
-	if (bAPPLY_TOPPLUSBJET_CUT && ! pass_top_plus_bjet ) return 0;
-	if (bAPPLY_MT2_CUT && ! pass_mt2cut ) return 0;
-	if (bAPPLY_DPHI_CUT && ! pass_dphicut ) return 0;
-	if (bAPPLY_BJET_CUT && ! pass_minbjet_cut ) return 0;
+*/
+
+	if (bAPPLY_NJET_CUT        && ! pass_njetcut      ) return 0;
+	if (bAPPLY_MET_CUT         && ! pass_metcut       ) return 0;
+	if (bAPPLY_TRIPLET_CUT     && ! pass_tripletcut   ) return 0;
+	if (bAPPLY_TOPMASS_CUT     && ! pass_topmasscut   ) return 0;
+	if (bAPPLY_TOPPLUSBJET_CUT && ! pass_top_plus_bjet) return 0;
+	if (bAPPLY_MT2_CUT         && ! pass_mt2cut       ) return 0;
+	if (bAPPLY_DPHI_CUT        && ! pass_dphicut      ) return 0;
+	if (bAPPLY_INVERT_DPHI_CUT &&   pass_dphicut      ) return 0;
+	if (bAPPLY_BJET_CUT        && ! pass_minbjet_cut  ) return 0;
 
 
 	const unsigned nbjets = bJet.size();
@@ -1338,7 +1394,7 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_bjetMass->Fill(bjetmass, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_bjetPt->Fill(bjetpt, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_M123->Fill(M123, wgt);
-		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_M23OverM123->Fill(M23OverM123, wgt);
+//		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_M23OverM123->Fill(M23OverM123, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_MT2->Fill(MT2, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_MTb->Fill(MTb, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_MTt->Fill(MTt, wgt);
@@ -1400,7 +1456,7 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_bjetMass->Fill(bjetmass, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_bjetPt->Fill(bjetpt, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_M123->Fill(M123, wgt);
-		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_M23OverM123->Fill(M23OverM123, wgt);
+//		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_M23OverM123->Fill(M23OverM123, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_MT2->Fill(MT2, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_MTb->Fill(MTb, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_MTt->Fill(MTt, wgt);
@@ -1421,7 +1477,7 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_bjetMass->Fill(bjetmass, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_bjetPt->Fill(bjetpt, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_M123->Fill(M123, wgt);
-		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_M23OverM123->Fill(M23OverM123, wgt);
+//		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_M23OverM123->Fill(M23OverM123, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_MT2->Fill(MT2, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_MTb->Fill(MTb, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_MTt->Fill(MTt, wgt);
@@ -1541,20 +1597,20 @@ bool FactorizationBySmearing::PassDphiCut(const vector<TLorentzVector>& jets,
 {
 	bool pass = true;
 
-	cout << __FUNCTION__ << "cut1/2/3 = " << cut1 << "/" << cut2 << "/" << cut3 << endl;
+//	cout << __FUNCTION__ << "cut1/2/3 = " << cut1 << "/" << cut2 << "/" << cut3 << endl;
 	if (jets.size() >=1) { 
 		const double dphi = fabs(jets.at(0).DeltaPhi(mht));
-		cout << __FUNCTION__ << ": jet1 pt/dphi " << jets.at(0).Pt() << "/" << dphi << " (" << (dphi>cut1 ? 1: 0) << ")" << endl; 
+//		cout << __FUNCTION__ << ": jet1 pt/dphi " << jets.at(0).Pt() << "/" << dphi << " (" << (dphi>cut1 ? 1: 0) << ")" << endl; 
 		pass = pass && (fabs(jets.at(0).DeltaPhi(mht)) > cut1); 
 		}
 	if (jets.size() >=2) { 
 		const double dphi = fabs(jets.at(1).DeltaPhi(mht));
-		cout << __FUNCTION__ << ": jet2 pt/dphi " << jets.at(1).Pt() << "/" << dphi << " (" << (dphi>cut2 ? 1: 0) << ")" << endl; 
+//		cout << __FUNCTION__ << ": jet2 pt/dphi " << jets.at(1).Pt() << "/" << dphi << " (" << (dphi>cut2 ? 1: 0) << ")" << endl; 
 		pass = pass && (fabs(jets.at(1).DeltaPhi(mht)) > cut2); 
 	}
 	if (jets.size() >=3) { 
 		const double dphi = fabs(jets.at(2).DeltaPhi(mht));
-		cout << __FUNCTION__ << ": jet3 pt/dphi " << jets.at(2).Pt() << "/" << dphi << " (" << (dphi>cut3 ? 1: 0) << ")" << endl; 
+//		cout << __FUNCTION__ << ": jet3 pt/dphi " << jets.at(2).Pt() << "/" << dphi << " (" << (dphi>cut3 ? 1: 0) << ")" << endl; 
 		pass = pass && (fabs(jets.at(2).DeltaPhi(mht)) > cut3); 
 		}
 	return pass;
@@ -2532,10 +2588,14 @@ void FactorizationBySmearing::TripletSelector(const std::vector<TLorentzVector> 
 	/* one thing, whenever you calculate a MET in TLorentzVector
 	 * set the mass of it to be Zero (force it)
 	 * because the mass of MET is used for MT2 calculation.
-	 * and you know the default MET in CMS has mass zero
+	 * as you know the default MET in CMS has mass zero
 	 * when you modify it, you probably can end up with a non-zero met mass
 	 * so you have to force it to be zero manually
 	 */
+
+	triplet.clear();
+	rSystem.clear();
+	bJet.clear();
 
 	const double Rmin_ = 0.85 * 80.385/173.5;
 	const double Rmax_ = 1.25 * 80.385/173.5;
@@ -2548,21 +2608,19 @@ void FactorizationBySmearing::TripletSelector(const std::vector<TLorentzVector> 
 	const double mWMin_ =  50.0;
 	const double mWMax_ = 120.0;
 
-	const double tripletJetPtCut_ = 30.0;
+//	const double tripletJetPtCut_ = 30.0;
 	const double tripletDRCut_    = 1.5;
 
 	const double bJetPtCut_   = 30;
 	const double bJetEtaCut_  = 2.4;
-	//    bJetDisc = "combinedSecondaryVertexBJetTags";
 	const double bJET_DISC_CUT_ = 0.679;
 
-	double highPt  = 0;
 	double highCSV = -1;
-	unsigned highPtIndex  = -1;
 	unsigned highCSVIndex = -1;
 
 	vector<TLorentzVector> bJets;
 
+	/* try to find b-jet candidates based on CSV */ 
 	for (unsigned i = 0; i<jets.size(); i++)
 	{
 		const double disc = bDiscriminator.at(i);
@@ -2582,20 +2640,11 @@ void FactorizationBySmearing::TripletSelector(const std::vector<TLorentzVector> 
 	{
 		for (unsigned i = 0; i < jets.size(); i++)
 		{
-			/*         csv = jets[i].bDiscriminator(bJetDisc_.c_str());
-						  cout<<"ETA: "<<jets[i].Eta()<<" PHI: "<<jets[i].phi()<<" PT: "<<jets[i].Pt()<<" CSV: "<<csv<<endl;
-						  */
 			if (abs(jets[i].Eta()) > bJetEtaCut_) continue;
 
-//			const double pt  = jets[i].Pt();
-			const double csv = bDiscriminator.at(i);   //????
+			const double csv = bDiscriminator.at(i); 
 
-/*			if (pt > highPt)
-			{
-				highPt = pt;
-				highPtIndex = i;
-			}
-*/			if (csv > highCSV)
+			if (csv > highCSV)
 			{
 				highCSV = csv;
 				highCSVIndex = i;
@@ -2603,10 +2652,14 @@ void FactorizationBySmearing::TripletSelector(const std::vector<TLorentzVector> 
 		}
 	} //if no bjet is found
 
+	/* pick the jet with highest  CSV values as b-jet candiate */
+	/* this pretty much gaurantees to find a b-jet candidate   */
+	/* for every event                                         */
 	if (highCSV != -1 && highCSV != -10)
 	{
 		bJets.push_back(jets[highCSVIndex]);
 	}
+
 
 	TLorentzVector p41(0,0,0,0);
 	TLorentzVector p42(0,0,0,0);
@@ -2623,14 +2676,11 @@ void FactorizationBySmearing::TripletSelector(const std::vector<TLorentzVector> 
 	unsigned selectedIndex = 0;
 	unsigned rank          = 5;
 	const double LN = -9999.99; 
-//	double bJetEta  = LN;
-//	double bJetPhi  = LN;
 	double m123     = LN ;
 	double m12      = LN;
 	double m13      = LN ;
 	double m23      = LN;
 	double dTopMin  = 999999;
-
 
 	vector<double> m123s;
 	vector<double> m12s;
@@ -2642,17 +2692,6 @@ void FactorizationBySmearing::TripletSelector(const std::vector<TLorentzVector> 
 	vector<bool> passesDijetCuts;
 	vector<bool> passesM23OverM123Cut;
 
-	auto_ptr<vector<bool> > selectedPassDijetCuts(new vector<bool>());
-	auto_ptr<vector<TLorentzVector> > selectedTriplet(new vector<TLorentzVector>());
-	auto_ptr<vector<TLorentzVector> > selectedRSystem(new vector<TLorentzVector>());
-	auto_ptr<vector<TLorentzVector> > selectedBJets(new vector<TLorentzVector>());
-	auto_ptr<vector<int> > selectedTripletIndex(new vector<int>());
-	auto_ptr<vector<int> > selectedBJetsIndex(new vector<int>());
-	auto_ptr<vector<double> > selectedM123(new vector<double>());
-	auto_ptr<vector<double> > selectedM12(new vector<double>());
-	auto_ptr<vector<double> > selectedM13(new vector<double>());
-	auto_ptr<vector<double> > selectedM23(new vector<double>());
-	auto_ptr<double>  selectedM23OverM123(new double());
 	auto_ptr<vector<bool> > hasBJet(new vector<bool>());
 	auto_ptr<vector<bool> > passDijetCuts(new vector<bool>());
 	auto_ptr<vector<bool> > passM23OverM123Cut(new vector<bool>());
@@ -2790,10 +2829,10 @@ void FactorizationBySmearing::TripletSelector(const std::vector<TLorentzVector> 
 		//Preferentially pick ones that pass the m23/m123 cut
 		if(passesM23OverM123Cut[i])
 		{
-			if(!skipFailedM23OverM123) 
-				dTopMin = 999999;
+			//if(!skipFailedM23OverM123) 
+			//	dTopMin = 999999;
 
-			skipFailedM23OverM123 = true;
+			//skipFailedM23OverM123 = true;
 
 			if(abs(m123s[i] - topMass_) < dTopMin)
 			{
@@ -2804,7 +2843,7 @@ void FactorizationBySmearing::TripletSelector(const std::vector<TLorentzVector> 
 		}
 
 		//Only consider these if you don't have a triplet passing m23/m123 
-		if(!skipFailedM23OverM123)
+		/*if(!skipFailedM23OverM123)
 		{
 			if(abs(m123s[i] - topMass_) < dTopMin)
 			{
@@ -2813,9 +2852,10 @@ void FactorizationBySmearing::TripletSelector(const std::vector<TLorentzVector> 
 				dTopMin = abs(m123s[i] - topMass_);
 			}
 		}
+		*/
 	}
 
-	if(atLeastOnePassed)
+	if (atLeastOnePassed)
 	{
 
 		TLorentzVector tripletP4(0, 0, 0, 0);
@@ -2825,11 +2865,11 @@ void FactorizationBySmearing::TripletSelector(const std::vector<TLorentzVector> 
 					i == indices[selectedIndex][1] || 
 					i == indices[selectedIndex][2])
 			{
-
 				tripletP4 = tripletP4 + jets[i];
-
-			}
-			else
+				cout << __FUNCTION__ << ": triplet jet (" << i << ") = ";
+					DumpJet(jets.at(i));
+				
+			} else
 			{
 				//rSystem.push_back(reco::Jet(jets[i].p4(), jets[i].vertex()));
 				rSystem.push_back(jets.at(i));
@@ -2847,11 +2887,9 @@ void FactorizationBySmearing::TripletSelector(const std::vector<TLorentzVector> 
 		}
 
 		M123 = m123s[selectedIndex];
+		cout << __LINE__ << ":M123/triple = " << M123 << " / " << tripletP4.M() << endl; 
 		M23OverM123 = m23s[selectedIndex]/m123s[selectedIndex];
-
-
-	}
-	else
+	} else
 	{
 		M123 = -1;
 		M23OverM123 = -1;
@@ -3004,8 +3042,6 @@ void FactorizationBySmearing::MTMT2(const TLorentzVector& MetVec,
 				{
 					wJet2P4 = rSystem[k];
 
-					//if((deltaR(wJet2P4.eta(), wJet2P4.phi(), 
-					//           bJetP4.eta(), bJetP4.phi()) < 0.01) )  continue;
 					if(wJet2P4.DeltaR(bJetP4) < 0.01) continue;
 
 					if( fabs((bJetP4 + wJet1P4 + wJet2P4).M() - mTop_) < dTopMin)
@@ -3094,13 +3130,22 @@ void FactorizationBySmearing::MTMT2(const TLorentzVector& MetVec,
 
 		const double invis_mass    = MetVec.M(); 
 
-		Mt2::LorentzTransverseVector  vis_A(Mt2::TwoVector(pxOfSystemA, 
-					pyOfSystemA), massOfSystemA);
+		Mt2::LorentzTransverseVector  vis_A(Mt2::TwoVector(pxOfSystemA, pyOfSystemA), massOfSystemA);
 		Mt2::LorentzTransverseVector  vis_B(Mt2::TwoVector(pxOfSystemB, pyOfSystemB), massOfSystemB);
 		Mt2::TwoVector                pT_Miss(pxMiss, pyMiss);
+		cout << __FUNCTION__ << "----inputs to mt2Calculator " << endl;
+		cout << " massOfSystemA = " << massOfSystemA << endl; 
+		cout << " pxOfSystemA   = " << pxOfSystemA << endl; 
+		cout << " pyOfSystemA   = " << pyOfSystemA << endl; 
+		cout << " massOfSystemB = " << massOfSystemB << endl; 
+		cout << " pxOfSystemB   = " << pxOfSystemB << endl; 
+		cout << " pyOfSystemB   = " << pyOfSystemB << endl; 
+		cout << " pxMiss        = " << pxMiss << endl; 
+		cout << " pyMiss        = " << pyMiss << endl; 
+		cout << " invis_mass    = " << invis_mass << endl; 
 
 		MT2 = mt2Calculator.mt2_332(vis_A, vis_B, pT_Miss, invis_mass);
-		cout<< __FUNCTION__ << ":" << "MT2="<<MT2<<endl;
+		//cout << __FUNCTION__ << ":" << "MT2="<<MT2<<endl;
 	} else
 	{
 		MT2 = -1;
@@ -3118,7 +3163,7 @@ void FactorizationBySmearing::MTMT2(const TLorentzVector& MetVec,
 				MetVec.M()*MetVec.M() + 
 				2*(Et_1*Et_2 - tripletP4.Px() * MetVec.Px() - 
 					tripletP4.Py()*MetVec.Py()));
-		cout << __FUNCTION__ << ": MTt="<<MTt<<endl;
+		//cout << __FUNCTION__ << ": MTt="<<MTt<<endl;
 	} else
 	{
 		MTt = -1;
@@ -3154,7 +3199,7 @@ void FactorizationBySmearing::MTMT2(const TLorentzVector& MetVec,
 				MetVec.M() * MetVec.M() + 
 				2*(Et_1*Et_2 - otherTopP4.Px() * MetVec.Px() - 
 					otherTopP4.Py() * MetVec.Py()));
-		cout<<__FUNCTION__ << ": MTb="<<MTb<<endl;
+		//cout<<__FUNCTION__ << ": MTb="<<MTb<<endl;
 	} else {
 		MTb = -1;
 	}
