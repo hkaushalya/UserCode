@@ -16,6 +16,7 @@
 #include "IOColors.hh"
 #include "TDirectory.h"
 #include <utility>
+#include "Type3TopTagger.h"
 
 /***************************************************************
  * See cc file for class description.
@@ -121,6 +122,7 @@ class FactorizationBySmearing : public NtupleSelector {
 		double UpperTailScaling_variation_;
 		bool absoluteTailScaling_;
 		bool bAPPLY_DPHI_CUT, bAPPLY_NJET_CUT, bAPPLY_MET_CUT, bAPPLY_TRIPLET_CUT, bAPPLY_TOPMASS_CUT, bAPPLY_TOPPLUSBJET_CUT, bAPPLY_MT2_CUT, bAPPLY_BJET_CUT; 
+		bool bAPPLY_INVERT_DPHI_CUT;
 		unsigned uMinNjet70Eta2p4_, uMinNjet50Eta2p4_, uMinNjet30Eta2p4_, uMinTriplets_;
 		double dMinMet_, dMinTopMass_, dMaxTopMass_, dMinTopPlusBjetMass_, dMinMt2_;
 		unsigned nBadEcalLaserEvts;
@@ -135,7 +137,10 @@ class FactorizationBySmearing : public NtupleSelector {
 		vector<vector<TH1*> > jerHist; //for each pt/eta bins
 		void BookJerDebugHists();
 
-		void DumpJets(const vector<TLorentzVector>& jets);
+		void DumpJets(const vector<TLorentzVector>& jets) const ;
+		void DumpJet(const TLorentzVector& jet) const ;
+		void DumpJetsAndCSV(const vector<TLorentzVector>& jets, const vector<double>& csv,
+							const TLorentzVector& met) const;
 		void GetHist(TDirectory *dir, Hist_t& hist, 
 					const pair<unsigned, unsigned> njetrange,
 					const pair<unsigned, unsigned> htrange,
@@ -170,6 +175,8 @@ class FactorizationBySmearing : public NtupleSelector {
    	void MTMT2(const TLorentzVector & MET, const std::vector<TLorentzVector> & triplet,
 						const std::vector<TLorentzVector> & rSystem, const std::vector<TLorentzVector> & bJetsInR, 
 						double & MT2, double & MTt, double& MTb);
+		topTagger::type3TopTagger* topt;
+		unsigned nreco, ngen, nsmear;
 };
 #endif
 
