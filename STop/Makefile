@@ -30,7 +30,8 @@ runsmear: FactorizationBySmearing.cc \
         mydict.o \
 	SmearFunction.o \
 	Utils.o \
-	ChengHanBisect_Mt2_332_Calculator.o
+	ChengHanBisect_Mt2_332_Calculator.o \
+	pluginUserCodeTopTagger.so	
 	$(CXX) $(CXXFLAGS) -o runsmear *.o $(GLIBS) $ $<
 	touch runsmear
 
