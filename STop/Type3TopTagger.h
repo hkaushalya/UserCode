@@ -3,8 +3,8 @@
 
 #include <memory>
 
-#include "recipeAUX/OxbridgeMT2/interface/Basic_Mt2_332_Calculator.h"
-#include "recipeAUX/OxbridgeMT2/interface/ChengHanBisect_Mt2_332_Calculator.h"
+#include "Basic_Mt2_332_Calculator.h"
+#include "ChengHanBisect_Mt2_332_Calculator.h"
 
 #include "combination.h"
 #include "indexSort.h"
