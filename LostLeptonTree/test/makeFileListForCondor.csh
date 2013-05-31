@@ -20,7 +20,7 @@ set LOCATION=2  #default set to pnfs
 #set OUTFILE="QCD_HT_250To500_MGPythia_v1_lpc1.files"
 #set OUTFILE="QCD_HT_500To1000_MGPythia_v1_lpc1.files"
 #set OUTFILE="QCD_HT_1000ToInf_MGPythia_v1_lpc1.files"
-#set OUTFILE="TT_CT10_TuneZ2star_8TeV-powheg-tauola.list"
+set OUTFILE="TT_CT10_TuneZ2star_8TeV-powheg-tauola.list_new"
 
 #set OUTFILE="QCD_Pt_300to470_TuneZ2star_8TeV_pythia6_Summer12_53X.list"
 #set OUTFILE="QCD_Pt_470to600_TuneZ2star_8TeV_pythia6_Summer12_53X.list"
@@ -37,7 +37,7 @@ set LOCATION=2  #default set to pnfs
 
 #set OUTFILE = "HTMHT_Run2012D_PromptReco_v1_lpc1.list"
 #set OUTFILE = "JetHT_Run2012D_PromptReco_v1_lpc1.list"
-set OUTFILE = "WJetsToLNu_HT-300To400_8TeV-madgraph_kasmi.list"
+#set OUTFILE = "WJetsToLNu_HT-300To400_8TeV-madgraph_kasmi.list"
 
 rm -rf ${OUTFILE}
 
@@ -53,9 +53,9 @@ else
 	#set SRCDIR="/pnfs/cms/WAX/11/store/user/lpcsusyhad/53X_ntuples/QCD_HT_250To500_MGPythia_v1_lpc1/seema/QCD_HT-250To500_TuneZ2star_8TeV-madgraph-pythia6/QCD_HT-250To500_TuneZ2star_8TeV-madgraph-pythia_v1_NOCUTS_12Oct2012V3/c31a0db70b73f0b9a355af58227b92dd"
 	#set SRCDIR="/pnfs/cms/WAX/11/store/user/lpcsusyhad/53X_ntuples/QCD_HT_500To1000_MGPythia_v1_lpc1/seema/QCD_HT-500To1000_TuneZ2star_8TeV-madgraph-pythia6/QCD_HT-500To1000_TuneZ2star_8TeV-madgraph-pythia_v1_NOCUTS_12Oct2012V3/c31a0db70b73f0b9a355af58227b92dd"
 	#set SRCDIR="/pnfs/cms/WAX/11/store/user/lpcsusyhad/53X_ntuples/QCD_HT_1000ToInf_MGPythia_v1_lpc1/seema/QCD_HT-1000ToInf_TuneZ2star_8TeV-madgraph-pythia6/QCD_HT-1000ToInf_TuneZ2star_8TeV-madgraph-pythia_v1_NOCUTS_12Oct2012V3/c31a0db70b73f0b9a355af58227b92dd" 
-#	set SRCDIR="/pnfs/cms/WAX/11/store/user/lpcsusyhad/53X_ntuples/kasmi/TT_CT10_TuneZ2star_8TeV-powheg-tauola/Summer12_DR53X-PU_S10_START53_V7A-v2_NOCUTS_12Oct2012V3/0c2ca37b7b411866265a5953adbfd963"
+	set SRCDIR="/pnfs/cms/WAX/11/store/user/lpcsusyhad/53X_ntuples/kasmi/TT_CT10_TuneZ2star_8TeV-powheg-tauola/Summer12_DR53X-PU_S10_START53_V7A-v2_NOCUTS_12Oct2012V3/0c2ca37b7b411866265a5953adbfd963"
 
-	set SRCDIR="/pnfs/cms/WAX/11/store/user/lpcsusyhad/53X_ntuples/kasmi/WJetsToLNu_HT-300To400_8TeV-madgraph/Summer12_DR53X-PU_S10_START53_V7A-v2_NOCUTS_12Oct2012V3/0c2ca37b7b411866265a5953adbfd963"
+#	set SRCDIR="/pnfs/cms/WAX/11/store/user/lpcsusyhad/53X_ntuples/kasmi/WJetsToLNu_HT-300To400_8TeV-madgraph/Summer12_DR53X-PU_S10_START53_V7A-v2_NOCUTS_12Oct2012V3/0c2ca37b7b411866265a5953adbfd963"
 
 	#set SRCDIR = "/pnfs/cms/WAX/11/store/user/lpcsusyhad/53X_ntuples/samantha/QCD_Pt_300to470_TuneZ2star_8TeV_pythia6_Summer12/samantha/QCD_Pt-300to470_TuneZ2star_8TeV_pythia6/Summer12_DR53X_PU_S10_START53_V7A_53X_HEPtagger_OCT262012/0c2ca37b7b411866265a5953adbfd963"
 #	set SRCDIR = "/pnfs/cms/WAX/11/store/user/lpcsusyhad/53X_ntuples/samantha/QCD_Pt_470to600_TuneZ2star_8TeV_pythia6_Summer12/samantha/QCD_Pt-470to600_TuneZ2star_8TeV_pythia6/Summer12_DR53X_PU_S10_START53_V7A_53X_HEPtagger_OCT262012/0c2ca37b7b411866265a5953adbfd963"
