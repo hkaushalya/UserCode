@@ -8,4 +8,6 @@
 <use name="DataFormats/Common"/>
 <use name="FWCore/Common"/>
 <use name="PhysicsTools/Utilities"/>
+<use name="HLTrigger/HLTcore"/>
+<use name="L1Trigger/GlobalTriggerAnalyzer"/>
 <flags EDM_PLUGIN="1"/>
