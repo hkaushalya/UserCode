@@ -12,7 +12,7 @@ Implementation:
 */
 //
 // Original Author:  Samantha Hewamanage
-// $Id: LostLeptonTree.cc,v 1.2 2012/12/04 16:34:44 samantha Exp $
+// $Id: LostLeptonTree.cc,v 1.1 2012/12/05 22:05:25 samantha Exp $
 //
 //
 
@@ -47,6 +47,7 @@ Implementation:
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 #include "TTree.h"
 #include "SimDataFormats/GeneratorProducts/interface/GenEventInfoProduct.h"
+#include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h"
 
 using namespace std;
 
@@ -64,12 +65,15 @@ class LostLeptonTree : public edm::EDAnalyzer {
 		void analyze(const edm::Event&, const edm::EventSetup&);
 		void BookHistograms();
 		void clearTreeVectors();  
+  		vector<double> generateWeights(const TH1* data_npu_estimated) const;
+		double getPUWeight(int npu) const; 
 
 		bool debug_;
 		edm::InputTag vtxSrc_, HBHENoiseFiltSrc_;
+		edm::InputTag firedTrigNamesSrc_, firedTrigPrescaleSrc_;
 		bool doPUReWeight_;
 		int doEventWeighing_;
-		edm::InputTag puWeigthSrc_, puWeigthABSrc_, puWeigthABCSrc_;
+		edm::InputTag puWeigthSrc_, puWeigthABSrc_, puWeigthABCSrc_, puWeigthRA2Src_;
 		edm::InputTag pfMetSrc_;
 		edm::InputTag jetAllsrc_, genjetAllsrc_;
 		edm::InputTag mhtSrc_, htSrc_;
@@ -79,12 +83,14 @@ class LostLeptonTree : public edm::EDAnalyzer {
 		edm::Service<TFileService> fs;
 		TTree* tree;
 		unsigned int         t_EvtRun, t_EvtLS, t_EvtEvent;
-		int                  t_NVertices;
+		int                  t_NVertices, t_tru_Npv, t_avg_Npv;
 		int                  t_MCflag;
-		double               t_PUWeight, t_PUWeightAB, t_PUWeightABC;
+		double               t_PUWeight, t_PUWeightAB, t_PUWeightABC, t_PUWeightRA2;
 		double               t_EvtWeight; //for flat sample weighing
 		double               t_PFMetPx, t_PFMetPy;
-		std::vector<double> *t_PFJetPt,  *t_PFJetEta,  *t_PFJetPhi,  *t_PFJetE,  *t_PFJetBTag;
+		std::vector<double> *t_PFJetPt,  *t_PFJetEta,  *t_PFJetPhi,  *t_PFJetE;
+  		std::vector<double> *t_PFJetBTag,*t_PFJetNHF,  *t_PFJetEMF, *t_PFbDiscriminator1, *t_PFbDiscriminator2, *t_PFbDiscriminator3, *t_PFbDiscriminator4;
+		std::vector<double> *t_PFJetHOEne;
 		double               t_PFht, t_PFmht;
 		int                  t_NJetsPt30Eta2p5, t_NJetsPt30Eta5p0, t_NJetsPt50Eta2p5, t_NJetsPt50Eta5p0;
 
@@ -94,12 +100,15 @@ class LostLeptonTree : public edm::EDAnalyzer {
 		int                  t_beamHaloFilter, t_eeBadScFilter, t_eeNoiseFilter, t_greedyMuons;
 		int 					  t_hcalLaserEventFilter, t_inconsistentMuons, t_ra2EcalBEFilter;
 		int 					  t_ra2EcalTPFilter, t_trackingFailureFilter, t_HBHENoiseFilterRA2;
+		int 						t_ecalLaserCorrFilter;
 		std::vector<string > *t_firedTrigs;
 		std::vector<double> *t_firedTrigsPrescale;
 
 		bool no_beamHaloFilter_, no_eeBadScFilter_, no_eeNoiseFilter_, no_greedyMuonsFilter_;
 		bool no_hcalLaserEventFilter_, no_inconsistentFilter_, no_ra2EcalBEFilter_, no_ra2EcalTPFilter_;
-		bool no_trackingFailureFilter_, no_HBHENoiseFilter_;
+		bool no_trackingFailureFilter_, no_HBHENoiseFilter_, no_ecalLaserCorrFilter_;
+  		std::vector<double> _puWeigths;
+  		std::string   btagname_;
 };
 
 
@@ -112,8 +121,10 @@ LostLeptonTree::LostLeptonTree(const edm::ParameterSet & iConfig) {
 	puWeigthSrc_    = iConfig.getParameter<edm::InputTag>("PUWeigthSource");
 	puWeigthABSrc_  = iConfig.getParameter<edm::InputTag>("PUWeigthABSource");
 	puWeigthABCSrc_ = iConfig.getParameter<edm::InputTag>("PUWeigthABCSource");
+	//puWeigthRA2Src_ = iConfig.getParameter<edm::InputTag>("PUWeigthRA2Source");
 	pfMetSrc_     = iConfig.getParameter<edm::InputTag>("PFMetSource");
 	jetAllsrc_    = iConfig.getParameter<edm::InputTag>("JetAllSource");
+  	btagname_       = iConfig.getParameter<std::string>  ("bTagName");
 	genjetAllsrc_ = iConfig.getParameter<edm::InputTag>("genJetAllSource");
 	mhtSrc_       = iConfig.getParameter<edm::InputTag>("MHTSource");
 	mcFlag_        = iConfig.getParameter<bool>("MCflag");
@@ -132,6 +143,36 @@ LostLeptonTree::LostLeptonTree(const edm::ParameterSet & iConfig) {
 	no_ra2EcalTPFilter_       = iConfig.getParameter<bool>("no_ra2EcalTPFilter");
 	no_trackingFailureFilter_ = iConfig.getParameter<bool>("no_trackingFailureFilter");
 	no_HBHENoiseFilter_       = iConfig.getParameter<bool>("no_HBHENoiseFilter");
+	no_ecalLaserCorrFilter_   = iConfig.getParameter<bool>("no_ecalLaserCorrFilter");
+
+	firedTrigNamesSrc_  = iConfig.getParameter<edm::InputTag>("firedTrigNamesSource");
+	firedTrigPrescaleSrc_  = iConfig.getParameter<edm::InputTag>("firedTrigsPrescalesSource");
+
+
+   std::string fileNamePU = iConfig.getParameter<std::string> ("FileNamePUDataDistribution");
+	if (fileNamePU.length() != 0 && fileNamePU != "NONE") {
+	//	edm::FileInPath filePUDataDistr(fileNamePU);
+	//	std::cout << "  Reading PU scenario from '" << filePUDataDistr.fullPath() << "'" << std::endl;
+		std::cout << __FUNCTION__ << ": Reading PU scenario from " << fileNamePU << std::endl;
+		//TFile file(filePUDataDistr.fullPath().c_str(), "READ");
+		TFile file(fileNamePU.c_str(), "READ");
+		if (file.IsZombie())
+		{
+			cout << __FUNCTION__ << ": PU ROOT file, " << fileNamePU << " not found!" << endl;
+			assert(false);
+		}
+		TH1 *h = 0;
+		file.GetObject("pileup", h);
+		if (h) {
+			h->SetDirectory(0);
+			_puWeigths = generateWeights(h);
+		} else {
+			//cout << __FUNCTION__ << ": Hist nameed 'pileup' not found in " << filePUDataDistr.fullPath() << endl;
+			cout << __FUNCTION__ << ": Hist nameed 'pileup' not found in " << fileNamePU << endl;
+			assert(false);
+		}
+	}
+
 
 }
 
@@ -145,12 +186,15 @@ void LostLeptonTree::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 	using namespace std;
 
 	clearTreeVectors();
+	bool saveEvent = true;
 
 	// fill event ID 
 	t_EvtRun   = iEvent.id().run();
 	t_EvtLS    = iEvent.luminosityBlock();
 	t_EvtEvent = iEvent.id().event();
 
+	cout << __FILE__ << endl;
+	cout << "========================== run:lumi:evt=" <<  iEvent.id().run() << ":" <<  iEvent.luminosityBlock() << ":" << iEvent.id().event() << endl;
 	// save number of vertices and position of primary vertex
 	edm::Handle< std::vector<reco::Vertex> > vertices;
 	iEvent.getByLabel(vtxSrc_, vertices);
@@ -158,26 +202,53 @@ void LostLeptonTree::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 
 	t_NVertices = vertices->size();
 
+	//not sure if I need this nor why others saved it. for now just 
+	//keeping it.
+	t_avg_Npv = 0;
+
 	// save pileup weight
 	double pu_event_wt = 1.0;
 	double pu_event_wtAB = 1.0;
 	double pu_event_wtABC = 1.0;
+	double pu_event_wtRA2 = 1.0;
 	edm::Handle<double> puweight;
 	edm::Handle<double> puweightAB;
 	edm::Handle<double> puweightABC;
+	edm::Handle<double> puweightRA2;
 	if( doPUReWeight_ && mcFlag_) {
-		iEvent.getByLabel(puWeigthSrc_, puweight);
-		pu_event_wt = *puweight;
-		iEvent.getByLabel(puWeigthABSrc_, puweightAB);
-		pu_event_wtAB = *puweightAB;
-		iEvent.getByLabel(puWeigthABCSrc_, puweightABC);
-		pu_event_wtABC = *puweightABC;
+//		iEvent.getByLabel(puWeigthSrc_, puweight);
+//		pu_event_wt = *puweight;
+//		iEvent.getByLabel(puWeigthABSrc_, puweightAB);
+//		pu_event_wtAB = *puweightAB;
+//		iEvent.getByLabel(puWeigthABCSrc_, puweightABC);
+//		pu_event_wtABC = *puweightABC;
+//iEvent.getByLabel(puWeigthRA2Src_, puweightRA2);
+//pu_event_wtRA2 = *puweightRA2;
+
+		edm::Handle<std::vector<PileupSummaryInfo> > puInfo;
+		iEvent.getByLabel("addPileupInfo", puInfo);
+		int npu = 0;
+		if (puInfo.isValid()) {
+			std::vector<PileupSummaryInfo>::const_iterator puIt;
+			int n = 0;
+			for (puIt = puInfo->begin(); puIt != puInfo->end(); ++puIt, ++n) {
+				//std::cout << " Pileup Information: bunchXing, nvtx: " << puIt->getBunchCrossing() << " " << puIt->getPU_NumInteractions() << std::endl;
+				if (puIt->getBunchCrossing() == 0) { // Select in-time bunch crossing
+					npu = puIt->getTrueNumInteractions();
+					t_tru_Npv = npu;
+					break;
+				}
+			}
+			pu_event_wt = getPUWeight(npu);
+		}
 	}
 	t_PUWeight = pu_event_wt;
 	t_PUWeightAB = pu_event_wtAB;
 	t_PUWeightABC = pu_event_wtABC;
+	//t_PUWeightRA2 = pu_event_wtRA2;
 
 	if(debug_)std::cout << "t_NVertices " << t_NVertices << "  t_PUWeight " << t_PUWeight << std::endl;
+	//std::cout << "t_NVertices " << t_NVertices  << " (" << t_tru_Npv << ")" << "  t_PUWeight " << t_PUWeight << std::endl;
 
 
 	//event weights for flat QCD samples
@@ -219,6 +290,19 @@ void LostLeptonTree::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 			t_PFJetEta ->push_back((*jetsAll)[ijet].eta());    
 			t_PFJetPhi ->push_back((*jetsAll)[ijet].phi());
 			t_PFJetE   ->push_back((*jetsAll)[ijet].energy()  );
+    		t_PFJetBTag  ->push_back((*jetsAll)[ijet].bDiscriminator(btagname_.c_str()) );
+			t_PFJetNHF   ->push_back((*jetsAll)[ijet].neutralHadronEnergyFraction());
+			t_PFJetEMF   ->push_back((*jetsAll)[ijet].photonEnergyFraction());
+
+			//calculate energy deposited in HO for each jet
+			const std::vector<reco::PFCandidatePtr> & pfcands = (*jetsAll)[ijet].getPFConstituents();
+			double hoEne   = 0.0;
+			std::vector<reco::PFCandidatePtr>::const_iterator itr;
+			for(itr = pfcands.begin(); itr != pfcands.end(); itr++) {
+				hoEne   += (*itr)->hoEnergy();
+			}
+			t_PFJetHOEne ->push_back(hoEne);
+
 
 			if( (*jetsAll)[ijet].pt()>30.0 && std::fabs((*jetsAll)[ijet].eta())<5.0 )
 			{
@@ -272,7 +356,7 @@ void LostLeptonTree::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 	 * get cleaning filter status
 	 ******************************************************/
 	edm::Handle<bool> beamHaloVal, eeBadVal, eeNoiseVal, greedyMuonsVal;
-	edm::Handle<bool> hcalLaserEventVal, inconsMuonsVal, ra2EcalBEVal;
+	edm::Handle<bool> hcalLaserEventVal, inconsMuonsVal, ra2EcalBEVal, ecalLaserCorrVal;
 	edm::Handle<bool> ra2EcalTPVal, trackFailureVal, HBHENoiseVal;
 
 
@@ -328,16 +412,33 @@ void LostLeptonTree::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 		t_HBHENoiseFilterRA2 = *HBHENoiseVal;
 	}
 
+	if (! no_ecalLaserCorrFilter_) {
+		iEvent.getByLabel("ecalLaserCorrFilter", ecalLaserCorrVal);
+		t_ecalLaserCorrFilter   = *ecalLaserCorrVal;
+	}
+
 
 	//get trigger info
 	
 	if (! mcFlag_)
 	{
+		edm::Handle<vector<std::string> > firedTrigNamesHandle;
+		edm::Handle<vector<unsigned> > firedTrigPrescalesHandle;
+		iEvent.getByLabel(firedTrigNamesSrc_, firedTrigNamesHandle);
+		iEvent.getByLabel(firedTrigPrescaleSrc_, firedTrigPrescalesHandle);
 
+		//cout << "trig size = " << (*firedTrigNamesHandle).size() << endl;
+		for (unsigned i=0 ;i < (*firedTrigNamesHandle).size(); ++i)
+		{
+			//cout << (*firedTrigNamesHandle).at(i) << "-> prescale = " << (*firedTrigPrescalesHandle).at(i) << endl;
+			t_firedTrigs->push_back((*firedTrigNamesHandle).at(i));
+			t_firedTrigsPrescale->push_back((*firedTrigPrescalesHandle).at(i));
+		}
+
+		if (t_firedTrigs->size()<1) saveEvent = saveEvent && false;
 	}
-
-
-	tree->Fill();
+	//save only trigger selected data
+	if (saveEvent) tree->Fill();
 }
 
 // ------------ method called once each job just before starting event loop  ------------
@@ -349,6 +450,9 @@ void LostLeptonTree::beginJob() {
 
 // ------------ method called once each job just after ending the event loop  ------------
 void LostLeptonTree::endJob() {
+
+	cout << "---------" << __FILE__ << ":" << __FUNCTION__ << "---------" << endl;
+	cout << "\t Saved Events = " << tree->GetEntries() << endl;
 
 }
 
@@ -362,11 +466,14 @@ void LostLeptonTree::BookHistograms() {
 	tree->Branch("t_EvtLS",     &t_EvtLS,    "t_EvtLS/i");
 	tree->Branch("t_EvtEvent",  &t_EvtEvent, "t_EvtEvent/i");
 	tree->Branch("t_NVertices", &t_NVertices,"t_NVertices/I");
-	tree->Branch("t_MCflag", &t_MCflag,"t_MCflag/I");
+	tree->Branch("t_tru_Npv",   &t_tru_Npv,  "t_tru_Npv/I");
+	tree->Branch("t_avg_Npv",   &t_avg_Npv,  "t_avg_Npv/I");
+	tree->Branch("t_MCflag",    &t_MCflag,   "t_MCflag/I");
 	tree->Branch("t_PUWeight",  &t_PUWeight, "t_PUWeight/D");
-	tree->Branch("t_PUWeightAB",  &t_PUWeightAB, "t_PUWeightAB/D");
+	tree->Branch("t_PUWeightAB",   &t_PUWeightAB,  "t_PUWeightAB/D");
 	tree->Branch("t_PUWeightABC",  &t_PUWeightABC, "t_PUWeightABC/D");
-	tree->Branch("t_EvtWeight",  &t_EvtWeight, "t_EvtWeight/D");
+	tree->Branch("t_PUWeightRA2",  &t_PUWeightRA2, "t_PUWeightRA2/D");
+	tree->Branch("t_EvtWeight", &t_EvtWeight, "t_EvtWeight/D");
 	tree->Branch("t_PFMetPx",   &t_PFMetPx,  "t_PFMetPx/D");
 	tree->Branch("t_PFMetPy",   &t_PFMetPy,  "t_PFMetPy/D");
 
@@ -374,10 +481,18 @@ void LostLeptonTree::BookHistograms() {
 	t_PFJetEta = new std::vector<double>();    
 	t_PFJetPhi = new std::vector<double>();
 	t_PFJetE   = new std::vector<double>();
+	t_PFJetBTag  = new std::vector<double>();
+	t_PFJetNHF   = new std::vector<double>();
+	t_PFJetEMF   = new std::vector<double>();
+	t_PFJetHOEne = new std::vector<double>();
 	tree->Branch("t_PFJetPt",  "vector<double>", &t_PFJetPt );
 	tree->Branch("t_PFJetEta", "vector<double>", &t_PFJetEta);
 	tree->Branch("t_PFJetPhi", "vector<double>", &t_PFJetPhi);
 	tree->Branch("t_PFJetE",   "vector<double>", &t_PFJetE);
+  tree->Branch("t_PFJetBTag",  "vector<double>", &t_PFJetBTag);
+  tree->Branch("t_PFJetNHF",   "vector<double>", &t_PFJetNHF);
+  tree->Branch("t_PFJetEMF",   "vector<double>", &t_PFJetEMF);
+  tree->Branch("t_PFJetHOEne", "vector<double>", &t_PFJetHOEne);
 	tree->Branch("t_NJetsPt30Eta2p5", &t_NJetsPt30Eta2p5, "t_NJetsPt30Eta2p5/I");
 	tree->Branch("t_NJetsPt30Eta5p0", &t_NJetsPt30Eta5p0, "t_NJetsPt30Eta5p0/I"); 
 	tree->Branch("t_NJetsPt50Eta2p5", &t_NJetsPt50Eta2p5, "t_NJetsPt50Eta2p5/I"); 
@@ -405,6 +520,7 @@ void LostLeptonTree::BookHistograms() {
 	tree->Branch("t_ra2EcalTPFilter", &t_ra2EcalTPFilter, "t_ra2EcalTPFilter/I");
 	tree->Branch("t_trackingFailureFilter", &t_trackingFailureFilter, "t_trackingFailureFilter/I");
 	tree->Branch("t_HBHENoiseFilterRA2", &t_HBHENoiseFilterRA2, "t_HBHENoiseFilterRA2/I");
+	tree->Branch("t_ecalLaserCorrFilter", &t_ecalLaserCorrFilter, "t_ecalLaserCorrFilter/I");
 
 	t_firedTrigs  = new std::vector<string>();
 	tree->Branch("t_firedTrigs",  "vector<string>", &t_firedTrigs );
@@ -419,6 +535,10 @@ void LostLeptonTree::clearTreeVectors() {
 	t_PFJetEta->clear();    
 	t_PFJetPhi->clear();
 	t_PFJetE->clear();
+	t_PFJetBTag->clear();
+	t_PFJetNHF->clear();
+	t_PFJetEMF->clear();
+	t_PFJetHOEne->clear();
 
 	t_genJetPt->clear();
 	t_genJetEta->clear();    
@@ -428,6 +548,115 @@ void LostLeptonTree::clearTreeVectors() {
 	t_firedTrigs->clear();
 	t_firedTrigsPrescale->clear();
 }
+
+
+// Get weight factor dependent on number of
+// added PU interactions
+// --------------------------------------------------
+double LostLeptonTree::getPUWeight(int npu) const {
+   double w = 1.;
+   if (npu < static_cast<int> (_puWeigths.size())) {
+      w = _puWeigths.at(npu);
+   } else {
+      std::cerr << "WARNING in WeightProcessor::getPUWeight: Number of PU vertices = " << npu
+            << " out of histogram binning." << std::endl;
+   }
+
+   return w;
+}
+
+// Generate weights for given data PU distribution
+// Scenarios from: https://twiki.cern.ch/twiki/bin/view/CMS/Pileup_MC_Gen_Scenarios
+// Code adapted from: https://twiki.cern.ch/twiki/bin/viewauth/CMS/PileupReweighting
+// --------------------------------------------------
+std::vector<double> LostLeptonTree::generateWeights(const TH1* data_npu_estimated) const
+{
+
+  unsigned int nMaxPU = 0;
+  double *npuProbs = 0;
+
+    nMaxPU = 60;
+    double npuSummer12_S10[60] = {
+      2.560E-06,
+      5.239E-06,
+      1.420E-05,
+      5.005E-05,
+      1.001E-04,
+      2.705E-04,
+      1.999E-03,
+      6.097E-03,
+      1.046E-02,
+      1.383E-02,
+      1.685E-02,
+      2.055E-02,
+      2.572E-02,
+      3.262E-02,
+      4.121E-02,
+      4.977E-02,
+      5.539E-02,
+      5.725E-02,
+      5.607E-02,
+      5.312E-02,
+      5.008E-02,
+      4.763E-02,
+      4.558E-02,
+      4.363E-02,
+      4.159E-02,
+      3.933E-02,
+      3.681E-02,
+      3.406E-02,
+      3.116E-02,
+      2.818E-02,
+      2.519E-02,
+      2.226E-02,
+      1.946E-02,
+      1.682E-02,
+      1.437E-02,
+      1.215E-02,
+      1.016E-02,
+      8.400E-03,
+      6.873E-03,
+      5.564E-03,
+      4.457E-03,
+      3.533E-03,
+      2.772E-03,
+      2.154E-03,
+      1.656E-03,
+      1.261E-03,
+      9.513E-04,
+      7.107E-04,
+      5.259E-04,
+      3.856E-04,
+      2.801E-04,
+      2.017E-04,
+      1.439E-04,
+      1.017E-04,
+      7.126E-05,
+      4.948E-05,
+      3.405E-05,
+      2.322E-05,
+      1.570E-05,
+      5.005E-06};
+    npuProbs = npuSummer12_S10;
+
+  std::vector<double> result(nMaxPU);
+  double s = 0.0;
+  for(unsigned int npu = 0; npu < nMaxPU; ++npu) {
+    double npu_estimated = data_npu_estimated->GetBinContent(data_npu_estimated->GetXaxis()->FindBin(npu));
+    result[npu] = npu_estimated / npuProbs[npu];
+    s += npu_estimated;
+  }
+  // normalize weights such that the total sum of weights over thw whole sample is 1.0, i.e., sum_i  result[i] * npu_probs[i] should be 1.0 (!)
+  for (unsigned int npu = 0; npu < nMaxPU; ++npu) {
+    result[npu] /= s;
+  }
+
+  return result;
+}
+
+
+
+
 
 
 
