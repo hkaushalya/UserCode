@@ -12,7 +12,7 @@ Implementation:
 */
 //
 // Original Author:  Samantha Hewamanage
-// $Id: LostLeptonTree.cc,v 1.1 2012/12/05 22:05:25 samantha Exp $
+// $Id: LostLeptonTree.cc,v 1.2 2013/05/31 22:30:36 samantha Exp $
 //
 //
 
@@ -48,6 +48,8 @@ Implementation:
 #include "TTree.h"
 #include "SimDataFormats/GeneratorProducts/interface/GenEventInfoProduct.h"
 #include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h"
+#include "DataFormats/HepMCCandidate/interface/GenParticle.h"
+#include "DataFormats/HepMCCandidate/interface/GenParticleFwd.h"
 
 using namespace std;
 
@@ -75,10 +77,11 @@ class LostLeptonTree : public edm::EDAnalyzer {
 		int doEventWeighing_;
 		edm::InputTag puWeigthSrc_, puWeigthABSrc_, puWeigthABCSrc_, puWeigthRA2Src_;
 		edm::InputTag pfMetSrc_;
-		edm::InputTag jetAllsrc_, genjetAllsrc_;
+		edm::InputTag jetAllsrc_, genjetAllsrc_ ,genParticleSrc_;
 		edm::InputTag mhtSrc_, htSrc_;
 		bool mcFlag_;
 		double minPFJetPt_, minGENJetPt_; 
+	   std::vector<double> genParticleList_;
 
 		edm::Service<TFileService> fs;
 		TTree* tree;
@@ -95,6 +98,7 @@ class LostLeptonTree : public edm::EDAnalyzer {
 		int                  t_NJetsPt30Eta2p5, t_NJetsPt30Eta5p0, t_NJetsPt50Eta2p5, t_NJetsPt50Eta5p0;
 
 		std::vector<double > *t_genJetPt, *t_genJetEta, *t_genJetPhi, *t_genJetE;
+		std::vector<double > *t_genParPt, *t_genParEta, *t_genParPhi, *t_genParE;
 		double               t_minPFJetPt, t_minGenJetPt;
 		int 					  t_allFilters;
 		int                  t_beamHaloFilter, t_eeBadScFilter, t_eeNoiseFilter, t_greedyMuons;
@@ -126,6 +130,8 @@ LostLeptonTree::LostLeptonTree(const edm::ParameterSet & iConfig) {
 	jetAllsrc_    = iConfig.getParameter<edm::InputTag>("JetAllSource");
   	btagname_       = iConfig.getParameter<std::string>  ("bTagName");
 	genjetAllsrc_ = iConfig.getParameter<edm::InputTag>("genJetAllSource");
+	genParticleSrc_ = iConfig.getParameter<edm::InputTag>("genParticleSource");
+	genParticleList_ = iConfig.getParameter<std::vector<double> > ("genParticleList");
 	mhtSrc_       = iConfig.getParameter<edm::InputTag>("MHTSource");
 	mcFlag_        = iConfig.getParameter<bool>("MCflag");
 	htSrc_        = iConfig.getParameter<edm::InputTag>("HTSource");
@@ -193,8 +199,8 @@ void LostLeptonTree::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 	t_EvtLS    = iEvent.luminosityBlock();
 	t_EvtEvent = iEvent.id().event();
 
-	cout << __FILE__ << endl;
-	cout << "========================== run:lumi:evt=" <<  iEvent.id().run() << ":" <<  iEvent.luminosityBlock() << ":" << iEvent.id().event() << endl;
+//	cout << __FILE__ << endl;
+//	cout << "========================== run:lumi:evt=" <<  iEvent.id().run() << ":" <<  iEvent.luminosityBlock() << ":" << iEvent.id().event() << endl;
 	// save number of vertices and position of primary vertex
 	edm::Handle< std::vector<reco::Vertex> > vertices;
 	iEvent.getByLabel(vtxSrc_, vertices);
@@ -336,9 +342,9 @@ void LostLeptonTree::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 	t_MCflag = mcFlag_;
 	if (mcFlag_)
 	{
+		//get gen-jets info
 		edm::Handle<edm::View<reco::GenJet> > genjetsAll;
 		iEvent.getByLabel(genjetAllsrc_, genjetsAll);
-
 
 		//std::cout << "genjetsAll->size() "<< genjetsAll->size() << std::endl;
 		for(unsigned int ijet=0; ijet<genjetsAll->size(); ijet++) {
@@ -350,6 +356,35 @@ void LostLeptonTree::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 				t_genJetE   ->push_back((*genjetsAll)[ijet].energy()  );
 			}
 		}
+
+		//get gen particle info
+     edm::Handle<std::vector<reco::GenParticle > > genParticles;
+		iEvent.getByLabel(genParticleSrc_, genParticles);
+
+		for (unsigned ig=0; ig<genParticles->size(); ig++) 
+		{
+			const reco::GenParticle& gen = genParticles->at(ig);
+			const int pdgId = gen.pdgId();
+			if (find(genParticleList_.begin(), genParticleList_.end(),(double) pdgId) == genParticleList_.end()) continue; 
+			const int pdgStatus = gen.status();
+	/*		cout << __FUNCTION__ << ":Gen par ig=id/stat/pt/eta/phi/e =\t"
+					<< ig << "=\t" << pdgId << "\t" << pdgStatus 
+					<< "\t" << gen.pt() 
+					<< "\t" << gen.eta() 
+					<< "\t" << gen.phi() 
+					<< "\t" << gen.energy()
+					<< endl;
+	*/			
+			t_genParPt ->push_back(gen.pt());
+			t_genParEta->push_back(gen.eta());    
+			t_genParPhi->push_back(gen.phi());
+			t_genParE  ->push_back(gen.energy());
+			//bool frombjet = find_mother( &gen, 5 );
+			//bool frombbarjet = find_mother( &gen, -5 );
+
+		}
+
+
 	}
 
 	/*******************************************************
@@ -453,6 +488,16 @@ void LostLeptonTree::endJob() {
 
 	cout << "---------" << __FILE__ << ":" << __FUNCTION__ << "---------" << endl;
 	cout << "\t Saved Events = " << tree->GetEntries() << endl;
+	if (mcFlag_) 
+	{
+		cout <<"\t Gen Particles saved = ";
+		for (unsigned i=0; i< genParticleList_.size();++i)
+		{
+			cout << genParticleList_.at(i) << ", ";
+		}
+		cout << endl;
+	}
+
 
 }
 
@@ -510,6 +555,16 @@ void LostLeptonTree::BookHistograms() {
 	tree->Branch("t_genJetPhi", "vector<double>", &t_genJetPhi);
 	tree->Branch("t_genJetE",   "vector<double>", &t_genJetE  );
 
+	t_genParPt  = new std::vector<double>();
+	t_genParEta = new std::vector<double>();    
+	t_genParPhi = new std::vector<double>();
+	t_genParE   = new std::vector<double>();
+	tree->Branch("t_genParPt",  "vector<double>", &t_genParPt );
+	tree->Branch("t_genParEta", "vector<double>", &t_genParEta);
+	tree->Branch("t_genParPhi", "vector<double>", &t_genParPhi);
+	tree->Branch("t_genParE",   "vector<double>", &t_genParE  );
+
+
 	tree->Branch("t_beamHaloFilter", &t_beamHaloFilter, "t_beamHaloFilter/I");
 	tree->Branch("t_eeBadScFilter", &t_eeBadScFilter, "t_eeBadScFilter/I");
 	tree->Branch("t_eeNoiseFilter", &t_eeNoiseFilter, "t_eeNoiseFilter/I");
@@ -544,6 +599,11 @@ void LostLeptonTree::clearTreeVectors() {
 	t_genJetEta->clear();    
 	t_genJetPhi->clear();
 	t_genJetE->clear();
+
+	t_genParPt->clear();
+	t_genParEta->clear();    
+	t_genParPhi->clear();
+	t_genParE->clear();
 
 	t_firedTrigs->clear();
 	t_firedTrigsPrescale->clear();
@@ -653,10 +713,6 @@ std::vector<double> LostLeptonTree::generateWeights(const TH1* data_npu_estimate
 
   return result;
 }
-
-
-
-
 
 
 
