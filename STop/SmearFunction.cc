@@ -864,6 +864,15 @@ void SmearFunction::SetResFuncColl(const unsigned i)
 		inputhist1NoHF_.assign("h_tot_Jet1_ResponsePt");
 		inputhist2NoHF_.assign("h_tot_Jet2_ResponsePt");
 		inputhist3pNoHF_.assign("h_tot_Jet3_ResponsePt");
+	} else if (uResFuncCollType_ == 2) 
+	{
+		//b-jet resolution functions
+		inputhist1HF_.assign("h_b_Jet1_ResponsePt");
+		inputhist2HF_.assign("h_b_Jet2_ResponsePt");
+		inputhist3pHF_.assign("h_b_Jet3_ResponsePt");
+		inputhist1NoHF_.assign("h_b_Jet1_ResponsePt");
+		inputhist2NoHF_.assign("h_b_Jet2_ResponsePt");
+		inputhist3pNoHF_.assign("h_b_Jet3_ResponsePt");
 	} else
 	{
 		cout << __FUNCTION__ << ": Unknown Resolution Func. Collection requested.!!!" << endl;
