@@ -192,8 +192,8 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 	}
 
 	const double dDATA_LUMI = 19458.0; //used in MC lumi weighing
-	bNON_STD_MODE        = 0;  //
-	sNON_STD_MODE_EXPLAIN = "ALL GEN JETS CSV VALUES = 1 ";
+	bNON_STD_MODE        = 1;  //
+	sNON_STD_MODE_EXPLAIN = "Isolating events with unclustered MET>350! and MHT is calc uses jets pt>100!";
 	bRUNNING_ON_MC       = 1; 
 	bDO_TRIG_SELECTION   = 0;   //DATA
 	bDO_TRIG_PRESCALING  = 0;   //DATA
@@ -201,8 +201,9 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 	bDO_PU_WEIGHING      = false;  //MC
 	bDO_LUMI_WEIGHING    = false;  //MC 
 	bDO_GENJET_SMEARING  = 1;  //MC
-	uNTRIES              = 100; //number of pseudo experiments per event
+	uNTRIES              = 500; //number of pseudo experiments per event
 	bDEBUG               = false;
+	bUSE_BJET_SMEAR_FUNC = 1; //use b-jet res. func. for b-jets
 
 
 	//* overide above with for std run settings for ease
@@ -267,7 +268,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		smearFunc_ = new SmearFunction();
 		//Pythia
 		smearFunc_->SetSmearingFile("/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/input_files/MCJetResolutions_Summer12_DR53X_QCD_Pt_15to3000_TuneZ2star_Flat_8TeV_pythia6_withCHS_withoutPUReweighting.root");
-		//smearFunc_->SetSmearingFile("MCJetResolutions_Summer12_DR53X_QCD_Pt_15to3000_TuneZ2star_Flat_8TeV_pythia6_withCHS_withoutPUReweighting.root");
+		smearFunc_->SetResFuncColl(0);
 		//MG
 		//smearFunc_->SetSmearingFile("/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/input_files/MCJetResolutions_Summer12_DR53X_QCD_HT_100ToInf_TuneZ2star_8TeV_madgraph_withCHS_withoutPUReweighting.root");
 
@@ -279,6 +280,17 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 //			absoluteTailScaling_ = true; 
 //		}
 		smearFunc_->SetAbsoluteTailScaling(absoluteTailScaling_);
+
+		//b-jet smearing option
+		if (bUSE_BJET_SMEAR_FUNC)
+		{
+			bjetsmearFunc_ = new SmearFunction();
+			//Pythia
+			bjetsmearFunc_->SetSmearingFile("/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/input_files/MCJetResolutions_Summer12_DR53X_QCD_Pt_15to3000_TuneZ2star_Flat_8TeV_pythia6_withCHS_withoutPUReweighting.root");
+			bjetsmearFunc_->SetResFuncColl(2);
+			bjetsmearFunc_->SetAbsoluteTailScaling(absoluteTailScaling_);
+		}
+
 
 //		const float sysVarScale = 2.0; //this is the default 
 		//const float sysVarScale = 5.0;  //this is what is used in 2010 note
@@ -311,6 +323,15 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		smearFunc_->SetAdditionalSmear_scaling(vAdditionalSmearing);
 		smearFunc_->UncertaintyName("Mean");
 
+		if (bUSE_BJET_SMEAR_FUNC)
+		{
+			bjetsmearFunc_->SetPtBinEdges_scaling(vPtBinEdges);
+			bjetsmearFunc_->SetEtaBinEdges_scaling(vEtaBinEdges);
+			bjetsmearFunc_->SetLowerTail_scaling(vTailScales);
+			bjetsmearFunc_->SetUpperTail_scaling(vTailScales);
+			bjetsmearFunc_->SetAdditionalSmear_scaling(vAdditionalSmearing);
+			bjetsmearFunc_->UncertaintyName("Mean");
+		}
 
 		//no vary scaling to do the systemtatics by resetting some
 		//of the scalings.
@@ -388,6 +409,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		}
 
 		smearFunc_->Init();
+		if (bUSE_BJET_SMEAR_FUNC) bjetsmearFunc_->Init();
 
 		BookJerDebugHists();
 	}
@@ -429,6 +451,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		if (bDEBUG) 
 			cout << red << "===================== run/ls/evt= " << t_EvtRun << " / " 
 				<<  t_EvtLS << " / " <<  t_EvtEvent << clearatt  << endl;
+		//if (t_EvtRun != 1 || t_EvtLS != 21955 || t_EvtEvent != 1778350)  continue;
 
 		/* preselection cuts */
 		if (t_NVertices < 1) continue;  //at least one good vertex
@@ -472,6 +495,7 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		if (bRUNNING_ON_MC) 
 		{
 			recoEvtTotWgt = dMC_LUMI_WGT * evtWeight;
+			//cout << __LINE__ << ":evtWeight=" << evtWeight << endl;
 			if (bDO_PU_WEIGHING) recoEvtTotWgt *= puWeight;
 		} else 
 		{
@@ -509,14 +533,39 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		TVector3 pfmetv(t_PFMetPx, t_PFMetPy,0);
 		TLorentzVector  pfmetvec(0,0,0,0);
 		pfmetvec.SetVectMag(pfmetv,0);
-		TLorentzVector reco_mhtvec(MHT(recoJets));	
-		const TLorentzVector reco_uncl_met_vec = pfmetvec - reco_mhtvec;  
-/*		cout << __FUNCTION__ << setprecision(1) << fixed << setw(18) << ":  pfmet/eta/phi/M= " << pfmetvec.Pt() << "/"<< pfmetvec.Eta() << "/" << pfmetvec.Phi() << "/"<< pfmetvec.M() << endl;
-		cout << __FUNCTION__ << setprecision(1) << fixed << setw(18) << ":unclmet/eta/phi/M= " << reco_uncl_met_vec.Pt() << "/"<< pfmetvec.Eta() << "/" << pfmetvec.Phi() << "/" << pfmetvec.M() << endl;
-*/
-		const bool accept_reco_evt = FillHistogram(recoJets, bDiscrminators_reco, reco_uncl_met_vec, 0, recoEvtTotWgt);
+		const TLorentzVector reco_mhtvec = MHT(recoJets);	
+		const TLorentzVector reco_uncl_met_vec_temp = pfmetvec - reco_mhtvec;  
+		TVector3 tv3_met_temp = reco_uncl_met_vec_temp.Vect();
+		tv3_met_temp.SetZ(0);
+		const TLorentzVector reco_uncl_met_vec(tv3_met_temp,0);  
+		//cout << "reco_uncl_met_vec mass = " << reco_uncl_met_vec.M() << endl;
+
+		//if (reco_uncl_met_vec.Pt()<350.0) continue;
+
+
+		const vector<unsigned> reco_bJetInds = FindBjets(recoJets, bDiscrminators_reco);
+		//cout << __LINE__ << ": recoEvtTotWgt=" << recoEvtTotWgt << endl;
+		const bool accept_reco_evt = FillHistogram(recoJets, reco_bJetInds, bDiscrminators_reco, reco_uncl_met_vec, 0, recoEvtTotWgt);
 		if (accept_reco_evt) 
 		{
+
+		/*cout << __LINE__ << ":: ###############################################################################" << endl;
+			cout << " RECO event accepted:"; PrintEventNumber();
+		PrintEventNumber();
+		cout << setprecision(1) << fixed << setw(18) << ":      pfmet/eta/phi/M= " << pfmetvec.Pt() << "/"<< pfmetvec.Eta() << "/" << pfmetvec.Phi() << "/"<< pfmetvec.M() << endl;
+		cout << setprecision(1) << fixed << setw(18) << ":        mht/eta/phi/M= " << reco_mhtvec.Pt() << "/"<< reco_mhtvec.Eta() << "/" << reco_mhtvec.Phi() << "/"<< reco_mhtvec.M() << endl;
+		cout << setprecision(1) << fixed << setw(18) << ":    unclmet/eta/phi/M= " << reco_uncl_met_vec.Pt() << "/"<< reco_uncl_met_vec.Eta() << "/" << reco_uncl_met_vec.Phi() << "/" << reco_uncl_met_vec.M() << endl;
+		cout << setprecision(1) << fixed << setw(18) << ":unclmettemp/eta/phi/M= " << reco_uncl_met_vec_temp.Pt() << "/"<< reco_uncl_met_vec_temp.Eta() << "/" << reco_uncl_met_vec_temp.Phi() << "/" << reco_uncl_met_vec_temp.M() << endl;
+		cout << ":: =====================================================================" << endl;
+		cout << ":: RECO JETS with pfMET ==============================================" << endl;
+		DumpJetsAndCSV(recoJets, bDiscrminators_reco, pfmetvec); 
+		cout << ":: RECO JETS with MHT   ==============================================" << endl;
+		DumpJetsAndCSV(recoJets, bDiscrminators_reco, reco_mhtvec); 
+		cout << ":: RECO JETS with Uncl. MET ==========================================" << endl;
+		DumpJetsAndCSV(recoJets, bDiscrminators_reco, reco_uncl_met_vec); 
+		cout << ":: =====================================================================" << endl;
+		*/
+		
 			nRecoJetEvts += recoEvtTotWgt;
 		}
 
@@ -524,19 +573,36 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		{
 			CreateGenJetVec(genJets);
 			SetGenJetBdiscriminators(recoJets, bDiscrminators_reco, genJets, bDiscrminators_gen); 
-			const bool accept_gen_evt = FillHistogram(genJets, bDiscrminators_gen, reco_uncl_met_vec, 1, recoEvtTotWgt);
+			const vector<unsigned> gen_bJetInds = FindBjets(genJets, bDiscrminators_gen);
+			const bool accept_gen_evt = FillHistogram(genJets, gen_bJetInds, bDiscrminators_gen, reco_uncl_met_vec, 1, recoEvtTotWgt);
 			if (accept_gen_evt) ++nGenJetEvts;
 
 			if (bDO_GENJET_SMEARING)
 			{
 				for (unsigned n = 0; n < uNTRIES; ++n)
 				{
-					SmearingGenJets(genJets, bDiscrminators_gen, smearedGenJets, bDiscrminators_smearedgen);
+					//cout << __LINE__  << " :::::::::: smearing gen jets " << endl;
+					vector<unsigned> smear_bJetInds;// = FindBjets(smearedGenJets, bDiscrminators_smearedgen);
+					SmearingGenJets(genJets, bDiscrminators_gen, smear_bJetInds, smearedGenJets, bDiscrminators_smearedgen);
+					//cout << __LINE__ << endl;
 					
 					double totWeight = smearingWgt * dMC_LUMI_WGT * evtWeight;
+
+					const TLorentzVector smear_mhtvec(MHT(smearedGenJets));	
+					const TLorentzVector smear_tot_met_vec = smear_mhtvec + reco_uncl_met_vec;  
+		/*			cout << "smear_tot_met_vec M = " << smear_tot_met_vec.M() << endl;
+
+		cout << ":: SMEAR JETS with SMEARED MHT=========================================" << endl;
+		DumpJetsAndCSV(smearedGenJets, bDiscrminators_smearedgen, smear_mhtvec); 
+		cout << ":: SMEAR JETS with SMEARED Uncl. MET ==================================" << endl;
+		DumpJetsAndCSV(smearedGenJets, bDiscrminators_smearedgen, smear_tot_met_vec); 
+		cout << ":: =====================================================================" << endl;
+*/
 					if (bDO_PU_WEIGHING) totWeight *= puWeight;
-					const bool accept_smear_evt = FillHistogram(smearedGenJets, bDiscrminators_smearedgen, reco_uncl_met_vec, 2, totWeight);
+					const bool accept_smear_evt = FillHistogram(smearedGenJets, smear_bJetInds, bDiscrminators_smearedgen, reco_uncl_met_vec, 2, totWeight);
+					//cout << __LINE__ << endl;
 					if (accept_smear_evt) {
+//						cout << " SMEAR event accepted:"; PrintEventNumber();
 						nSmearedJetEvts += totWeight;
 					}
 					if (accept_reco_evt && !accept_reco_evt)
@@ -670,14 +736,14 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 
 					TH1* hreco = (TH1*) (outRootFile->Get(reco_hist.str().c_str()));
 					if (hreco == NULL) { cout << "hreco = " << reco_hist.str() << " was not found!" << endl; assert(false); } 
-					hreco->SetDirectory(0);
+					//hreco->SetDirectory(0);
 					TH1* hsmear = (TH1*) (outRootFile->Get(smear_hist.str().c_str()));
 					if (hsmear == NULL) { cout << "hsmear = " << smear_hist.str() << " was not found!" << endl; assert(false); } 
-					hsmear->SetDirectory(0);
+					//hsmear->SetDirectory(0);
 					TH1* hgen = (TH1*) (outRootFile->Get(gen_hist.str().c_str()));
 					//->Clone(gen_hist_name.str().c_str()));
 					if (hgen == NULL) { cout << "hgen = " << gen_hist.str() << " was not found!" << endl; assert(false); } 
-					hgen->SetDirectory(0);
+					//hgen->SetDirectory(0);
 
 					hgen->SetLineColor(kBlue);
 					hgen->SetMarkerColor(kBlue);
@@ -846,8 +912,14 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 		if (bSystematicMode) {	
 			cout << clearatt << endl;
 		}
+		cout << "Jet Res. Collection    = " << smearFunc_->GetResFuncCollType()  << " (" << smearFunc_->GetResFuncCollTypeName() << ")" << endl;
 		cout << "Smearing file          = " << smearFunc_->SmearingFile() << endl;
-		cout << "Jet Res. Collection    = " << smearFunc_->GetResFuncCollType() << endl;
+		if (bUSE_BJET_SMEAR_FUNC)
+		{
+		cout << "bUSE_BJET_SMEAR_FUNC   = " << bUSE_BJET_SMEAR_FUNC << endl;
+		cout << "B-Jet Res. Collection  = " << bjetsmearFunc_->GetResFuncCollType()  << " (" << bjetsmearFunc_->GetResFuncCollTypeName() << ")" << endl;
+		cout << "B-Smearing file        = " << bjetsmearFunc_->SmearingFile() << endl;
+		}
 	}
 
 	cout << "---- Actual Event Counts in Reco (Smeared) MHT hist ---- " << endl;
@@ -940,8 +1012,17 @@ TLorentzVector FactorizationBySmearing::MHT(const std::vector<TLorentzVector>& v
 		if ( vjets[ijet].Pt()>30.0 && std::fabs(vjets[ijet].Eta())<5.0 ) 
 		{
 			mht -= vjets[ijet];
+
+/*			cout << __FUNCTION__ << ":" << setprecision(1)  << fixed
+				<< setw(3) << ijet 
+				<< setw(15) << vjets.at(ijet).Pt() 
+				<< setw(15) << vjets.at(ijet).Eta() 
+				<< setw(15) << vjets.at(ijet).Phi() 
+				<< setw(15) << vjets.at(ijet).M() 
+				<< endl;*/ 
 		}
 	}
+	//cout << __FUNCTION__ << ":" << setprecision(1) << fixed << setw(18) << ":        mht/eta/phi/M= " << mht.Pt() << "/"<< mht.Eta() << "/" << mht.Phi() << "/"<< mht.M() << endl;
 	return mht;
 }
 
@@ -964,6 +1045,7 @@ void FactorizationBySmearing::CreateRecoJetVec(std::vector<TLorentzVector>& vjet
 							  (*t_PFJetPhi)[i], (*t_PFJetE)[i]   );
 		vjets.push_back(tl);
 		bDisc.push_back( (*t_PFJetBTag)[i]);
+//		cout << "i=" << (*t_PFJetBTag)[i] << endl;
 		//bDisc.push_back(1.0);
 	}
 
@@ -987,21 +1069,40 @@ void FactorizationBySmearing::CreateGenJetVec(std::vector<TLorentzVector>& vjets
 
 //--------------------------------------------------------------------------
 void FactorizationBySmearing::SmearingGenJets(const vector<TLorentzVector>& jets_gen, 
-		const vector<double>& bDisc_gen, std::vector<TLorentzVector>& genJets_smeared, 
+		const vector<double>& bDisc_gen, 
+		vector<unsigned>& bJetInds_smeared,
+		std::vector<TLorentzVector>& genJets_smeared, 
 		std::vector<double>& bDisc_smeared)
 {
 	if (bDEBUG) cout << __FUNCTION__ << ":" << __LINE__ << endl;
 
 	genJets_smeared.clear();
 	bDisc_smeared.clear();
+	bJetInds_smeared.clear();
+	const double bJET_DISC_CUT_   = 0.679;
+	const double tripletJetPtCut_ = 30.0; 
 	
 	int i_jet = 0;
 	unsigned i =0;
 
 	for (vector<TLorentzVector>::const_iterator it = jets_gen.begin(); it != jets_gen.end(); ++it) {
+		const double oldPt  = it->Pt();
+		const double oldEta = fabs(it->Eta());
+		const double csv    = bDisc_gen.at(i);
 
-		if (it->Pt() > smearedJetPt_) {
-			const double scale  = JetResolutionHist_Pt_Smear(it->Pt(), it->Eta(), i_jet); //what is this i_jet purpose??? jet id index
+		if (oldPt > smearedJetPt_) { //this is smearing min jet pt
+			
+			bool isBjet = false;
+			if (oldPt > tripletJetPtCut_ && oldEta<2.4 && csv > bJET_DISC_CUT_) 
+			{
+				isBjet = true;
+				bJetInds_smeared.push_back(i);
+			}
+
+			//change scale if b-jet
+			double scale = 1.0;
+			if (isBjet && bUSE_BJET_SMEAR_FUNC)  scale  = BJetResolutionHist_Pt_Smear(it->Pt(), it->Eta(), i_jet);
+			else scale  = JetResolutionHist_Pt_Smear(it->Pt(), it->Eta(), i_jet);   //why use i_jet not i??? 
 
 			const double newPt  = it->Pt() * scale;
 			const double newEta = it->Eta();
@@ -1048,29 +1149,33 @@ double FactorizationBySmearing::JetResolutionHist_Pt_Smear(const double& pt, con
 	if (bDEBUG) cout << __FUNCTION__ << ":" << __LINE__ << endl;
    int i_jet;
    i < 2 ? i_jet = i : i_jet = 2;
-   int i_Pt = GetIndex(pt, smearFunc_->GetPtBinEdges());
+   int i_Pt  = GetIndex(pt, smearFunc_->GetPtBinEdges());
    int i_eta = GetIndex(eta, smearFunc_->GetEtaBinEdges());
 
 	//const double res = smearFunc_->getSmearFunc(1,i_jet,i_eta,i_Pt)->GetRandom();
 	double res = 1.0;
-	//int tries = 0;
-	//for (tries; tries< 10; ++tries)
-	///{
-		const double res_temp = smearFunc_->getSmearFunc(0,i_jet,i_eta,i_Pt)->GetRandom();
-		//if (res_temp <0.00001) 
-		//{
-		//	cout << i_jet << ":" << i_eta << ":" << i_Pt << ": tries=" << tries << " = " << res_temp << endl;
-		//	continue;
-		//}
-		res = res_temp;
-		//break;
-	//}
-	//if (tries == 10) cout << i_jet << ":" << i_eta << ":" << i_Pt << ": MAX TRIES REACHED!!!!" << endl;
+	const double res_temp = smearFunc_->getSmearFunc(0,i_jet,i_eta,i_Pt)->GetRandom();
+	res = res_temp;
 	if (bDEBUG) cout << __FUNCTION__ << ":" << __LINE__ << ": res = " << res << endl;
 
    return res;
 }
 
+//--------------------------------------------------------------------------
+// pt resolution for b-jet smearing
+double FactorizationBySmearing::BJetResolutionHist_Pt_Smear(const double& pt, const double& eta, const int& i)
+{
+	if (bDEBUG) cout << __FUNCTION__ << ":" << __LINE__ << endl;
+   int i_jet;
+   i < 2 ? i_jet = i : i_jet = 2;
+   int i_Pt  = GetIndex(pt, bjetsmearFunc_->GetPtBinEdges());
+   int i_eta = GetIndex(eta, bjetsmearFunc_->GetEtaBinEdges());
+
+	const double res = bjetsmearFunc_->getSmearFunc(0,i_jet,i_eta,i_Pt)->GetRandom();
+	if (bDEBUG) cout << __FUNCTION__ << ":" << __LINE__ << ": res = " << res << endl;
+
+   return res;
+}
 //--------------------------------------------------------------------------
 int FactorizationBySmearing::GetIndex(const double& x, const std::vector<double>* vec)
 {
@@ -1118,17 +1223,17 @@ int FactorizationBySmearing::GetIndex(const double& x, const std::vector<double>
 }
 */
 
-void FactorizationBySmearing::DumpJets(const vector<TLorentzVector>& jets) const
+void FactorizationBySmearing::DumpJets(const vector<TLorentzVector>& jets, const double& minPt) const
 {
 	cout << setw(3) << "#" 
-			<< setw(15) << "Pt>10" 
+			<< setw(15) << "Pt>" << minPt 
 			<< setw(15) << "Eta"  
 			<< setw(15) << "Phi" 
 			<< setw(15) << "M" 
 			<< endl;  
 	for (unsigned i=0; i < jets.size(); i++)
 	{
-		if (jets.at(i).Pt()>10.0)
+		if (jets.at(i).Pt()>minPt)
 		{
 			cout << setprecision(1)  << fixed
 				<< setw(3) << i 
@@ -1146,7 +1251,7 @@ void FactorizationBySmearing::DumpJetsAndCSV(const vector<TLorentzVector>& jets,
 							const TLorentzVector& met) const
 {
 	cout << setw(3) << "#" 
-			<< setw(15) << "Pt>10" 
+			<< setw(15) << "Pt>0" 
 			<< setw(15) << "Eta"  
 			<< setw(15) << "Phi" 
 			<< setw(15) << "M" 
@@ -1155,7 +1260,7 @@ void FactorizationBySmearing::DumpJetsAndCSV(const vector<TLorentzVector>& jets,
 			<< endl;  
 	for (unsigned i=0; i < jets.size(); i++)
 	{
-		if (jets.at(i).Pt()>10.0)
+		if (jets.at(i).Pt()>0.0)
 		{
 			cout << setprecision(1)  << fixed
 				<< setw(3) << i 
@@ -1180,7 +1285,8 @@ void FactorizationBySmearing::DumpJet(const TLorentzVector& jet) const
 		<< endl;  
 }
 
-bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, const vector<double>& bDisc, 
+bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
+				const vector<unsigned>& bJetInds, const vector<double>& bDisc, 
 				const TLorentzVector& reco_uncl_met_vec, const int& jetcoll, const double& wgt)
 {
 	//0=reco
@@ -1188,7 +1294,7 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
 	//2=smeared
 	
 	//debug only
-/*	cout << endl;
+	/*cout << endl;
 	if (jetcoll==1) 
 	{
 		cout << __FUNCTION__ << ":: ------------------------------------------------------------ GEN Jets" << endl;
@@ -1200,21 +1306,25 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
 	} else if (jetcoll==0)
 	{
 		cout << __FUNCTION__ << ":: ============================================================= RECO Jets" << endl;
+		cout << __LINE__ << ": wgt = " << wgt << endl;
 		++nreco;
 		//DumpJets(jets);
 	}
-*/
+	*/
+	
+
+	//cout << __LINE__<< endl;
 	//calcualte MET 
 	const TLorentzVector clus_metvec(MHT(jets));  
 
 	TVector3 mv3 = reco_uncl_met_vec.Vect() + clus_metvec.Vect();
 	mv3.SetZ(0);
-	TLorentzVector tot_metvec(0,0,0,0);
-	tot_metvec.SetVectMag(mv3,0);
+	const TLorentzVector tot_metvec(mv3,0);
+	
 
-//	const double mht        = mhtvec.Pt(); 
+	const double mht        = clus_metvec.Pt(); 
 	const double met        = tot_metvec.Pt(); 
-	const double mht        = mht;  //this is just lazy! so I do not have to rename mht everywhere
+	const double unclmet    = reco_uncl_met_vec.Pt();
 	const double ht         = HT(jets);
 	const int njet50eta2p5  = CountJets(jets, 50.0, 2.5); 
 	const int njet30eta5p0  = CountJets(jets, 30.0, 5.0); 
@@ -1234,44 +1344,33 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
 //	DumpJetsAndCSV(jets, bDisc, tot_metvec);
 
 	//top tagger stuff
-
 	const double bJET_DISC_CUT_ = 0.679;
 	//for Reco one must use 30 gev cut but for gen-jet smearing we need to use much smaller like 10 GeV !! (Chris -05/15/2013)
 	const double tripletJetPtCut_ = 30.0; //I have in ntuples reco jets pt>30 and all gen jets pt>0. increasing   
 														// increasing this causes smeared results to be lower!!! 05-13-2013
+	//cout << __LINE__<< endl;
 	vector<TLorentzVector> Jets_thisTry_PtCut;
-	std::vector<TLorentzVector> bJet;
 	for(unsigned jet_i = 0; jet_i < jets.size(); jet_i++)
 	{
 		if(jets.at(jet_i).Pt() > tripletJetPtCut_)
 		{
 			Jets_thisTry_PtCut.push_back(jets.at(jet_i));
-
-			//for b-jet counting need to cut on eta/pt/bdisc
-			if (fabs(jets.at(jet_i).Eta())<2.4 && bDisc.at(jet_i) > bJET_DISC_CUT_) {
-				bJet.push_back(jets.at(jet_i));
-			}
 		}
 	}
+	//get b-jet vectors
+	std::vector<TLorentzVector> bJet;
+	//cout << "jets size = " << jets.size() << endl;
+	//DumpJets(jets,0);
+	for (unsigned i=0;i< bJetInds.size(); ++i)
+	{
+	//	cout << "bJetinds " << i << "=" << bJetInds.at(i)  << endl;
+		bJet.push_back(jets.at(bJetInds.at(i)));
+	}
 
-	std::vector<TLorentzVector> triplet;  //this is the top, holds the fat jet
-	std::vector<TLorentzVector> rSystem;
-
-//	double M23OverM123 = -9999.99;
-//	double M123        = -9999.99; 
 
 	topt->processEvent(Jets_thisTry_PtCut, bDisc, tot_metvec);
-	//TripletSelector(Jets_thisTry_PtCut, bDisc, triplet, rSystem, bJet, M23OverM123, M123);
 
-	//cout << "triplet size = " << triplet.size() << endl;
-	//DumpJets(triplet);
-	//cout << "rSystem size = " << rSystem.size() << endl;
-	//DumpJets(rSystem);
-	//cout << "bjet    size = " << bJet.size() << endl;
-	//DumpJets(bJet);
-	//cout << "------------------------------" << endl;
-
-
+	//cout << __LINE__<< endl;
 	//M123 mass of the top
 	const double MT2  = (double)(topt->MT2);
 	const double MTt  = (double)(topt->mTbestTopJet);
@@ -1279,16 +1378,13 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
 	const double M123 = (double)(topt->bestTopJetMass);
 	const int bestTriplIndex = (int)(topt->bestTopJetIdx);
 	
-// MTMT2(tot_metvec,triplet,rSystem,bJet,MT2,MTt,MTb);
 	bool pass_topselection = true;
 	const double MTb_p_MTt = MTb + 0.5 * MTt;
 
-
 	//now apply cuts
 	const bool pass_njetcut       = (njet_pt70>=2 && njet_pt50>=4 && njet_pt30>=5) ? true : false;           // 0000001 = 1
-	const bool pass_metcut        = (tot_metvec.Pt()>175.0 ) ? true : false;                                 // 0000010 = 2
-	//const bool pass_tripletcut    = (triplet.size()>=1) ? true : false;                                      // 0000100 = 4
-	const bool pass_tripletcut    = (bestTriplIndex != -1) ? true : false;                                      // 0000100 = 4
+	const bool pass_metcut        = (met>175.0 ) ? true : false;                                 				// 0000010 = 2
+	const bool pass_tripletcut    = (bestTriplIndex != -1) ? true : false;                                   // 0000100 = 4
 	const bool pass_topmasscut    = (M123>80.0 && M123<270.0 ) ? true : false;                               // 0001000 = 8
 	const bool pass_top_plus_bjet = (MTb_p_MTt> 500.0) ? true : false;                                       // 0010000 = 16
 	const bool pass_mt2cut        = (MT2>300.0) ? true : false;                                              // 0100000 = 32
@@ -1329,7 +1425,6 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
 	if (bAPPLY_INVERT_DPHI_CUT &&   pass_dphicut      ) return 0;
 	if (bAPPLY_BJET_CUT        && ! pass_minbjet_cut  ) return 0;
 
-
 	const unsigned nbjets = bJet.size();
 	double bjetmass = 0;
 	double bjetpt   = 0;
@@ -1339,6 +1434,7 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
 		bjetpt   = bJet.at(0).Pt();
 	}
 
+	//cout << __LINE__<< endl;
 	const unsigned i_JetBin = GetVectorIndex(JetBins_, (unsigned) njet50eta2p5);
 	const unsigned i_HtBin  = GetVectorIndex(HtBins_, ht);
 	const unsigned i_MhtBin = GetVectorIndex(MhtBins_, mht);
@@ -1379,10 +1475,12 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
 	if (jetcoll == 0) //reco hists
 	{ 
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_Mht->Fill(mht, wgt);
+		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_Met->Fill(met, wgt);
+		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_UnclMet->Fill(unclmet, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_Ht->Fill(ht, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_Njet50eta2p5->Fill(njet50eta2p5, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_Njet30eta5p0->Fill(njet30eta5p0, wgt);
-		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_DphiMin->Fill(dPhiMin, wgt);
+		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_DphiMin_mht->Fill(dPhiMin, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_RecoEvt.h_DphiMinVsMht->Fill(mht, dPhiMin, wgt);
 		//the wgt = trigPrescale when running over data
 		//wgt = puweight when running over MC OR
@@ -1444,10 +1542,12 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
 	} else if (jetcoll == 1)  //gen hists
 	{
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_Mht->Fill(mht, wgt);
+		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_Met->Fill(met, wgt);
+		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_UnclMet->Fill(unclmet, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_Ht->Fill(ht, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_Njet50eta2p5->Fill(njet50eta2p5, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_Njet30eta5p0->Fill(njet30eta5p0, wgt);
-		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_DphiMin->Fill(dPhiMin, wgt);
+		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_DphiMin_mht->Fill(dPhiMin, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_DphiMinVsMht->Fill(mht, dPhiMin, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_evtWeight->Fill(wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_GenEvt.h_nVtx->Fill(nVtx, wgt);
@@ -1465,10 +1565,12 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
 	} else if (jetcoll == 2)  //smeared hists
 	{
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_Mht->Fill(mht, wgt);
+		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_Met->Fill(met, wgt);
+		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_UnclMet->Fill(unclmet, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_Ht->Fill(ht, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_Njet50eta2p5->Fill(njet50eta2p5, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_Njet30eta5p0->Fill(njet30eta5p0, wgt);
-		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_DphiMin->Fill(dPhiMin, wgt);
+		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_DphiMin_mht->Fill(dPhiMin, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_DphiMinVsMht->Fill(mht, dPhiMin, wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_evtWeight->Fill(wgt);
 		Hist.at(i_JetBin).at(i_HtBin).at(i_MhtBin).hv_SmearedEvt.h_nVtx->Fill(nVtx, wgt);
@@ -1521,11 +1623,12 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets, 
 		assert (false);
 	}
 	
-	if (jetcoll == 0 && mht>1000)
+/*	if (jetcoll == 0 && mht>1000)
 	{
 		cout << "njet/ht/mht=" << njet50eta2p5 << "/" << ht << "/" << mht;
 		PrintEventNumber();
 	}
+	*/
 	return true;
 }
 void FactorizationBySmearing::FillJetHistogram(const vector<TLorentzVector>& jets, 
@@ -1533,7 +1636,7 @@ void FactorizationBySmearing::FillJetHistogram(const vector<TLorentzVector>& jet
 				const double& wgt) 
 {
 	const unsigned njetsExist = jets.size();
-	const unsigned njetsIwant = 10;
+	const unsigned njetsIwant = 7;  //make this global to sync with hist creation for jets1!!!! TODO:
 	unsigned njet2loop = njetsIwant;
 	if (njetsExist<njetsIwant) njet2loop = njetsExist;
 
@@ -1585,8 +1688,7 @@ double FactorizationBySmearing::DelPhiMin(const vector<TLorentzVector>& jets,
 
 	std::sort(vDelPhi_jetmht.begin(), vDelPhi_jetmht.end(), sort_using_less_than);	
 
-	
-	const double dPhiMin = vDelPhi_jetmht.at(0);
+	const double dPhiMin = vDelPhi_jetmht.size()>0 ? vDelPhi_jetmht.at(0) : -9999.9;
 //	cout << __FUNCTION__ << ": delphimin = " <<  dPhiMin << endl;
 	return dPhiMin;
 }
@@ -1913,24 +2015,28 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 
 	for (unsigned i = 0;i < jetcoll.size(); ++i)
 	{
-		stringstream njet50eta2p5title, njet30eta5p0title, httitle, mhttitle;
+		stringstream njet50eta2p5title, njet30eta5p0title, httitle, mhttitle, mettitle, unclmettitle;
 		njet50eta2p5title << htmhtrange.str().c_str() << ";Njets [ET>50 GeV,| #eta |<2.5];Events;";
 		njet30eta5p0title << htmhtrange.str().c_str() << ";Njets [ET>30 GeV,| #eta |<5.0];Events;";
 		httitle  << htmhtrange.str().c_str() << ";HT [3 Jets, PT>50 GeV, | #eta |<2.5];Events;";
-		mhttitle << htmhtrange.str().c_str() << ";MET [PT>30 GeV, | #eta |<5.0];Events;";
+		mhttitle << htmhtrange.str().c_str() << ";MHT [PT>30 GeV, | #eta |<5.0];Events;";
+		mettitle << htmhtrange.str().c_str() << ";MET (pfMET);Events;";
+		unclmettitle << htmhtrange.str().c_str() << ";Unclustered MET (pfMET - MHT);Events;";
 
-		stringstream njet50eta2p5name, njet30eta5p0name, htname, mhtname;
+		stringstream njet50eta2p5name, njet30eta5p0name, htname, mhtname, metname, unclmetname;
 		njet50eta2p5name << jetcoll.at(i) << "_njet50eta2p5";
 		njet30eta5p0name << jetcoll.at(i) << "_njet30eta5p0";
 		htname  << jetcoll.at(i) << "_ht";
-		mhtname << jetcoll.at(i) << "_met";
+		mhtname << jetcoll.at(i) << "_mht";
+		metname << jetcoll.at(i) << "_met";
+		unclmetname << jetcoll.at(i) << "_unclmet";
 
-		stringstream dphiminname, dphiminvsmhtname;
-		stringstream dphimintitle, dphiminvsmhttitle;
-		dphimintitle << htmhtrange.str().c_str() << ";#Delta #Phi_{min};Events;";
-		dphiminname  << jetcoll.at(i) << "_dphimin";
-		dphiminvsmhttitle << htmhtrange.str().c_str() << ";MET;#Delta #Phi_{min};";
-		dphiminvsmhtname  << jetcoll.at(i) << "_dphiminVsMet";
+		stringstream dphimin_mht_name, dphiminvsmhtname, dphiminmetname;
+		stringstream dphimin_mht_title, dphiminvsmhttitle, dphiminvsmettitle;
+		dphimin_mht_title << htmhtrange.str().c_str() << ";#Delta #Phi_{min};Events;";
+		dphimin_mht_name  << jetcoll.at(i) << "_dphimin";
+		dphiminvsmhttitle << htmhtrange.str().c_str() << ";MHT;#Delta #Phi_{min};";
+		dphiminvsmhtname  << jetcoll.at(i) << "_dphiminVsMht";
 		
 		stringstream evtWeight_name, nvtx_name;	
 		stringstream evtWeight_title, nvtx_title;	
@@ -1971,8 +2077,10 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 			hist.hv_RecoEvt.h_Njet50eta2p5 = new TH1D(njet50eta2p5name.str().c_str(), njet50eta2p5title.str().c_str(), 20, 0, 20);
 			hist.hv_RecoEvt.h_Njet30eta5p0 = new TH1D(njet30eta5p0name.str().c_str(), njet30eta5p0title.str().c_str(), 20, 0, 20);
 			hist.hv_RecoEvt.h_Mht          = new TH1D(mhtname.str().c_str()         , mhttitle.str().c_str()         , nBins_mht, min_mht, max_mht);
+			hist.hv_RecoEvt.h_Met          = new TH1D(metname.str().c_str()         , mettitle.str().c_str()         , nBins_mht, min_mht, max_mht);
+			hist.hv_RecoEvt.h_UnclMet      = new TH1D(unclmetname.str().c_str()     , unclmettitle.str().c_str()     , nBins_mht, min_mht, max_mht);
 			hist.hv_RecoEvt.h_Ht           = new TH1D(htname.str().c_str()          , httitle.str().c_str()          , nBins_ht , min_ht ,  max_ht);
-			hist.hv_RecoEvt.h_DphiMin      = new TH1D(dphiminname.str().c_str()     , dphimintitle.str().c_str()     , 125, 0, 2.5);
+			hist.hv_RecoEvt.h_DphiMin_mht      = new TH1D(dphimin_mht_name.str().c_str()     , dphimin_mht_title.str().c_str()     , 125, 0, 2.5);
 			hist.hv_RecoEvt.h_DphiMinVsMht = new TH2D(dphiminvsmhtname.str().c_str(), dphiminvsmhttitle.str().c_str(), 1400, 0, 350, 250, 0, 2.5);
 			hist.hv_RecoEvt.h_evtWeight    = new TH1D(evtWeight_name.str().c_str()  , evtWeight_title.str().c_str()  , evtWgt_nbins, evtWgt_min, evtWgt_max); 
 			hist.hv_RecoEvt.h_nVtx         = new TH1D(nvtx_name.str().c_str()       , nvtx_title.str().c_str()       , 40, 0, 40);
@@ -1980,17 +2088,19 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 			hist.hv_RecoEvt.h_bjetMass     = new TH1D(bjetmass_name.str().c_str()   , bjetmass_title.str().c_str()   , 120, 0, 600);
 			hist.hv_RecoEvt.h_bjetPt       = new TH1D(bjetpt_name.str().c_str()     , bjetpt_title.str().c_str()     , 60, 0, 300);
 			hist.hv_RecoEvt.h_M123         = new TH1D(m123_name.str().c_str()       , m123_title.str().c_str()       , 120, 0, 600);
-			hist.hv_RecoEvt.h_M23OverM123  = new TH1D(m23overm123_name.str().c_str(), m23overm123_title.str().c_str()       , 100, 0, 2);
+			hist.hv_RecoEvt.h_M23OverM123  = new TH1D(m23overm123_name.str().c_str(), m23overm123_title.str().c_str(), 100, 0, 2);
 			hist.hv_RecoEvt.h_MT2          = new TH1D(mt2_name.str().c_str()        , mt2_title.str().c_str()        , 100, 0, 1000);
-			hist.hv_RecoEvt.h_MTb          = new TH1D(mtb_name.str().c_str()        , mtb_title.str().c_str()        , 40, 0, 400);
-			hist.hv_RecoEvt.h_MTt          = new TH1D(mtt_name.str().c_str()        , mtt_title.str().c_str()        , 40, 0, 400);
+			hist.hv_RecoEvt.h_MTb          = new TH1D(mtb_name.str().c_str()        , mtb_title.str().c_str()        , 100, 0, 1000);
+			hist.hv_RecoEvt.h_MTt          = new TH1D(mtt_name.str().c_str()        , mtt_title.str().c_str()        , 120, 0, 1200);
 			hist.hv_RecoEvt.h_MTb_p_MTt    = new TH1D(mtb_p_mtt_name.str().c_str()  , mtb_p_mtt_title.str().c_str()  , 100, 0, 1000);
 
 			hist.hv_RecoEvt.h_Njet50eta2p5->Sumw2();
 			hist.hv_RecoEvt.h_Njet30eta5p0->Sumw2();
 			hist.hv_RecoEvt.h_Mht->Sumw2();
+			hist.hv_RecoEvt.h_Met->Sumw2();
+			hist.hv_RecoEvt.h_UnclMet->Sumw2();
 			hist.hv_RecoEvt.h_Ht->Sumw2();
-			hist.hv_RecoEvt.h_DphiMin->Sumw2();
+			hist.hv_RecoEvt.h_DphiMin_mht->Sumw2();
 			hist.hv_RecoEvt.h_DphiMinVsMht->Sumw2();
 			hist.hv_RecoEvt.h_evtWeight->Sumw2();
 			hist.hv_RecoEvt.h_nVtx->Sumw2();
@@ -2088,8 +2198,10 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 			hist.hv_GenEvt.h_Njet50eta2p5 = new TH1D(njet50eta2p5name.str().c_str(), njet50eta2p5title.str().c_str(), 20, 0, 20);
 			hist.hv_GenEvt.h_Njet30eta5p0 = new TH1D(njet30eta5p0name.str().c_str(), njet30eta5p0title.str().c_str(), 20, 0, 20);
 			hist.hv_GenEvt.h_Mht          = new TH1D(mhtname.str().c_str()         , mhttitle.str().c_str()         , nBins_mht, min_mht, max_mht);
+			hist.hv_GenEvt.h_Met          = new TH1D(metname.str().c_str()         , mettitle.str().c_str()         , nBins_mht, min_mht, max_mht);
+			hist.hv_GenEvt.h_UnclMet      = new TH1D(unclmetname.str().c_str()    , unclmettitle.str().c_str()     , nBins_mht, min_mht, max_mht);
 			hist.hv_GenEvt.h_Ht           = new TH1D(htname.str().c_str()          , httitle.str().c_str()          , nBins_ht, min_ht, max_ht);
-			hist.hv_GenEvt.h_DphiMin      = new TH1D(dphiminname.str().c_str()     , dphimintitle.str().c_str()     , 120, 0, 2.5);
+			hist.hv_GenEvt.h_DphiMin_mht  = new TH1D(dphimin_mht_name.str().c_str()     , dphimin_mht_title.str().c_str()     , 120, 0, 2.5);
 			hist.hv_GenEvt.h_DphiMinVsMht = new TH2D(dphiminvsmhtname.str().c_str(), dphiminvsmhttitle.str().c_str(), 1400, 0, 350, 250, 0, 2.5);
 			hist.hv_GenEvt.h_evtWeight    = new TH1D(evtWeight_name.str().c_str()  , evtWeight_title.str().c_str()  , evtWgt_nbins,evtWgt_min,evtWgt_max);
 			hist.hv_GenEvt.h_nVtx         = new TH1D(nvtx_name.str().c_str()       , nvtx_title.str().c_str()       , 40,0,40);
@@ -2098,17 +2210,19 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 			hist.hv_GenEvt.h_bjetMass     = new TH1D(bjetmass_name.str().c_str()   , bjetmass_title.str().c_str()   , 120, 0, 600);
 			hist.hv_GenEvt.h_bjetPt       = new TH1D(bjetpt_name.str().c_str()     , bjetpt_title.str().c_str()     , 60, 0, 300);
 			hist.hv_GenEvt.h_M123         = new TH1D(m123_name.str().c_str()       , m123_title.str().c_str()       , 120, 0, 600);
-			hist.hv_GenEvt.h_M23OverM123  = new TH1D(m23overm123_name.str().c_str(), m23overm123_title.str().c_str()       , 100, 0, 2);
+			hist.hv_GenEvt.h_M23OverM123  = new TH1D(m23overm123_name.str().c_str(), m23overm123_title.str().c_str(), 100, 0, 2);
 			hist.hv_GenEvt.h_MT2          = new TH1D(mt2_name.str().c_str()        , mt2_title.str().c_str()        , 100, 0, 1000);
-			hist.hv_GenEvt.h_MTb          = new TH1D(mtb_name.str().c_str()        , mtb_title.str().c_str()        , 40, 0, 400);
-			hist.hv_GenEvt.h_MTt          = new TH1D(mtt_name.str().c_str()        , mtt_title.str().c_str()        , 40, 0, 400);
+			hist.hv_GenEvt.h_MTb          = new TH1D(mtb_name.str().c_str()        , mtb_title.str().c_str()        , 100, 0, 1000);
+			hist.hv_GenEvt.h_MTt          = new TH1D(mtt_name.str().c_str()        , mtt_title.str().c_str()        , 120, 0, 1200);
 			hist.hv_GenEvt.h_MTb_p_MTt    = new TH1D(mtb_p_mtt_name.str().c_str()  , mtb_p_mtt_title.str().c_str()  , 100, 0, 1000);
 
 			hist.hv_GenEvt.h_Njet50eta2p5->Sumw2();
 			hist.hv_GenEvt.h_Njet30eta5p0->Sumw2();
 			hist.hv_GenEvt.h_Mht->Sumw2();
+			hist.hv_GenEvt.h_Met->Sumw2();
+			hist.hv_GenEvt.h_UnclMet->Sumw2();
 			hist.hv_GenEvt.h_Ht->Sumw2();
-			hist.hv_GenEvt.h_DphiMin->Sumw2();
+			hist.hv_GenEvt.h_DphiMin_mht->Sumw2();
 			hist.hv_GenEvt.h_DphiMinVsMht->Sumw2();
 			hist.hv_GenEvt.h_evtWeight->Sumw2();
 			hist.hv_GenEvt.h_nVtx->Sumw2();
@@ -2129,8 +2243,11 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 			hist.hv_SmearedEvt.h_Njet50eta2p5 = new TH1D(njet50eta2p5name.str().c_str(), njet50eta2p5title.str().c_str(), 20, 0, 20);
 			hist.hv_SmearedEvt.h_Njet30eta5p0 = new TH1D(njet30eta5p0name.str().c_str(), njet30eta5p0title.str().c_str(), 20, 0, 20);
 			hist.hv_SmearedEvt.h_Mht          = new TH1D(mhtname.str().c_str()         , mhttitle.str().c_str()         , nBins_mht, min_mht, max_mht);
-			hist.hv_SmearedEvt.h_Ht           = new TH1D(htname.str().c_str()          , httitle.str().c_str()          ,  nBins_ht,  min_ht,  max_ht);
-			hist.hv_SmearedEvt.h_DphiMin      = new TH1D(dphiminname.str().c_str()     , dphimintitle.str().c_str()     , 125, 0, 2.5);
+			hist.hv_SmearedEvt.h_Met          = new TH1D(metname.str().c_str()         , mettitle.str().c_str()         , nBins_mht, min_mht, max_mht);
+			hist.hv_SmearedEvt.h_UnclMet      = new TH1D(unclmetname.str().c_str()     , unclmettitle.str().c_str()     , nBins_mht, min_mht, max_mht);
+			hist.hv_SmearedEvt.h_Ht           = new TH1D(htname.str().c_str()          , httitle.str().c_str()          , nBins_ht ,  min_ht,  max_ht);
+			hist.hv_SmearedEvt.h_DphiMin_mht  = new TH1D(dphimin_mht_name.str().c_str(), dphimin_mht_title.str().c_str(), 125, 0, 2.5);
+			//hist.hv_SmearedEvt.h_DphiMin_met  = new TH1D(dphimin_met_name.str().c_str(), dphimin_met_title.str().c_str(), 125, 0, 2.5);
 			hist.hv_SmearedEvt.h_DphiMinVsMht = new TH2D(dphiminvsmhtname.str().c_str(), dphiminvsmhttitle.str().c_str(), 1400, 0, 350, 250, 0, 2.5);
 			hist.hv_SmearedEvt.h_evtWeight    = new TH1D(evtWeight_name.str().c_str()  , evtWeight_title.str().c_str()  , evtWgt_nbins, evtWgt_min, evtWgt_max);
 			hist.hv_SmearedEvt.h_nVtx         = new TH1D(nvtx_name.str().c_str()       , nvtx_title.str().c_str()       , 40, 0, 40);
@@ -2139,18 +2256,20 @@ void FactorizationBySmearing::GetHist(TDirectory *dir, Hist_t& hist,
 			hist.hv_SmearedEvt.h_bjetMass     = new TH1D(bjetmass_name.str().c_str()   , bjetmass_title.str().c_str()   , 120, 0, 600);
 			hist.hv_SmearedEvt.h_bjetPt       = new TH1D(bjetpt_name.str().c_str()     , bjetpt_title.str().c_str()     , 60, 0, 300);
 			hist.hv_SmearedEvt.h_M123         = new TH1D(m123_name.str().c_str()       , m123_title.str().c_str()       , 120, 0, 600);
-			hist.hv_SmearedEvt.h_M23OverM123  = new TH1D(m23overm123_name.str().c_str(), m23overm123_title.str().c_str()       , 100, 0, 2);
+			hist.hv_SmearedEvt.h_M23OverM123  = new TH1D(m23overm123_name.str().c_str(), m23overm123_title.str().c_str(), 100, 0, 2);
 			hist.hv_SmearedEvt.h_MT2          = new TH1D(mt2_name.str().c_str()        , mt2_title.str().c_str()        , 100, 0, 1000);
-			hist.hv_SmearedEvt.h_MTb          = new TH1D(mtb_name.str().c_str()        , mtb_title.str().c_str()        , 40, 0, 400);
-			hist.hv_SmearedEvt.h_MTt          = new TH1D(mtt_name.str().c_str()        , mtt_title.str().c_str()        , 40, 0, 400);
+			hist.hv_SmearedEvt.h_MTb          = new TH1D(mtb_name.str().c_str()        , mtb_title.str().c_str()        , 100, 0, 1000);
+			hist.hv_SmearedEvt.h_MTt          = new TH1D(mtt_name.str().c_str()        , mtt_title.str().c_str()        , 120, 0, 1200);
 			hist.hv_SmearedEvt.h_MTb_p_MTt    = new TH1D(mtb_p_mtt_name.str().c_str()  , mtb_p_mtt_title.str().c_str()  , 100, 0, 1000);
 
 
 			hist.hv_SmearedEvt.h_Njet50eta2p5->Sumw2();
 			hist.hv_SmearedEvt.h_Njet30eta5p0->Sumw2();
 			hist.hv_SmearedEvt.h_Mht->Sumw2();
+			hist.hv_SmearedEvt.h_Met->Sumw2();
+			hist.hv_SmearedEvt.h_UnclMet->Sumw2();
 			hist.hv_SmearedEvt.h_Ht->Sumw2();
-			hist.hv_SmearedEvt.h_DphiMin->Sumw2();
+			hist.hv_SmearedEvt.h_DphiMin_mht->Sumw2();
 			hist.hv_SmearedEvt.h_DphiMinVsMht->Sumw2();
 			hist.hv_SmearedEvt.h_evtWeight->Sumw2();
 			hist.hv_SmearedEvt.h_nVtx->Sumw2();
@@ -2239,16 +2358,16 @@ void FactorizationBySmearing::GetJetHist(vector<JetHist_t>& Hist, const string j
 					const string htmhtrange)
 {
 	//save up to 10 leading jets
-	const int njets = 10;
+	const int njets = 7;
 	for (int i=0; i<njets; ++i)
 	{
 		stringstream ptname, etaname, phiname, dphiname; 
 		stringstream pttitle, etatitle, phititle, dphititle; 
 		const int index = i + 1;
-		ptname   << jetcoll << "jet" << index << "_pt";
-		etaname  << jetcoll << "jet" << index << "_eta";
-		phiname  << jetcoll << "jet" << index << "_phi";
-		dphiname << jetcoll << "jet" << index << "_dphi";
+		ptname   << jetcoll << "_jet" << index << "_pt";
+		etaname  << jetcoll << "_jet" << index << "_eta";
+		phiname  << jetcoll << "_jet" << index << "_phi";
+		dphiname << jetcoll << "_jet" << index << "_dphi";
 		pttitle  << htmhtrange << ";Jet-" << index << " P_{T} [GeV];Events;";
 		etatitle << htmhtrange << ";Jet-" << index << " #eta;Events;";
 		pttitle  << htmhtrange << ";Jet-" << index << " #phi ;Events;";
@@ -3205,4 +3324,25 @@ void FactorizationBySmearing::MTMT2(const TLorentzVector& MetVec,
 	}
 
 
+}
+
+vector<unsigned> FactorizationBySmearing::FindBjets(const vector<TLorentzVector>& jets, const vector<double>& bDisc)
+{
+	const double bJET_DISC_CUT_   = 0.679;
+	const double tripletJetPtCut_ = 30.0; 
+	std::vector<unsigned> bJetInds;
+	for (unsigned jet_i = 0; jet_i < jets.size(); jet_i++)
+	{
+//		cout << __FUNCTION__ << "jet_i = " << jet_i << endl;
+		//for b-jet counting need to cut on eta/pt/bdisc
+		if (jets.at(jet_i).Pt() > tripletJetPtCut_
+			 && fabs(jets.at(jet_i).Eta())<2.4 
+			 && bDisc.at(jet_i) > bJET_DISC_CUT_ 
+			 )
+		{
+//			cout << __FUNCTION__ << "b jet_i = " << jet_i << endl;
+			bJetInds.push_back(jet_i);
+		}
+	}
+	return bJetInds;
 }
