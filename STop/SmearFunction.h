@@ -97,7 +97,7 @@ private:
    std::vector<std::vector<TH1F*> > SigmaPtHist_scaled_total;
    std::vector<std::vector<TF1*> > SigmaPt_scaled_total;
 
-	unsigned uResFuncCollType_; //default=0 (JetAll), jet Ranked=1
+	unsigned uResFuncCollType_; //default=0 (JetAll), jet Ranked=1 , b-jets = 2
 
 public:
 
@@ -106,6 +106,22 @@ public:
 	void SetSmearingFile(const string name) { smearingfile_ = name; }
 	void SetResFuncColl(const unsigned i);
 	unsigned GetResFuncCollType() const { return uResFuncCollType_; }
+	string GetResFuncCollTypeName() const 
+	{
+		if (uResFuncCollType_ == 0)
+		{
+			return "h_tot_JetAll_ResponsePt (common)";
+		} else if (uResFuncCollType_ == 1)
+		{
+			return "h_tot_Jet1_ResponsePt (jet-ranked)";
+		} else if (uResFuncCollType_ == 2) 
+		{
+			return "h_b_Jet1_ResponsePt (b-jet)";
+		} else
+		{
+			return "Unknown Resolution Func. Collection!";
+		}
+	}
 
 	//setters (override default settings)
 	void SetPtBinEdges(const vector<double> ptBins);
