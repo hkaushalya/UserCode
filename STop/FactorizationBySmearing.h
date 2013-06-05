@@ -42,7 +42,9 @@ class FactorizationBySmearing : public NtupleSelector {
 		void CreateRecoJetVec(std::vector<TLorentzVector>& vjets, std::vector<double>& bDisc);
 		void CreateGenJetVec(std::vector<TLorentzVector>& vjets);
 		double JetResolutionHist_Pt_Smear(const double& pt, const double& eta, const int& i);
+		double BJetResolutionHist_Pt_Smear(const double& pt, const double& eta, const int& i);
 		void SmearingGenJets(const vector<TLorentzVector>& jets_gen, const vector<double>& bDisc_gen, 
+						vector<unsigned>& bJetInds,
 						std::vector<TLorentzVector> &genJets_smeared, std::vector<double>& bDisc_smeared);
 		void SetGenJetBdiscriminators(const vector<TLorentzVector>& jets_reco, const std::vector<double>& bDisc_reco,
 									const std::vector<TLorentzVector> &genJets, std::vector<double>& bDisc_gen);
@@ -65,8 +67,11 @@ class FactorizationBySmearing : public NtupleSelector {
 			TH1D *h_Njet50eta2p5;
 			TH1D *h_Njet30eta5p0;
 			TH1D *h_Mht;      //this Mht/Ht plots are for cut confirmations. Total HT/MHT plots are separately made
+			TH1D *h_Met;
+			TH1D *h_UnclMet;
  			TH1D *h_Ht;
-			TH1D *h_DphiMin;
+			TH1D *h_DphiMin_mht;
+			TH1D *h_DphiMin_met;
 			TH2D *h_DphiMinVsMht;
 			TH1D *h_nbjets;
 			TH1D *h_bjetMass;
@@ -107,9 +112,10 @@ class FactorizationBySmearing : public NtupleSelector {
 		bool bDEBUG, bNON_STD_MODE;
 		string sNON_STD_MODE_EXPLAIN;
 		bool bRUNNING_ON_MC;
+		bool bUSE_BJET_SMEAR_FUNC; //control using b-jet reponse functions to smear b-jets
 		bool bDO_TRIG_PRESCALING, bDO_TRIG_SELECTION, bDO_PU_WEIGHING, bDO_GENJET_SMEARING;
 		bool bDO_LUMI_WEIGHING;
-		SmearFunction *smearFunc_;
+		SmearFunction *smearFunc_, *bjetsmearFunc_;
 		double smearedJetPt_;
 		unsigned uNTRIES;
 		std::vector<double> PtBinEdges_scaling_;
@@ -137,10 +143,11 @@ class FactorizationBySmearing : public NtupleSelector {
 		vector<vector<TH1*> > jerHist; //for each pt/eta bins
 		void BookJerDebugHists();
 
-		void DumpJets(const vector<TLorentzVector>& jets) const ;
+		void DumpJets(const vector<TLorentzVector>& jets, const double& minPt=10.0) const ;
 		void DumpJet(const TLorentzVector& jet) const ;
 		void DumpJetsAndCSV(const vector<TLorentzVector>& jets, const vector<double>& csv,
 							const TLorentzVector& met) const;
+		vector<unsigned> FindBjets(const vector<TLorentzVector>& jets, const vector<double>& bDisc);
 		void GetHist(TDirectory *dir, Hist_t& hist, 
 					const pair<unsigned, unsigned> njetrange,
 					const pair<unsigned, unsigned> htrange,
@@ -151,7 +158,8 @@ class FactorizationBySmearing : public NtupleSelector {
 							, const string htmhtrangelabel	);
 		unsigned GetVectorIndex(const vector<double>& bins, const double& val);
 		unsigned GetVectorIndex(const vector< pair<unsigned, unsigned> >& binEdges, const unsigned& val);
-		bool FillHistogram(const vector<TLorentzVector>& jets, const vector<double>& bDisc, 
+		bool FillHistogram(const vector<TLorentzVector>& jets, const vector<unsigned>& bJetInds, 
+						const vector<double>& bDisc, 
 						const TLorentzVector& reco_uncl_met, const int& jetcoll, const double& wgt=1.0);
 		int CountJets(const std::vector<TLorentzVector>& vjets, 
 			const double minPt, const double maxEta);		
