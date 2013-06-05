@@ -2,7 +2,9 @@
 
 export configSpecStr=$1
 export systVariation=$2
+export cutmask=$3
 export totevts=-1
+#export totevts=10
 
 export filetail="_"$configSpecStr
 
@@ -43,7 +45,7 @@ initialdir = ${outputDir}
 Output = ${logDir}_${configSpecStr}_\$(Cluster)_\$(Process).stdout
 Error = ${logDir}_${configSpecStr}_\$(Cluster)_\$(Process).stderr
 Log = ${logDir}_${configSpecStr}_\$(Cluster)_\$(Process).log
-Arguments = $inputlist \$(Cluster).root ${totevts} ${systVariation} 
+Arguments = $inputlist \$(Cluster).root ${totevts} ${systVariation} ${cutmask} 
 
 Queue 
 

@@ -3,7 +3,7 @@
 set systVariation = 0
 
 set curDir = `pwd`
-set mainDir = "$curDir/04202012_CutFlow"
+set mainDir = "$curDir/05222013_UseDefaultJetRes_100sampling"
 
 if (! -d $mainDir ) then
 	mkdir $mainDir
@@ -17,7 +17,8 @@ endif
 
 #set ttdir           = "${mainDir}/TTC10"
 
-foreach i (1 5 13 29 61 63) #these are the bitmasks enabling each cut cumulatively
+#foreach i (1 5 13 29 61 63) #these are the bitmasks enabling each cut cumulatively
+foreach i (0 383 255) #these are the bitmasks enabling each cut cumulatively
 
 			set ttdir = "${mainDir}/$i"
 			mkdir -vp $ttdir
