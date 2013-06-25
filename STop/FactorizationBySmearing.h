@@ -37,8 +37,10 @@ class FactorizationBySmearing : public NtupleSelector {
 		double   DeltaPhi(double, double);
 		double   DeltaR(double eta1, double phi1, double eta2, double phi2);
 		double   HT (const std::vector<TLorentzVector>&);
-		TLorentzVector MHT(const std::vector<TLorentzVector>&);
-		TLorentzVector GetMET(const vector<TLorentzVector>& jets);
+		TLorentzVector MHT(const std::vector<TLorentzVector>& jets,
+							const double& minPt=30.0, const double& maxEta=5.0); 
+		TLorentzVector GetMET(const vector<TLorentzVector>& jets,
+							const double& minPt=10.0, const double& maxEta=5.0); 
 		void CreateRecoJetVec(std::vector<TLorentzVector>& vjets, std::vector<double>& bDisc);
 		void CreateGenJetVec(std::vector<TLorentzVector>& vjets);
 		double JetResolutionHist_Pt_Smear(const double& pt, const double& eta, const int& i);
@@ -54,6 +56,7 @@ class FactorizationBySmearing : public NtupleSelector {
 		vector<TLorentzVector> GetPt50Eta2p5Jets(const vector<TLorentzVector>& jets);
 		void Print4vec(const TLorentzVector& tl1, const TLorentzVector& tl2) const;
 		void Print4vec(const TLorentzVector& tl1) const;
+		TLorentzVector GetSmearUnclMet(const TLorentzVector& met);
 
 		struct JetHist_t {
 			TH1D *h_Jet_pt;
@@ -129,7 +132,7 @@ class FactorizationBySmearing : public NtupleSelector {
 		bool absoluteTailScaling_;
 		bool bAPPLY_DPHI_CUT, bAPPLY_NJET_CUT, bAPPLY_MET_CUT, bAPPLY_TRIPLET_CUT, bAPPLY_TOPMASS_CUT, bAPPLY_TOPPLUSBJET_CUT, bAPPLY_MT2_CUT, bAPPLY_BJET_CUT; 
 		bool bAPPLY_INVERT_DPHI_CUT;
-		unsigned uMinNjet70Eta2p4_, uMinNjet50Eta2p4_, uMinNjet30Eta2p4_, uMinTriplets_;
+		unsigned uMinNjet70Eta2p4_, uMinNjet50Eta2p4_, uMinNjet30Eta2p4_, uMinTriplets_, uMinBjets_;
 		double dMinMet_, dMinTopMass_, dMaxTopMass_, dMinTopPlusBjetMass_, dMinMt2_;
 		unsigned nBadEcalLaserEvts;
 
@@ -170,7 +173,6 @@ class FactorizationBySmearing : public NtupleSelector {
 		bool PassDphiCut(const vector<TLorentzVector>& jets, 
 					const TLorentzVector& mht, const unsigned njet50min, 
 					const double& cut1, const double& cut2, const double& cut3);
-		bool PassBaselineSelection(const vector<TLorentzVector>& jets, const TLorentzVector met_vec);
 		double GetLumiWgt(const string& datasetname, const double& dataLumi);
 		void DivideByBinWidth(TH1* h);
 		bool PassCleaning();
@@ -180,9 +182,6 @@ class FactorizationBySmearing : public NtupleSelector {
 		void PrintEventNumber() const;
 		bool PassHOfilter();
    	void TripletSelector(const std::vector<TLorentzVector> & , const std::vector<double> bDisc, std::vector<TLorentzVector> & , std::vector<TLorentzVector> & , std::vector<TLorentzVector> & , double & , double & );
-   	void MTMT2(const TLorentzVector & MET, const std::vector<TLorentzVector> & triplet,
-						const std::vector<TLorentzVector> & rSystem, const std::vector<TLorentzVector> & bJetsInR, 
-						double & MT2, double & MTt, double& MTb);
 		topTagger::type3TopTagger* topt;
 		unsigned nreco, ngen, nsmear;
 };
