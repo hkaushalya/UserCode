@@ -10,10 +10,23 @@
 #include <string>
 #include "assert.h"
 #include "TPaveText.h"
+#include <iomanip>
 
 using namespace std;
 
 const static double LargeNegNum = -99999.99;
+
+double StatErr(const TH1* h)
+{
+	double toterr2 = 0;
+	for (int bin = 1; bin <= h->GetNbinsX(); ++bin)
+	{
+		const double binerr = h->GetBinError(bin);
+		toterr2 += (binerr*binerr);
+	}
+	const double toterr = sqrt(toterr2);
+	return toterr;
+}
 
 TCanvas* GetCanvas(TPad *p1, TPad *p2)
 {
@@ -99,8 +112,10 @@ void makeHist(const string title="")
 	else if (sample==4) title += "All Stop cuts applied + Inverted #Delta#Phi (use b-Jet JERs)";
 	else if (sample==5) title += "No cuts applied";
 */
+	stringstream unclmet_title;
+	unclmet_title << title << "Unclutered MET";
 	hist2print.push_back(Hist("met",title,2,100.0, 400.0,1));
-	hist2print.push_back(Hist("unclmet",title,2,100.0, 400.0,1));
+	hist2print.push_back(Hist("unclmet",unclmet_title.str().c_str(),2,0.0, 100.0,1));
 	hist2print.push_back(Hist("mht",title,2,100.0, 400.0,1));
 	hist2print.push_back(Hist("ht",title,2,0,2000,1));
 	hist2print.push_back(Hist("njet30eta5p0",title,1,0,15,1));
@@ -109,8 +124,8 @@ void makeHist(const string title="")
 	hist2print.push_back(Hist("M123",title,2));
 //	hist2print.push_back(Hist("M23overM123",title));
 	hist2print.push_back(Hist("MT2",title,2));
-	hist2print.push_back(Hist("MTb",title));
-	hist2print.push_back(Hist("MTt",title));
+	hist2print.push_back(Hist("MTb",title,4));
+	hist2print.push_back(Hist("MTt",title,4));
 	hist2print.push_back(Hist("MTb_p_MTt",title,2,400,1000,1));
 	//hist2print.push_back(Hist("jet1_pt",title,2));
 	//hist2print.push_back("bjetPt");
@@ -274,9 +289,16 @@ void makeHist(const string title="")
 		const double sum_reco  = hreco->Integral(1, hreco->GetNbinsX()+1);
 		const double sum_smear = hsmear->Integral(1, hsmear->GetNbinsX()+1);
 		const double sum_gen   = hgen->Integral(1, hgen->GetNbinsX()+1);
-		recoleg << "reco (" << sum_reco << ")";
-		smearleg << "smear (" << sum_smear << ")";
-		genleg << "gen (" << sum_gen << ")";
+		const double err_reco = StatErr(hreco);
+		const double err_smear = StatErr(hsmear);
+		
+
+		cout << setprecision(1) << fixed;
+
+		recoleg << "Reco (" << sum_reco << "#pm" << err_reco << ")";
+		smearleg << "Smear (" << sum_smear << "#pm" << err_smear << ")";
+		genleg << "Gen (" << sum_gen << ")";
+		cout <<  smear_hist_name.str() << "::reco/smear = " << sum_reco << "/" << sum_smear << endl;
 
 		TLegend *l2 = new TLegend(0.6,0.6,0.9,0.9);
 		l2->AddEntry(hreco, recoleg.str().c_str());

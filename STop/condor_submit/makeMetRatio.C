@@ -16,6 +16,19 @@ using namespace std;
 
 const static double LargeNegNum = -99999.99;
 
+
+double StatErr(const TH1* h)
+{
+	double toterr2 = 0;
+	for (int bin = 1; bin <= h->GetNbinsX(); ++bin)
+	{
+		const double binerr = h->GetBinError(bin);
+		toterr2 += (binerr*binerr);
+	}
+	const double toterr = sqrt(toterr2);
+	return toterr;
+}
+
 TCanvas* GetCanvas(TPad *p1, TPad *p2)
 {
    //TCanvas *c1 = new TCanvas("c1", "c1",15,60,550,600);
@@ -80,7 +93,8 @@ class Hist
 };
 
 
-void makeMetRatio(const int sample)
+//void makeMetRatio(const int sample=0)
+void makeMetRatio(const string title="")
 {
 	vector<Hist> hist2print;
 	TPaveText *tx = new TPaveText(.05,.1,.95,.8);
@@ -90,13 +104,14 @@ void makeMetRatio(const int sample)
 	string mtitle("");
 
 	//if (sample==1) mtitle += "NJet(70/50/30>=2/4/5), #slash{E}_{T}>175, Triplet>1, 80<TopMass<270, TOP+0.5*BJET>500, MT2>300, #Delta#Phi(.5,.5,.3), BJets>=1";
-	if (sample==1)      mtitle += "All Stop cuts applied (use default JERs for all jets)";
+/*	if (sample==1)      mtitle += "All Stop cuts applied (use default JERs for all jets)";
 	else if (sample==2) mtitle += "All Stop cuts applied + Inverted #Delta#Phi (use default JERs for all jets)";
 	else if (sample==3) mtitle += "All Stop cuts applied (use b-Jet JERs)";
 	else if (sample==4) mtitle += "All Stop cuts applied + Inverted #Delta#Phi (use b-Jet JERs)";
+*/
 
 	//hist2print.push_back(Hist("met","Smeared Gen-Jets (QCD MG)",2,150.0, 400.0));
-	hist2print.push_back(Hist("met","t#bar{t} MC",2,150.0, 400.0));
+	hist2print.push_back(Hist("met",title,4,150.0, 400.0));
 
 	TFile *outRootFile_num = new TFile("StopDphiCut.root");
 	TFile *outRootFile_den = new TFile("StopInvrtDphiCut.root");
@@ -198,13 +213,13 @@ void makeMetRatio(const int sample)
 
 		hsmear_num->SetLineColor(kRed);
 		hsmear_num->SetMarkerColor(kRed);
-		hsmear_num->SetMarkerStyle(24);
+		hsmear_num->SetMarkerStyle(26);
 		hsmear_num->SetLineWidth(2);
 		//hsmear_num->GetXaxis()->SetRangeUser(0,300);
 
-		hsmear_den->SetLineColor(kBlue);
-		hsmear_den->SetMarkerColor(kBlue);
-		hsmear_den->SetMarkerStyle(24);
+		hsmear_den->SetLineColor(kRed);
+		hsmear_den->SetMarkerColor(kRed);
+		hsmear_den->SetMarkerStyle(20);
 		hsmear_den->SetLineWidth(2);
 		//hsmear_den->GetXaxis()->SetRangeUser(0,300);
 
@@ -215,9 +230,9 @@ void makeMetRatio(const int sample)
 		hreco_num->SetLineWidth(2);
 		//hreco_num->GetXaxis()->SetRangeUser(0,300);
 
-		hreco_den->SetLineColor(kGreen);
-		hreco_den->SetMarkerColor(kGreen);
-		hreco_den->SetMarkerStyle(26);
+		hreco_den->SetLineColor(kBlack);
+		hreco_den->SetMarkerColor(kBlack);
+		hreco_den->SetMarkerStyle(20);
 		hreco_den->SetLineWidth(2);
 		//hreco_den->GetXaxis()->SetRangeUser(0,300);
 
@@ -257,10 +272,16 @@ void makeMetRatio(const int sample)
 		const double sum_den = hsmear_den->Integral(1, hsmear_den->GetNbinsX()+1);
 		const double sum_reco_num = hreco_num->Integral(1, hreco_num->GetNbinsX()+1);
 		const double sum_reco_den = hreco_den->Integral(1, hreco_den->GetNbinsX()+1);
-		numleg << "Smear[#Delta#Phi] (" << setprecision(1) << fixed << sum_num << ")";
-		denleg << "Smear[Inv.#Delta#Phi] ("<< setprecision(1) << fixed  << sum_den << ")";
-		reco_numleg << "Reco[#Delta#Phi] ("<< setprecision(1) << fixed  << sum_reco_num << ")";
-		reco_denleg << "Reco[Inv.#Delta#Phi] ("<< setprecision(1) << fixed  << sum_reco_den << ")";
+
+		const double staterr_num = StatErr(hsmear_num);
+		const double staterr_den = StatErr(hsmear_den);
+		const double staterr_reco_num = StatErr(hreco_num);
+		const double staterr_reco_den = StatErr(hreco_den);
+
+		numleg << "Smear[#Delta#Phi] (" << setprecision(1) << fixed << sum_num << "#pm" << staterr_num << ")";
+		denleg << "Smear[Inv.#Delta#Phi] ("<< setprecision(1) << fixed  << sum_den  << "#pm" << staterr_den << ")";
+		reco_numleg << "Reco[#Delta#Phi] ("<< setprecision(1) << fixed  << sum_reco_num << "#pm" << staterr_reco_num  << ")";
+		reco_denleg << "Reco[Inv.#Delta#Phi] ("<< setprecision(1) << fixed  << sum_reco_den  << "#pm" << staterr_reco_den << ")";
 
 		TLegend *l2 = new TLegend(0.6,0.6,0.9,0.9);
 		l2->AddEntry(hsmear_num, numleg.str().c_str());
