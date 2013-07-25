@@ -13,7 +13,7 @@
 //
 // Original Author:  samantha hewamanage
 //         Created:  Tue Jul 26 22:15:44 CDT 2011
-// $Id: Factorization_SmearedJets.cc,v 1.3 2011/12/14 23:43:04 samantha Exp $
+// $Id: Factorization_SmearedJets.cc,v 1.2 2012/05/03 14:51:52 samantha Exp $
 //
 //
 
@@ -532,6 +532,7 @@ Factorization_SmearedJets::~Factorization_SmearedJets()
 bool
 Factorization_SmearedJets::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
+	std::cout << __LINE__ << std::endl;
    using namespace edm;
 	++uProcessed;
 	cutsHist.processed->Fill(1);
@@ -553,6 +554,7 @@ Factorization_SmearedJets::filter(edm::Event& iEvent, const edm::EventSetup& iSe
 		 	<<  kRunLumiEvent.run << ":" << kRunLumiEvent.lumi 
 			<< ":" << kRunLumiEvent.evt << std::endl;
 
+	std::cout << __LINE__ << std::endl;
 
 	Weight = 1;
 
@@ -567,6 +569,7 @@ Factorization_SmearedJets::filter(edm::Event& iEvent, const edm::EventSetup& iSe
 		Weight *= lumiWeight;
 	}
 
+	std::cout << __LINE__ << std::endl;
 	//event weights for flat QCD samples
 	double storedWeight = 1;
 	if ( doEventWeighing )
@@ -578,6 +581,7 @@ Factorization_SmearedJets::filter(edm::Event& iEvent, const edm::EventSetup& iSe
 		Weight *= storedWeight;
 	}
 
+	std::cout << __LINE__ << std::endl;
 	/* 
 	 * prescaled trigger weights
 	 */
@@ -598,6 +602,7 @@ Factorization_SmearedJets::filter(edm::Event& iEvent, const edm::EventSetup& iSe
 		Weight *= prescaleWeight;
 		//std::cout << "Weight = " << Weight << std::endl;
 	}
+	std::cout << __LINE__ << std::endl;
 
 	hist_eventWeights->Fill(Weight);
 	//std::cout << "Weight = " << Weight << std::endl;
@@ -606,6 +611,7 @@ Factorization_SmearedJets::filter(edm::Event& iEvent, const edm::EventSetup& iSe
 	 *  validity.
 	 */
 
+	std::cout << __LINE__ << std::endl;
 	const bool bUseRSMod = true;
 	if (bUseRSMod)
 	{

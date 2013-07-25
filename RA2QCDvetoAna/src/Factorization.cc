@@ -63,6 +63,9 @@
 #include <iomanip>
 #include "TPad.h"
 
+
+using namespace std;
+
 //
 // class declaration
 //
@@ -74,26 +77,6 @@ class Factorization : public edm::EDFilter {
 
       static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
-   private:
-      virtual void beginJob() ;
-      virtual bool filter(edm::Event&, const edm::EventSetup&);
-      virtual void endJob() ;
-      
-      virtual bool beginRun(edm::Run&, edm::EventSetup const&);
-      virtual bool endRun(edm::Run&, edm::EventSetup const&);
-      virtual bool beginLuminosityBlock(edm::LuminosityBlock&, edm::EventSetup const&);
-      virtual bool endLuminosityBlock(edm::LuminosityBlock&, edm::EventSetup const&);
-		bool storeHLT(const edm::Event& e, const edm::EventSetup& iSetup);
-
-      // ----------member data ---------------------------
-		//jet collections
-		edm::InputTag pfJetInputTag_;
-		edm::Handle<reco::PFJetCollection> pfJetcollection;
-		edm::InputTag mhtInputTag_, htInputTag_;
-		edm::Handle<edm::View<reco::MET> > mhtHandle;
-		edm::Handle<double> htHandle;
-		edm::InputTag prescaleWeightInputTag;
-
 		struct RunLumiEvt_t
 		{
 			unsigned run;
@@ -101,20 +84,20 @@ class Factorization : public edm::EDFilter {
 			unsigned evt;
 		};
 
-		
-		int inMinVtx;
-		unsigned int uProcessed; // number of processed events
-		unsigned int uPassed; //number of events passed the filter
-		RunLumiEvt_t kRunLumiEvent;
-		int iVerbose; // control print levels
-		double dMinHT;
-		double dMinMHT;
-
 		struct EventHist_t {
+			TH1F* nvtx;
 			TH1F* mht;
-			TH1F* ht;
-			TH1F* njet;
+			TH1F* pfmht;
+			TH1F* ht;	//calculated by hand
+			TH1F* pfht; //ht in PAT
+			TH1F* njet30;
+			TH1F* njet50;
 			TH1F* meff;
+			TH1F* dphiMin;
+			TH1F* delphiMin_jetmht[10]; // using 3 jets, 4 jets etc
+			TH1F* prescaleWeights;
+			TH1F* eventWeights;
+			//TH2F* trigVsWeight;
 		};
 
 		struct JetHist_t{
@@ -126,8 +109,15 @@ class Factorization : public edm::EDFilter {
 
 		struct Hist_t {  //hists for each inclusive jet category
 			EventHist_t evt;
-			JetHist_t jet[5];
-			TH1F* delphiMin_jetmht[3];
+			JetHist_t jet[10];
+			TH1F* pass[6];
+			TH1F* passFineBin[6];
+			TH1F* fail[6];
+			TH1F* failFineBin[6];
+			TH1F* signal;
+			TH1F* signalFineBin;
+			TH1F* sidebandSyst[2];
+			TH1F* sidebandSystFineBin[2];
 		};
 
 		struct CutsPassedHists_t
@@ -138,25 +128,65 @@ class Factorization : public edm::EDFilter {
 			TH1F *mht;
 		};
 
-		CutsPassedHists_t cutsHist;
 
-		TH1F* hDelPhiMin_mht[8];
-		TH1F* hPass[16];
-		TH1F* hFail[57];
-		TH1F* hSignalRegion[27];
+
+   private:
+      virtual void beginJob() ;
+      virtual bool filter(edm::Event&, const edm::EventSetup&);
+      virtual void endJob() ;
+      
+      virtual bool beginRun(edm::Run&, edm::EventSetup const&);
+      virtual bool endRun(edm::Run&, edm::EventSetup const&);
+      virtual bool beginLuminosityBlock(edm::LuminosityBlock&, edm::EventSetup const&);
+      virtual bool endLuminosityBlock(edm::LuminosityBlock&, edm::EventSetup const&);
+		bool storeHLT(const edm::Event& e, const edm::EventSetup& iSetup);
+		void PrintHeader();
+		void BookHistograms();
+		void BookCommonHistograms(TFileDirectory& dir, const float htMin, 
+								const float htMax, Hist_t& hist);
+
+		void FillHistograms(
+				edm::Handle<reco::VertexCollection> vertexHandle,
+				edm::Handle<std::vector<pat::Jet> > pf30eta50JetHandle,
+				edm::Handle<std::vector<pat::Jet> > pf50eta25JetHandle,
+				edm::Handle<edm::View<reco::MET> > mhtHandle,
+				edm::Handle<double> htHandle, const float& myht, const float& mymht,
+				const float dPhiMin, 
+				const bool bRA2DphiCut, 
+				const bool bSidebandSyst1, 
+				const bool bSidebandSyst2,
+				const float prescaleWeight,
+				const float Weight,
+				Hist_t& hist
+				);
+		// ----------member data ---------------------------
+		//jet collections
+		edm::InputTag mhtInputTag_, htInputTag_;
+		edm::Handle<edm::View<reco::MET> > mhtHandle;
+		edm::Handle<double> htHandle;
+		edm::InputTag prescaleWeightInputTag;
+
+		int inMinVtx;
+		unsigned int uProcessed; // number of processed events
+		unsigned int uPassed; //number of events passed the filter
+		RunLumiEvt_t kRunLumiEvent;
+		int iVerbose; // control print levels
+		double dMinHT;
+		double dMinMHT, dMaxMHT;
+
+
+		CutsPassedHists_t cutsHist;
 
 		EventHist_t evtHist;
 		JetHist_t pf30_jet1Hist, pf30_jet2Hist, pf30_jet3Hist; //for upto 5 jets may be
 		JetHist_t pf50eta25_jet1Hist, pf50eta25_jet2Hist, pf50eta25_jet3Hist; //for upto 5 jets may be
-		TH1F* hDelPhiMin;
 
 		edm::InputTag patJetsPFPt50Eta25InputTag_, patJetsPFPt30Eta50InputTag_;
 		edm::Handle<std::vector<pat::Jet> > pfpt50eta25JetHandle, pfpt30eta50JetHandle;
 
 		TH1F* MHT_by_phislice[6];
-		void DoDelMinStudy(edm::Handle<std::vector<pat::Jet> > jetHandle
+		float DelPhiMin(edm::Handle<std::vector<pat::Jet> > jetHandle
 				, edm::Handle<edm::View<reco::MET> > mhtHandle);
-		void PrintHeader();
 		TLorentzVector vMetVec;
 		edm::Handle<std::vector<reco::PFMET> >pfMetHandle;
 		unsigned uFailMinHTCut, uFailMinPFMHTCut;
@@ -168,12 +198,12 @@ class Factorization : public edm::EDFilter {
 		int doLumiWeighing, doEventWeighing;
 		edm::Handle<double> prescaleWeightHandle;
 		bool usePrescaleWeight;
-		TH1F* hist_prescaleWeights;
-		TH1F* hist_eventWeights;
-		TH2F* hist_trigVsWeight;
 		std::vector<std::string> triggerPathsToStore_;  // Vector to store list of HLT paths to store results of in ntuple
 		edm::InputTag hlTriggerResults_;    // Input tag for TriggerResults
-
+    	std::vector<double> htBins_;
+		std::vector<Hist_t> vHist;
+		float myHt, myMht;
+		std::vector<float> vDphiVariations;
 
 };
 
@@ -208,6 +238,7 @@ Factorization::Factorization(const edm::ParameterSet& iConfig)
 	//outputFile      = iConfig.getUntrackedParameter<double>("outputFile","Default.root");
 	dMinHT          = iConfig.getUntrackedParameter<double>("dMinHT",0.0);
 	dMinMHT         = iConfig.getUntrackedParameter<double>("dMinMHT",0.0);
+	dMaxMHT         = iConfig.getUntrackedParameter<double>("dMaxMHT",99999.0);
 	iVerbose        = iConfig.getUntrackedParameter<int>("verbose",0);
 	doLumiWeighing  = iConfig.getUntrackedParameter<int>("ApplyLumiWeighing",0);
 	doEventWeighing = iConfig.getUntrackedParameter<int>("ApplyEventWeighing",0);
@@ -219,217 +250,22 @@ Factorization::Factorization(const edm::ParameterSet& iConfig)
 	uFailMinPFMHTCut = 0;
 	sumLumiWeights   = 0;
 	Weight           = 1;
+	htBins_ = iConfig.getParameter<std::vector<double > >("htBins");
 
+	//difference variation of the dPhiMin selections.
+	//make sure the book the correct number of histograms 
+	//when these are changed!!!
+	vDphiVariations.push_back(0.15);
+	vDphiVariations.push_back(0.20);
+	vDphiVariations.push_back(0.25);
+	vDphiVariations.push_back(0.30);
+	vDphiVariations.push_back(0.35);
+	vDphiVariations.push_back(0.40);
 
-	//generate hists
-	edm::Service<TFileService> fs;
-
-
-	cutsHist.processed  = fs->make<TH1F> ("evts_processed" ,"Number of events pass the processed cut", 5, 0, 5);
-	cutsHist.njet  = fs->make<TH1F> ("evtsPassedNjetCut" ,"Number of events pass the njet cut", 5, 0, 5);
-	cutsHist.ht    = fs->make<TH1F> ("evtsPassedHtCut" ,"Number of events pass the ht cut", 5, 0, 5);
-	cutsHist.mht   = fs->make<TH1F> ("evtsPassedMhtCut" ,"Number of events pass the mht cut", 5, 0, 5);
-
-
-	const float met_min = 0, met_max=500, met_bins=100;
-	MHT_by_phislice[0] = fs->make<TH1F> ("mht_phislice_lt0.1" ,"MHT (#Delta#Phi_{min}<0.1);MHT [GeV];Events;", met_bins, met_min, met_max);
-	MHT_by_phislice[1] = fs->make<TH1F> ("mht_phislice_lt0.2" ,"MHT (0.1<#Delta#Phi_{min}<0.2);MHT [GeV];Events;", met_bins, met_min, met_max);
-	MHT_by_phislice[2] = fs->make<TH1F> ("mht_phislice_lt0.3" ,"MHT (0.2<#Delta#Phi_{min}<0.3);MHT [GeV];Events;", met_bins, met_min, met_max);
-	MHT_by_phislice[3] = fs->make<TH1F> ("mht_phislice_lt0.5" ,"MHT (0.3<#Delta#Phi_{min}<0.5);MHT [GeV];Events;", met_bins, met_min, met_max);
-	MHT_by_phislice[4] = fs->make<TH1F> ("mht_phislice_lt0.8" ,"MHT (0.5<#Delta#Phi_{min}<0.8);MHT [GeV];Events;", met_bins, met_min, met_max);
-	MHT_by_phislice[5] = fs->make<TH1F> ("mht_phislice_gt0.8" ,"MHT (#Delta#Phi_{min}>0.8);MHT [GeV];Events;", met_bins, met_min, met_max);
-
-	//these are general event hist to check the PAT tuples cuts
-	const double evt_met_max = 800, evt_met_bins = 400;
-	const double evt_ht_max = 4000, evt_ht_bins = 80;
-
-	evtHist.mht  = fs->make<TH1F> ("mht" ,"RA2: (MHT from PFmetHandle);MHT [GeV];Events;", evt_met_bins, 0, evt_met_max);
-	evtHist.ht   = fs->make<TH1F> ("ht" ,"RA2: HT from Jets ET>50 && |#Eta|<2.4;HT [GeV];Events;", evt_ht_bins, 0, evt_ht_max);
-	evtHist.njet = fs->make<TH1F> ("njet_et50eta24" ,"RA2: Njets (Et>50 && |#Eta|<2.4;NJETS;Events;", 10, 0, 10);
-	evtHist.meff = fs->make<TH1F> ("meteff" ,"RA2:;MEff;Events;", 50, 0, 5000);
-
-
-	const double pt_bins = 200, pt_max = 2000;
-	pf30_jet1Hist.pt  = fs->make<TH1F> ("pf30_jet1_pt"  ,"RA2: PF30-Jet1 pt;pt [GeV];Events;", pt_bins, 0, pt_max);
-	pf30_jet1Hist.eta = fs->make<TH1F> ("pf30_jet1_eta" ,"RA2: PF30-Jet1 eta;eta;Events;", 100, -5, 5);
-	pf30_jet1Hist.phi = fs->make<TH1F> ("pf30_jet1_phi" ,"RA2: PF30-Jet1 phi;phi;Events;", 160, -8, 8);
-	pf30_jet1Hist.delphi = fs->make<TH1F> ("pf30_jet1_delphi" ,"RA2: PF30-Jet1: #Delta#Phi; #Delta#Phi (jet, MHT) ;Events;", 40, 0, 4);
-
-	pf30_jet2Hist.pt  = fs->make<TH1F> ("pf30_jet2_pt"  ,"RA2: PF30-Jet2 pt;pt [GeV];Events;", pt_bins, 0, pt_max);
-	pf30_jet2Hist.eta = fs->make<TH1F> ("pf30_jet2_eta" ,"RA2: PF30-Jet2 eta;eta;Events;", 100, -5, 5);
-	pf30_jet2Hist.phi = fs->make<TH1F> ("pf30_jet2_phi" ,"RA2: PF30-Jet2 phi;phi;Events;", 160, -8, 8);
-	pf30_jet2Hist.delphi = fs->make<TH1F> ("pf30_jet2_delphi" ,"RA2: PF30-Jet2: #Delta#Phi; #Delta#Phi (jet, MHT);Events;", 40, 0, 4);
-
-	pf30_jet3Hist.pt = fs->make<TH1F> ("pf30_jet3_pt" ,"RA2: PF30-Jet3 pt;pt [GeV];Events;", pt_bins, 0, pt_max);
-	pf30_jet3Hist.eta = fs->make<TH1F> ("pf30_jet3_eta" ,"RA2: PF30-Jet3 eta;eta;Events;", 100, -5, 5);
-	pf30_jet3Hist.phi = fs->make<TH1F> ("pf30_jet3_phi" ,"RA2: PF30-Jet3 phi;phi;Events;", 160, -8, 8);
-	pf30_jet3Hist.delphi = fs->make<TH1F> ("pf30_jet3_delphi" ,"RA2: PF30-Jet3: #Delta#Phi; #Delta#Phi (jet, MHT);Events;", 40, 0, 4);
-
-	pf30_jet1Hist.pt->Sumw2();
-	pf30_jet2Hist.pt->Sumw2();
-	pf30_jet3Hist.pt->Sumw2();
-	pf30_jet1Hist.eta->Sumw2();
-	pf30_jet2Hist.eta->Sumw2();
-	pf30_jet3Hist.eta->Sumw2();
-	pf30_jet1Hist.phi->Sumw2();
-	pf30_jet2Hist.phi->Sumw2();
-	pf30_jet3Hist.phi->Sumw2();
-	pf30_jet1Hist.delphi->Sumw2();
-	pf30_jet2Hist.delphi->Sumw2();
-	pf30_jet3Hist.delphi->Sumw2();
-
-	//const float npassFailHistBins = 13;
-	//const float passFailHistBins[] = {50,60,70,80,90,100,110,120,140,160,200,300,500,1000};
-	//to check event counts in each of the signal bins
-	//const float npassFailHistBins = 7;
-	//const float passFailHistBins[] = {50,100,150,200,350,500,600,1000};
-	const float npassFailHistBins = 14;
-	const float passFailHistBins[] = {50,60,70,80,90,100,110,120,140,160,200,350,500,800,1000};
-
-	hPass[0]  = fs->make<TH1F> ("Pass_0","PASS from #Delta#Phi_{min} cut >0.15", npassFailHistBins, passFailHistBins);
-	hPass[1]  = fs->make<TH1F> ("Pass_1","PASS from #Delta#Phi_{min} cui >0.2", npassFailHistBins, passFailHistBins);
-	hPass[2]  = fs->make<TH1F> ("Pass_2","PASS from #Delta#Phi_{min} cut >0.25", npassFailHistBins, passFailHistBins);
-	hPass[3]  = fs->make<TH1F> ("Pass_3","PASS from #Delta#Phi_{min} cut >0.3", npassFailHistBins, passFailHistBins);
-	hPass[4]  = fs->make<TH1F> ("Pass_4","PASS from #Delta#Phi_{min} cut >0.35", npassFailHistBins, passFailHistBins);
-	hPass[5]  = fs->make<TH1F> ("Pass_5","PASS from #Delta#Phi_{min} cut >0.4", npassFailHistBins, passFailHistBins);
-	hPass[6]  = fs->make<TH1F> ("Pass_RA2dphi","PASS from RA2 dPhi Selection: dphi (j1 & j1 , mht) >0.5 and dphi (j3, mht)>0.3)", npassFailHistBins, passFailHistBins);
-	hPass[7]  = fs->make<TH1F> ("Pass_RA2dphi_HT500" ,"PASS from RA2 dPhi Selection: dphi (j1 & j1 , mht) >0.5 and dphi (j3, mht)>0.3) && HT>500 GeV", npassFailHistBins, passFailHistBins);
-	hPass[8]  = fs->make<TH1F> ("Pass_RA2dphi_HT800" ,"PASS from RA2 dPhi Selection: dphi (j1 & j1 , mht) >0.5 and dphi (j3, mht)>0.3) && HT>800 GeV", npassFailHistBins, passFailHistBins);
-	hPass[9]  = fs->make<TH1F> ("Pass_RA2dphi_HT1000","PASS from RA2 dPhi Selection: dphi (j1 & j1 , mht) >0.5 and dphi (j3, mht)>0.3) && HT>1000 GeV", npassFailHistBins, passFailHistBins);
-	hPass[10] = fs->make<TH1F> ("Pass_RA2dphi_HT1200","PASS from RA2 dPhi Selection: dphi (j1 & j1 , mht) >0.5 and dphi (j3, mht)>0.3) && HT>1200 GeV", npassFailHistBins, passFailHistBins);
-	hPass[11] = fs->make<TH1F> ("Pass_RA2dphi_HT1400","PASS from RA2 dPhi Selection: dphi (j1 & j1 , mht) >0.5 and dphi (j3, mht)>0.3) && HT>1400 GeV", npassFailHistBins, passFailHistBins);
-	hPass[12] = fs->make<TH1F> ("Pass_RA2dphi_500HT800"  ,"PASS from RA2 dPhi Selection: dphi (j1 & j1 , mht) >0.5 and dphi (j3, mht)>0.3) && 500<HT<800 GeV", npassFailHistBins, passFailHistBins);
-	hPass[13] = fs->make<TH1F> ("Pass_RA2dphi_800HT1000" ,"PASS from RA2 dPhi Selection: dphi (j1 & j1 , mht) >0.5 and dphi (j3, mht)>0.3) && 800<HT<1000 GeV", npassFailHistBins, passFailHistBins);
-	hPass[14] = fs->make<TH1F> ("Pass_RA2dphi_1000HT1200","PASS from RA2 dPhi Selection: dphi (j1 & j1 , mht) >0.5 and dphi (j3, mht)>0.3) && 1000<HT<1200 GeV", npassFailHistBins, passFailHistBins);
-	hPass[15] = fs->make<TH1F> ("Pass_RA2dphi_1200HT1400","PASS from RA2 dPhi Selection: dphi (j1 & j1 , mht) >0.5 and dphi (j3, mht)>0.3) && 1200<HT<1400 GeV", npassFailHistBins, passFailHistBins);
-	for (int i = 0; i < 16; ++i ) { hPass[i]->Sumw2();}
-
-	hFail[0]  = fs->make<TH1F> ("Fail_0","FAIL from #Delta#Phi_{min} cut <0.15", npassFailHistBins, passFailHistBins);
-	hFail[1]  = fs->make<TH1F> ("Fail_1","FAIL from #Delta#Phi_{min} cut <0.2", npassFailHistBins, passFailHistBins);
-	hFail[2]  = fs->make<TH1F> ("Fail_2","FAIL from #Delta#Phi_{min} cut <0.25", npassFailHistBins, passFailHistBins);
-	hFail[3]  = fs->make<TH1F> ("Fail_3","FAIL from #Delta#Phi_{min} cut <0.3", npassFailHistBins, passFailHistBins);
-	hFail[4]  = fs->make<TH1F> ("Fail_4","FAIL from #Delta#Phi_{min} cut <0.35", npassFailHistBins, passFailHistBins);
-	hFail[5]  = fs->make<TH1F> ("Fail_5","FAIL from #Delta#Phi_{min} cut <0.4", npassFailHistBins, passFailHistBins);
-	hFail[6]  = fs->make<TH1F> ("Fail_lt_point2","Fail from #Delta#Phi_{min} cut <0.2", 1500, 0, 1500);
-	hFail[7]  = fs->make<TH1F> ("Fail_lt_point3","Fail from #Delta#Phi_{min} cut <0.3", 1500, 0, 1500);
-	hFail[8]  = fs->make<TH1F> ("Fail_lt_point2_HT500","Fail from #Delta#Phi_{min} cut <0.2 && HT>500 GeV", 1500, 0, 1500);
-	hFail[9]  = fs->make<TH1F> ("Fail_lt_point2_HT800","Fail from #Delta#Phi_{min} cut <0.2 && HT>800 GeV", 1500, 0, 1500);
-	hFail[10] = fs->make<TH1F> ("Fail_lt_point2_HT1000","Fail from #Delta#Phi_{min} cut <0.2 && HT>1000 GeV", 1500, 0, 1500);
-	hFail[11] = fs->make<TH1F> ("Fail_lt_point2_HT1200","Fail from #Delta#Phi_{min} cut <0.2 && HT>1200 GeV", 1500, 0, 1500);
-	hFail[12] = fs->make<TH1F> ("Fail_lt_point2_HT1400","Fail from #Delta#Phi_{min} cut <0.2 && HT>1400 GeV", 1500, 0, 1500);
-	hFail[13] = fs->make<TH1F> ("Fail_lt_point2_500HT800"  ,"Fail from #Delta#Phi_{min} cut <0.2 && 500<HT<800 GeV", 1500, 0, 1500);
-	hFail[14] = fs->make<TH1F> ("Fail_lt_point2_800HT1000" ,"Fail from #Delta#Phi_{min} cut <0.2 && 800<HT<1000 GeV", 1500, 0, 1500);
-	hFail[15] = fs->make<TH1F> ("Fail_lt_point2_1000HT1200","Fail from #Delta#Phi_{min} cut <0.2 && 1000<HT<1200 GeV", 1500, 0, 1500);
-	hFail[16] = fs->make<TH1F> ("Fail_lt_point2_1200HT1400","Fail from #Delta#Phi_{min} cut <0.2 && 1200<HT<1400 GeV", 1500, 0, 1500);
-
-	hFail[17] = fs->make<TH1F> ("Syst1_Fail_ht500","HT>500: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
-	hFail[18] = fs->make<TH1F> ("Syst1_Fail_ht500_fineBin","FineBin:HT>500: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", 1500, 0, 1500);
-	hFail[19] = fs->make<TH1F> ("Syst1_Fail_ht600","HT>600: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
-	hFail[20] = fs->make<TH1F> ("Syst1_Fail_ht600_fineBin","FineBin: HT>600: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", 1500, 0, 1500);
-	hFail[21] = fs->make<TH1F> ("Syst2_Fail_ht500","HT>500: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2", npassFailHistBins, passFailHistBins);
-	hFail[22] = fs->make<TH1F> ("Syst2_Fail_ht500_fineBin","FineBin: HT>500: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", 1500, 0, 1500);
-	hFail[23] = fs->make<TH1F> ("Syst2_Fail_ht600","HT>600: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2", npassFailHistBins, passFailHistBins);
-	hFail[24] = fs->make<TH1F> ("Syst2_Fail_ht600_fineBin","FineBin: HT>600: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", 1500, 0, 1500);
-
-	hFail[25] = fs->make<TH1F> ("Syst1_Fail_HT800_fineBin"     ,"FineBin:HT>800: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 " , 1500, 0, 1500);
-	hFail[26] = fs->make<TH1F> ("Syst1_Fail_HT1000_fineBin"    ,"FineBin:HT>1000: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", 1500, 0, 1500);
-	hFail[27] = fs->make<TH1F> ("Syst1_Fail_HT1200_fineBin"    ,"FineBin:HT>1200: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", 1500, 0, 1500);
-	hFail[28] = fs->make<TH1F> ("Syst1_Fail_HT1400_fineBin"    ,"FineBin:HT>1400: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", 1500, 0, 1500);
-	hFail[29] = fs->make<TH1F> ("Syst1_Fail_500HT800_fineBin"  ,"FineBin:500<HT<800: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 "  , 1500, 0, 1500);
-	hFail[30] = fs->make<TH1F> ("Syst1_Fail_800HT1000_fineBin" ,"FineBin:800<HT<1000: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 " , 1500, 0, 1500);
-	hFail[31] = fs->make<TH1F> ("Syst1_Fail_1000HT1200_fineBin","FineBin:1000<HT<1200: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", 1500, 0, 1500);
-	hFail[32] = fs->make<TH1F> ("Syst1_Fail_1200HT1400_fineBin","FineBin:1200<HT<1400: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", 1500, 0, 1500);
-
-	hFail[33] = fs->make<TH1F> ("Syst2_Fail_HT800_fineBin"     ,"FineBin:HT>800: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 " , 1500, 0, 1500);
-	hFail[34] = fs->make<TH1F> ("Syst2_Fail_HT1000_fineBin"    ,"FineBin:HT>1000: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", 1500, 0, 1500);
-	hFail[35] = fs->make<TH1F> ("Syst2_Fail_HT1200_fineBin"    ,"FineBin:HT>1200: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", 1500, 0, 1500);
-	hFail[36] = fs->make<TH1F> ("Syst2_Fail_HT1400_fineBin"    ,"FineBin:HT>1400: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", 1500, 0, 1500);
-	hFail[37] = fs->make<TH1F> ("Syst2_Fail_500HT800_fineBin"  ,"FineBin:500<HT<800: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 "  , 1500, 0, 1500);
-	hFail[38] = fs->make<TH1F> ("Syst2_Fail_800HT1000_fineBin" ,"FineBin:800<HT<1000: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 " , 1500, 0, 1500);
-	hFail[39] = fs->make<TH1F> ("Syst2_Fail_1000HT1200_fineBin","FineBin:1000<HT<1200: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", 1500, 0, 1500);
-	hFail[40] = fs->make<TH1F> ("Syst2_Fail_1200HT1400_fineBin","FineBin:1200<HT<1400: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", 1500, 0, 1500);
-
-
-	hFail[41] = fs->make<TH1F> ("Syst1_Fail_ht800"        , "HT>800: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
-	hFail[42] = fs->make<TH1F> ("Syst1_Fail_ht1000"       , "HT>1000: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
-	hFail[43] = fs->make<TH1F> ("Syst1_Fail_ht1200"       , "HT>1200: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
-	hFail[44] = fs->make<TH1F> ("Syst1_Fail_HT1400"       , "HT>1400: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
-	hFail[45] = fs->make<TH1F> ("Syst1_Fail_HT500to800"   , "500<HT<800: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
-	hFail[46] = fs->make<TH1F> ("Syst1_Fail_HT800to1000"  , "800<HT<1000: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
-	hFail[47] = fs->make<TH1F> ("Syst1_Fail_HT1000to1200" , "1000<HT<1200: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
-	hFail[48] = fs->make<TH1F> ("Syst1_Fail_HT1200to1400" , "1200<HT<1400: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
-
-	hFail[49] = fs->make<TH1F> ("Syst2_Fail_ht800"        , "HT>800: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", npassFailHistBins, passFailHistBins);
-	hFail[50] = fs->make<TH1F> ("Syst2_Fail_ht1000"       , "HT>1000: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", npassFailHistBins, passFailHistBins);
-	hFail[51] = fs->make<TH1F> ("Syst2_Fail_ht1200"       , "HT>1200: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", npassFailHistBins, passFailHistBins);
-	hFail[52] = fs->make<TH1F> ("Syst2_Fail_HT1400"       , "HT>1400: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", npassFailHistBins, passFailHistBins);
-	hFail[53] = fs->make<TH1F> ("Syst2_Fail_HT500to800"   , "500<HT<800: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", npassFailHistBins, passFailHistBins);
-	hFail[54] = fs->make<TH1F> ("Syst2_Fail_HT800to1000"  , "800<HT<1000: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", npassFailHistBins, passFailHistBins);
-	hFail[55] = fs->make<TH1F> ("Syst2_Fail_HT1000to1200" , "1000<HT<1200: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", npassFailHistBins, passFailHistBins);
-	hFail[56] = fs->make<TH1F> ("Syst2_Fail_HT1200to1400" , "1200<HT<1400: FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", npassFailHistBins, passFailHistBins);
-
-
-
-	for (int i = 0; i <=56; ++i ) { hFail[i]->Sumw2();}
-
-	hSignalRegion[0]  = fs->make<TH1F> ("Signal_HT500MHT200" ,"Signal Region: HT>500 GeV & MHT>200 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[1]  = fs->make<TH1F> ("Signal_HT500MHT350" ,"Signal Region: HT>500 GeV & MHT>350 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[2]  = fs->make<TH1F> ("Signal_HT500MHT500" ,"Signal Region: HT>500 GeV & MHT>500 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[3]  = fs->make<TH1F> ("Signal_HT800MHT200" ,"Signal Region: HT>800 GeV & MHT>200 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[4]  = fs->make<TH1F> ("Signal_HT800MHT350" ,"Signal Region: HT>800 GeV & MHT>350 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[5]  = fs->make<TH1F> ("Signal_HT800MHT500" ,"Signal Region: HT>800 GeV & MHT>500 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[6]  = fs->make<TH1F> ("Signal_HT1000MHT200","Signal Region: HT>1000 GeV & MHT>200 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[7]  = fs->make<TH1F> ("Signal_HT1000MHT350","Signal Region: HT>1000 GeV & MHT>350 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[8]  = fs->make<TH1F> ("Signal_HT1000MHT500","Signal Region: HT>1000 GeV & MHT>500 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[9]  = fs->make<TH1F> ("Signal_HT1200MHT200","Signal Region: HT>1200 GeV & MHT>200 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[10] = fs->make<TH1F> ("Signal_HT1200MHT350","Signal Region: HT>1200 GeV & MHT>350 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[11] = fs->make<TH1F> ("Signal_HT1200MHT500","Signal Region: HT>1200 GeV & MHT>500 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[12] = fs->make<TH1F> ("Signal_HT1400MHT200","Signal Region: HT>1400 GeV & MHT>200 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[13] = fs->make<TH1F> ("Signal_HT1400MHT350","Signal Region: HT>1400 GeV & MHT>350 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[14] = fs->make<TH1F> ("Signal_HT1400MHT500","Signal Region: HT>1400 GeV & MHT>500 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	
-
-	hSignalRegion[15] = fs->make<TH1F> ("Signal_HT500to800MHT200"  ,"Signal Region: 500<HT<800 GeV & MHT>200 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[16] = fs->make<TH1F> ("Signal_HT500to800MHT350"  ,"Signal Region: 500<HT<800 GeV & MHT>350 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[17] = fs->make<TH1F> ("Signal_HT500to800MHT500"  ,"Signal Region: 500<HT<800 GeV & MHT>500 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[18] = fs->make<TH1F> ("Signal_HT800to1000MHT200" ,"Signal Region: 800<HT<1000 GeV & MHT>200 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[19] = fs->make<TH1F> ("Signal_HT800to1000MHT350" ,"Signal Region: 800<HT<1000 GeV & MHT>350 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[20] = fs->make<TH1F> ("Signal_HT800to1000MHT500" ,"Signal Region: 800<HT<1000 GeV & MHT>500 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[21] = fs->make<TH1F> ("Signal_HT1000to1200MHT200","Signal Region: 1000<HT<1200 GeV & MHT>200 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[22] = fs->make<TH1F> ("Signal_HT1000to1200MHT350","Signal Region: 1000<HT<1200 GeV & MHT>350 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[23] = fs->make<TH1F> ("Signal_HT1000to1200MHT500","Signal Region: 1000<HT<1200 GeV & MHT>500 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[24] = fs->make<TH1F> ("Signal_HT1200to1400MHT200","Signal Region: 1200<HT<1400 GeV & MHT>200 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[25] = fs->make<TH1F> ("Signal_HT1200to1400MHT350","Signal Region: 1200<HT<1400 GeV & MHT>350 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	hSignalRegion[26] = fs->make<TH1F> ("Signal_HT1200to1400MHT500","Signal Region: 1200<HT<1400 GeV & MHT>500 GeV && pass RA2 #Delta#Phi_{min}", 1500, 0, 1500);
-	for (int i = 0; i <27; ++i ) { hSignalRegion[i]->Sumw2();}
-
-	hDelPhiMin_mht[0] = fs->make<TH1F> ("delPhiMin_MHT_60TO80"  ,"RA2: #Delta#Phi_{min} for 60 <#slash{H}_{T}<80 GeV" , 150, 0, 3);
-	hDelPhiMin_mht[1] = fs->make<TH1F> ("delPhiMin_MHT_80to100" ,"RA2: #Delta#Phi_{min} for 80 <#slash{H}_{T}<100 GeV", 150, 0, 3);
-	hDelPhiMin_mht[2] = fs->make<TH1F> ("delPhiMin_MHT_100to120","RA2: #Delta#Phi_{min} for 100<#slash{H}_{T}<120 GeV", 150, 0, 3);
-	hDelPhiMin_mht[3] = fs->make<TH1F> ("delPhiMin_MHT_120to140","RA2: #Delta#Phi_{min} for 120<#slash{H}_{T}<140 GeV", 150, 0, 3);
-	hDelPhiMin_mht[4] = fs->make<TH1F> ("delPhiMin_MHT_140to170","RA2: #Delta#Phi_{min} for 140<#slash{H}_{T}<170 GeV", 150, 0, 3);
-	hDelPhiMin_mht[5] = fs->make<TH1F> ("delPhiMin_MHT_170to200","RA2: #Delta#Phi_{min} for 170<#slash{H}_{T}<200 GeV", 150, 0, 3);
-	hDelPhiMin_mht[6] = fs->make<TH1F> ("delPhiMin_MHT_200to250","RA2: #Delta#Phi_{min} for 200<#slash{H}_{T}<250 GeV", 150, 0, 3);
-	hDelPhiMin_mht[7] = fs->make<TH1F> ("delPhiMin_MHT_250up"   ,"RA2: #Delta#Phi_{min} for #slash{H}_{T}>250 GeV"    , 150, 0, 3);
-
-	hDelPhiMin_mht[1]->Sumw2();
-	hDelPhiMin_mht[2]->Sumw2();
-	hDelPhiMin_mht[3]->Sumw2();
-	hDelPhiMin_mht[4]->Sumw2();
-	hDelPhiMin_mht[5]->Sumw2();
-	hDelPhiMin_mht[6]->Sumw2();
-	hDelPhiMin_mht[7]->Sumw2();
-
-	hDelPhiMin = fs->make<TH1F> ("delPhiMin"  ,"RA2: #Delta#Phi_{min}" , 150, 0, 3);
-	hDelPhiMin->Sumw2();
-	
-	hist_prescaleWeights = fs->make<TH1F> ("prescaleWeights","Prescale Weights",2000,0,2000);
-	hist_prescaleWeights->Sumw2();
-	hist_eventWeights    = fs->make<TH1F> ("totalEventWeights","Total Event Weights",2000,0,2000);
-	hist_eventWeights->Sumw2();
+	BookHistograms();
 
 	//prescale weight with respective triggers
-	const int nBins = (int) triggerPathsToStore_.size();
+	/*const int nBins = (int) triggerPathsToStore_.size();
 	hist_trigVsWeight = fs->make<TH2F> ("trigVsprescaleWeights","Trigger Vs Prescale Weights",nBins,0,nBins,2000,0,2000);
 	int i = 1;
 	for (std::vector<std::string>::const_iterator trigNameTempl = triggerPathsToStore_.begin();
@@ -437,9 +273,134 @@ Factorization::Factorization(const edm::ParameterSet& iConfig)
 	{
 		hist_trigVsWeight->GetXaxis()->SetBinLabel(i,(*trigNameTempl).c_str());
 		++i;
+	}*/
+
+}
+
+void Factorization::BookHistograms()
+{
+	edm::Service<TFileService> fs;
+	assert (htBins_.size()>1 && "Factorization:: htBins_ size must be >1!");
+	
+	for (unsigned i =0; i < htBins_.size()-1; ++i)
+	{
+		stringstream dirName;
+		dirName << "HT" << htBins_.at(i) << "to" << htBins_.at(i+1);
+		TFileDirectory subDir = fs->mkdir(dirName.str());
+		Hist_t hist;
+		vHist.push_back(hist);
+		BookCommonHistograms(subDir, htBins_.at(i), htBins_.at(i+1), vHist.at(i));
 	}
 
+}
+void Factorization::BookCommonHistograms(TFileDirectory& dir, const float htMin, 
+								const float htMax, Hist_t& hist)
+{
 
+	//ht/mht/jet et,eta,phi,dphi-jet-mht, jet mass
+
+	const double evt_mht_max = 1500, evt_mht_bins = 750;
+	const double evt_ht_max = 4000, evt_ht_bins = 800;
+	hist.evt.nvtx   = dir.make<TH1F> ("nvtx"  ,"RA2 Good Vertices; N Vtx;Events;", 40, 0, 40);
+	hist.evt.pfmht  = dir.make<TH1F> ("pfmht","MHT from PFmetHandle;MHT [GeV];Events;", evt_mht_bins, 0, evt_mht_max);
+	hist.evt.mht    = dir.make<TH1F> ("mht"  ,"Calculated MHT;MHT [GeV];Events;", evt_mht_bins, 0, evt_mht_max);
+	hist.evt.ht     = dir.make<TH1F> ("ht"   ,"HT from pfHT Handle ;pfHT [GeV];Events;", evt_ht_bins, 0, evt_ht_max);
+	hist.evt.pfht   = dir.make<TH1F> ("pfht" ,"HT from Jets ET>50 GeV && |#Eta|<2.4;HT [GeV];Events;", evt_ht_bins, 0, evt_ht_max);
+	hist.evt.njet30 = dir.make<TH1F> ("njet30" ,"Njets (Et>30 GeV && | #Eta |<5.0;NJETS;Events;", 20, 0, 20);
+	hist.evt.njet50 = dir.make<TH1F> ("njet50" ,"Njets (Et>50 GeV && | #Eta |<2.4;NJETS;Events;", 20, 0, 20);
+	hist.evt.meff   = dir.make<TH1F> ("meff" ,"RA2:;MEff;Events;", 50, 0, 5000);
+	hist.evt.prescaleWeights = dir.make<TH1F> ("prescaleWeights","Prescale Weights",2000,0,2000);
+	hist.evt.eventWeights    = dir.make<TH1F> ("totalEventWeights","Total Event Weights",2000,0,2000);
+	hist.evt.dphiMin = dir.make<TH1F> ("dphiMin"  ,"RA2: #Delta#Phi_{min}" , 150, 0, 3);
+
+	hist.evt.pfmht->Sumw2();
+	hist.evt.mht->Sumw2();
+	hist.evt.ht->Sumw2();
+	hist.evt.pfht->Sumw2();
+	hist.evt.njet30->Sumw2();
+	hist.evt.njet50->Sumw2();
+	hist.evt.meff->Sumw2();
+	hist.evt.prescaleWeights->Sumw2();
+	hist.evt.eventWeights->Sumw2();
+
+	const double pt_bins = 200, pt_max = 2000;
+	for (int i =0; i < 10; ++i)
+	{
+		const int jetnum = i+1;
+		stringstream pt_name, pt_title, eta_name, eta_title, phi_name, phi_title, dphi_name, dphi_title;
+		pt_name << "jet"<< jetnum << "_pt";
+		eta_name << "jet"<< jetnum << "_eta";
+		phi_name << "jet"<< jetnum << "_phi";
+		dphi_name << "jet"<< jetnum << "_dphi";
+		pt_title << "Jet-"<< jetnum <<" pt;pt [GeV];Events";
+		eta_title << "Jet-"<< jetnum <<" eta;eta;Events;";
+		phi_title << "Jet-"<< jetnum <<" phi;phi;Events;";
+		dphi_title << "Jet-"<< jetnum <<" #Delta#Phi; #Delta#Phi (jet, MHT) ;Events;";
+
+		hist.jet[i].pt  = dir.make<TH1F> (pt_name.str().c_str(),pt_title.str().c_str(), pt_bins, 0, pt_max);
+		hist.jet[i].eta = dir.make<TH1F> (eta_name.str().c_str(),eta_title.str().c_str(), 100, -5, 5);
+		hist.jet[i].phi = dir.make<TH1F> (phi_name.str().c_str(),phi_title.str().c_str(), 160, -8, 8);
+		hist.jet[i].delphi = dir.make<TH1F> (dphi_name.str().c_str(),dphi_title.str().c_str(), 40, 0, 4);
+
+		hist.jet[i].pt->Sumw2();
+		hist.jet[i].eta->Sumw2();
+		hist.jet[i].phi->Sumw2();
+		hist.jet[i].delphi->Sumw2();
+	}
+	
+	//for ratio plot
+	const float npassFailHistBins = 14;
+	const float passFailHistBins[] = {50,60,70,80,90,100,110,120,140,160,200,350,500,800,1000};
+	//pass variations
+	hist.pass[0] = dir.make<TH1F> ("pass0","PASS from #Delta#Phi_{min} cut >0.15", npassFailHistBins, passFailHistBins); 
+	hist.pass[1] = dir.make<TH1F> ("pass1","PASS from #Delta#Phi_{min} cut >0.20", npassFailHistBins, passFailHistBins); 
+	hist.pass[2] = dir.make<TH1F> ("pass2","PASS from #Delta#Phi_{min} cut >0.25", npassFailHistBins, passFailHistBins); 
+	hist.pass[3] = dir.make<TH1F> ("pass3","PASS from #Delta#Phi_{min} cut >0.30", npassFailHistBins, passFailHistBins); 
+	hist.pass[4] = dir.make<TH1F> ("pass4","PASS from #Delta#Phi_{min} cut >0.35", npassFailHistBins, passFailHistBins); 
+	hist.pass[5] = dir.make<TH1F> ("pass5","PASS from #Delta#Phi_{min} cut >0.40", npassFailHistBins, passFailHistBins); 
+
+	hist.fail[0] = dir.make<TH1F> ("fail0","FAIL from #Delta#Phi_{min} cut <0.15", npassFailHistBins, passFailHistBins);
+	hist.fail[1] = dir.make<TH1F> ("fail1","FAIL from #Delta#Phi_{min} cut <0.20", npassFailHistBins, passFailHistBins);
+	hist.fail[2] = dir.make<TH1F> ("fail2","FAIL from #Delta#Phi_{min} cut <0.25", npassFailHistBins, passFailHistBins);
+	hist.fail[3] = dir.make<TH1F> ("fail3","FAIL from #Delta#Phi_{min} cut <0.30", npassFailHistBins, passFailHistBins);
+	hist.fail[4] = dir.make<TH1F> ("fail4","FAIL from #Delta#Phi_{min} cut <0.35", npassFailHistBins, passFailHistBins);
+	hist.fail[5] = dir.make<TH1F> ("fail5","FAIL from #Delta#Phi_{min} cut <0.40", npassFailHistBins, passFailHistBins);
+
+	hist.passFineBin[0] = dir.make<TH1F> ("passFineBin0","PASS from #Delta#Phi_{min} cut >0.15", evt_mht_bins, 0, evt_mht_max); 
+	hist.passFineBin[1] = dir.make<TH1F> ("passFineBin1","PASS from #Delta#Phi_{min} cut >0.20", evt_mht_bins, 0, evt_mht_max); 
+	hist.passFineBin[2] = dir.make<TH1F> ("passFineBin2","PASS from #Delta#Phi_{min} cut >0.25", evt_mht_bins, 0, evt_mht_max); 
+	hist.passFineBin[3] = dir.make<TH1F> ("passFineBin3","PASS from #Delta#Phi_{min} cut >0.30", evt_mht_bins, 0, evt_mht_max); 
+	hist.passFineBin[4] = dir.make<TH1F> ("passFineBin4","PASS from #Delta#Phi_{min} cut >0.35", evt_mht_bins, 0, evt_mht_max); 
+	hist.passFineBin[5] = dir.make<TH1F> ("passFineBin5","PASS from #Delta#Phi_{min} cut >0.40", evt_mht_bins, 0, evt_mht_max); 
+
+	hist.failFineBin[0] = dir.make<TH1F> ("failFineBin0","FAIL from #Delta#Phi_{min} cut <0.15", evt_mht_bins, 0, evt_mht_max);
+	hist.failFineBin[1] = dir.make<TH1F> ("failFineBin1","FAIL from #Delta#Phi_{min} cut <0.20", evt_mht_bins, 0, evt_mht_max);
+	hist.failFineBin[2] = dir.make<TH1F> ("failFineBin2","FAIL from #Delta#Phi_{min} cut <0.25", evt_mht_bins, 0, evt_mht_max);
+	hist.failFineBin[3] = dir.make<TH1F> ("failFineBin3","FAIL from #Delta#Phi_{min} cut <0.30", evt_mht_bins, 0, evt_mht_max);
+	hist.failFineBin[4] = dir.make<TH1F> ("failFineBin4","FAIL from #Delta#Phi_{min} cut <0.35", evt_mht_bins, 0, evt_mht_max);
+	hist.failFineBin[5] = dir.make<TH1F> ("failFineBin5","FAIL from #Delta#Phi_{min} cut <0.40", evt_mht_bins, 0, evt_mht_max);
+
+	for (int i=0; i<6; ++i) 
+	{ 
+		hist.pass[i]->Sumw2(); hist.fail[i]->Sumw2(); 
+		hist.passFineBin[i]->Sumw2(); hist.failFineBin[i]->Sumw2(); 
+	}
+
+	hist.sidebandSyst[0] = dir.make<TH1F> ("sidebandSyst1"," Sideband Syst1: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
+	hist.sidebandSyst[1] = dir.make<TH1F> ("sidebandSyst2"," Sideband Syst2: FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", npassFailHistBins, passFailHistBins);
+	hist.sidebandSystFineBin[0] = dir.make<TH1F> ("sidebandSyst1_fineBin","Sideband Syst1 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.5 and dphi (j3, mht)>0.1 ", 1500, 0, 1500);
+	hist.sidebandSystFineBin[1] = dir.make<TH1F> ("sidebandSyst2_fineBin","Sideband Syst2 (FineBinned) : FAIL from dphi (j1 & j2 , mht) >0.4 and dphi (j3, mht)>0.2 ", 1500, 0, 1500);
+
+	hist.signal = dir.make<TH1F> ("signal" ,"Signal Region", npassFailHistBins, passFailHistBins);
+	hist.signalFineBin = dir.make<TH1F> ("signalFineBin" ,"Signal Region", 1500, 0, 1500);
+
+	hist.sidebandSyst[0]->Sumw2();
+	hist.sidebandSyst[1]->Sumw2();
+	hist.sidebandSystFineBin[0]->Sumw2();
+	hist.sidebandSystFineBin[1]->Sumw2();
+
+	hist.signal->Sumw2();
+	hist.signalFineBin->Sumw2();
 }
 
 
@@ -462,20 +423,23 @@ Factorization::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
    using namespace edm;
 	++uProcessed;
-	cutsHist.processed->Fill(1);
+	//cutsHist.processed->Fill(1);
 	kRunLumiEvent.run  = iEvent.id().run();
 	kRunLumiEvent.lumi = iEvent.id().luminosityBlock(); 
 	kRunLumiEvent.evt  = iEvent.id().event();
 
-//    std::cout << __LINE__<< ":: Processing event: "
-//		 	<<  kRunLumiEvent.run << ":" << kRunLumiEvent.lumi 
-//			<< ":" << kRunLumiEvent.evt << std::endl;
-//			return 0;
-
-    if (iVerbose) std::cout << __LINE__<< ":: Processing event: "
-		 	<<  kRunLumiEvent.run << ":" << kRunLumiEvent.lumi 
+	if (iVerbose) std::cout << __LINE__<< ":: Processing event: "
+			<< kRunLumiEvent.run << ":" << kRunLumiEvent.lumi 
 			<< ":" << kRunLumiEvent.evt << std::endl;
 
+	//vertex cut is applied in the RA2Cleanning process.
+	Handle<reco::VertexCollection> vertexHandle;
+	iEvent.getByLabel("goodVerticesRA2", vertexHandle);
+   if (! vertexHandle.isValid())
+	{
+		std::cout << __FUNCTION__ << ":" << __LINE__ << ":vertexHandle handle not found!" << std::endl;
+		assert(false);
+	}
 
 	Weight = 1;
 
@@ -516,12 +480,12 @@ Factorization::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 			assert (false);
 		}
 		prescaleWeight = (*prescaleWeightHandle);
-		hist_prescaleWeights->Fill(prescaleWeight);
+		//hist_prescaleWeights->Fill(prescaleWeight);
 		Weight *= prescaleWeight;
 		//std::cout << "Weight = " << Weight << std::endl;
 	}
 
-	hist_eventWeights->Fill(Weight);
+	//hist_eventWeights->Fill(Weight);
 	//std::cout << "Weight = " << Weight << std::endl;
 	 // storeHLT(iEvent, iSetup);
 
@@ -562,23 +526,79 @@ Factorization::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 	//APPLY RA2 cuts
 
 	if ( pfpt50eta25JetHandle->size() <3 ) return 0;
-	cutsHist.njet->Fill(1);
+	//cutsHist.njet->Fill(1);
 	if ( (*htHandle) < dMinHT) { ++uFailMinHTCut; return 0; }
-	cutsHist.ht->Fill(1);
-	if ( (*mhtHandle)[0].pt() < dMinMHT ) {++uFailMinPFMHTCut; return 0; }
-	cutsHist.mht->Fill(1);
+	//cutsHist.ht->Fill(1);
+	if ( (*mhtHandle)[0].pt() <  dMinMHT || (*mhtHandle)[0].pt() > dMaxMHT )
+	{ 
+		++uFailMinPFMHTCut; return 0; 
+	}
+	//cutsHist.mht->Fill(1);
+
+	//recalc ht/mht
+	myHt = 0, myMht = 0;
+	for (unsigned i=0; i<pfpt50eta25JetHandle->size(); ++i) myHt += (*pfpt50eta25JetHandle)[i].pt();
+
+	TLorentzVector tlVec(0,0,0,0);
+	for (unsigned i=0; i<pfpt30eta50JetHandle->size(); ++i)
+	{
+		const TLorentzVector iJetVec(
+					(*pfpt30eta50JetHandle)[i].px(), (*pfpt30eta50JetHandle)[i].py(),
+					(*pfpt30eta50JetHandle)[i].pz(), (*pfpt30eta50JetHandle)[i].energy()
+					);
+		tlVec += iJetVec;
+	}
+	myMht = tlVec.Pt();
+
+	const float dPhiMin = DelPhiMin(pfpt30eta50JetHandle,	mhtHandle);
+
+	//Check if RA2 dphi cuts are satisfied
+	bool bPassRA2dphiCut = true;
+	bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[0].phi(), (*mhtHandle)[0].phi())) > 0.5);
+	bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[1].phi(), (*mhtHandle)[0].phi())) > 0.5);
+	bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[2].phi(), (*mhtHandle)[0].phi())) > 0.3);
 
 
-	/*
-	 * Fill hists after RA2b base selection
-	 */
-	evtHist.njet->Fill(pfpt50eta25JetHandle->size(), Weight);
-	evtHist.mht->Fill( (*mhtHandle)[0].pt(), Weight);
-	evtHist.ht->Fill((*htHandle), Weight);
-	evtHist.meff->Fill( (*mhtHandle)[0].pt() + (*htHandle), Weight);
+	/**************************************************/
+	//                 for systematics
+	/**************************************************/
+	bool bSidebandSyst1 = true;
+	if (pfpt30eta50JetHandle->size() >= 1) bSidebandSyst1 = bSidebandSyst1 && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[0].phi(), (*mhtHandle)[0].phi())) > 0.5);
+	if (pfpt30eta50JetHandle->size() >= 2) bSidebandSyst1 = bSidebandSyst1 && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[1].phi(), (*mhtHandle)[0].phi())) > 0.5);
+	if (pfpt30eta50JetHandle->size() >= 3) bSidebandSyst1 = bSidebandSyst1 && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[2].phi(), (*mhtHandle)[0].phi())) > 0.1);
 
+	bool bSidebandSyst2 = true;
+	if (pfpt30eta50JetHandle->size() >= 1) bSidebandSyst2 = bSidebandSyst2 && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[0].phi(), (*mhtHandle)[0].phi())) > 0.4);
+	if (pfpt30eta50JetHandle->size() >= 2) bSidebandSyst2 = bSidebandSyst2 && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[1].phi(), (*mhtHandle)[0].phi())) > 0.4);
+	if (pfpt30eta50JetHandle->size() >= 3) bSidebandSyst2 = bSidebandSyst2 && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[2].phi(), (*mhtHandle)[0].phi())) > 0.2);
 
-	DoDelMinStudy(pfpt50eta25JetHandle,	mhtHandle);
+	//loop over all ht bins
+	for (unsigned i =0; i < htBins_.size()-1; ++i)
+	{
+		//stringstream dirName;
+		//dirName << "HT" << htBins_.at(i) << "to" << htBins_.at(i+1);
+	
+		if (myHt >= htBins_.at(i) && myHt < htBins_.at(i+1)) 
+		{
+			FillHistograms(
+				vertexHandle,
+				pfpt30eta50JetHandle,
+				pfpt50eta25JetHandle,
+				mhtHandle,
+				htHandle,
+				myHt, 
+				myMht,
+				dPhiMin, 
+				bPassRA2dphiCut, 
+				bSidebandSyst1, 
+				bSidebandSyst2,
+				prescaleWeight,
+				Weight,
+				vHist.at(i)
+				);
+			break;
+		}
+	}
 
 	++uPassed;
    return true;
@@ -660,7 +680,7 @@ Factorization::endJob() {
 	std::cout << "[ATM:04] Event Weighing? ---- = " << doEventWeighing << std::endl;
 	std::cout << "[ATM:05] Prescale Weighing? - = " << usePrescaleWeight << std::endl;
 	std::cout << "[ATM:31] Minimum HT --------- = " << dMinHT << std::endl;
-	std::cout << "[ATM:32] Minimum MHT -------- = " << dMinMHT << std::endl;
+	std::cout << "[ATM:32] MHT min/max -------- = " << dMinMHT << " - " << dMaxMHT << std::endl;
 	std::cout << "[ATM:40] PASS Summary --------- " << std::endl;
 	std::cout << "[ATM:43] Pass ht ------------ = " << (uProcessed - uFailMinHTCut) << std::endl;
 	std::cout << "[ATM:44] Pass mht ----------- = " << (uProcessed - uFailMinHTCut - uFailMinPFMHTCut)  << std::endl;
@@ -715,8 +735,8 @@ Factorization::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   descriptions.addDefault(desc);
 }
 
-void Factorization::DoDelMinStudy(edm::Handle<std::vector<pat::Jet> > jetHandle
-				, edm::Handle<edm::View<reco::MET> > mhtHandle
+float Factorization::DelPhiMin(edm::Handle<std::vector<pat::Jet> > jetHandle, 
+					edm::Handle<edm::View<reco::MET> > mhtHandle
 				)
 {
 	//PrintHeader();
@@ -726,7 +746,6 @@ void Factorization::DoDelMinStudy(edm::Handle<std::vector<pat::Jet> > jetHandle
 	for (unsigned i = 0 ; i < jetHandle->size() ; ++i)
 	{
 		if (i>2) break; //use only three leading jets
-		//std::cout << "i = " <<  i << std::endl;
 		const float delphi_jetmht = fabs(TVector2::Phi_mpi_pi((*jetHandle)[i].phi() - (*mhtHandle)[0].phi()));
 		vDelPhi_jetmht.push_back(delphi_jetmht);
 	}
@@ -737,325 +756,98 @@ void Factorization::DoDelMinStudy(edm::Handle<std::vector<pat::Jet> > jetHandle
 	//std::cout << "vDelPhi_jetmht size = " << vDelPhi_jetmht.size() << std::endl;
 	
 	const float dPhiMin = vDelPhi_jetmht.at(0);
+	return dPhiMin;
+}
 
-	const float jet1_pt  = (*jetHandle)[0].pt();
-	const float jet2_pt  = (*jetHandle)[1].pt();
-	const float jet3_pt  = (*jetHandle)[2].pt();
-	const float jet1_phi = (*jetHandle)[0].phi();
-	const float jet2_phi = (*jetHandle)[1].phi();
-	const float jet3_phi = (*jetHandle)[2].phi();
-	const float jet1_eta = (*jetHandle)[0].eta();
-	const float jet2_eta = (*jetHandle)[1].eta();
-	const float jet3_eta = (*jetHandle)[2].eta();
-	const float j1mht_dphi = fabs(TVector2::Phi_mpi_pi(jet1_phi - (*mhtHandle)[0].phi()));
-	const float j2mht_dphi = fabs(TVector2::Phi_mpi_pi(jet2_phi - (*mhtHandle)[0].phi()));
-	const float j3mht_dphi = fabs(TVector2::Phi_mpi_pi(jet3_phi - (*mhtHandle)[0].phi()));
+void Factorization::FillHistograms(
+				edm::Handle<reco::VertexCollection> vertexHandle,
+				edm::Handle<std::vector<pat::Jet> > pf30eta50JetHandle,
+				edm::Handle<std::vector<pat::Jet> > pf50eta25JetHandle,
+				edm::Handle<edm::View<reco::MET> > mhtHandle,
+				edm::Handle<double> htHandle, const float& myht, const float& mymht,
+				const float dPhiMin, 
+				const bool bRA2DphiCut, 
+				const bool bSidebandSyst1, 
+				const bool bSidebandSyst2,
+				const float prescaleWeight,
+				const float Weight,
+				Hist_t& hist
+				)
+{
 
-	pf30_jet1Hist.pt->Fill(jet1_pt, Weight);
-	pf30_jet2Hist.pt->Fill(jet2_pt, Weight);
-	pf30_jet3Hist.pt->Fill(jet3_pt, Weight);
-	pf30_jet1Hist.phi->Fill(jet1_phi, Weight);
-	pf30_jet2Hist.phi->Fill(jet2_phi, Weight);
-	pf30_jet3Hist.phi->Fill(jet3_phi, Weight);
-	pf30_jet1Hist.eta->Fill(jet1_eta, Weight);
-	pf30_jet2Hist.eta->Fill(jet2_eta, Weight);
-	pf30_jet3Hist.eta->Fill(jet3_eta, Weight);
+	hist.evt.prescaleWeights->Fill(prescaleWeight);
+	hist.evt.eventWeights->Fill(Weight);
 
-	pf30_jet1Hist.delphi->Fill(j1mht_dphi, Weight);
-	pf30_jet2Hist.delphi->Fill(j2mht_dphi, Weight);
-	pf30_jet3Hist.delphi->Fill(j3mht_dphi, Weight);
+	hist.evt.nvtx->Fill(vertexHandle->size(), Weight);
 
-	hDelPhiMin->Fill(dPhiMin);
+	const float mht = (*mhtHandle)[0].pt();
+	const float ht  = (*htHandle);
 
+	hist.evt.njet50->Fill(pfpt50eta25JetHandle->size(), Weight);
+	hist.evt.njet30->Fill(pfpt30eta50JetHandle->size(), Weight);
 
-	// dphimin in slices of MHT
-	if ( mht >= 60 && mht< 80 ) hDelPhiMin_mht[0]->Fill(dPhiMin, Weight);
-	else if ( mht >= 80 && mht< 100 ) hDelPhiMin_mht[1]->Fill(dPhiMin, Weight);
-	else if ( mht >= 100 && mht< 120 ) hDelPhiMin_mht[2]->Fill(dPhiMin, Weight);
-	else if ( mht >= 120 && mht< 140 ) hDelPhiMin_mht[3]->Fill(dPhiMin, Weight);
-	else if ( mht >= 140 && mht< 170 ) hDelPhiMin_mht[4]->Fill(dPhiMin, Weight);
-	else if ( mht >= 170 && mht< 200 ) hDelPhiMin_mht[5]->Fill(dPhiMin, Weight);
-	else if ( mht >= 200 && mht< 250 ) hDelPhiMin_mht[6]->Fill(dPhiMin, Weight);
-	else if ( mht >= 250 ) hDelPhiMin_mht[7]->Fill(dPhiMin, Weight);
-
-	// mht in slices of dphimin
-	if ( dPhiMin < 0.1 ) MHT_by_phislice[0]->Fill(mht);
-	else if ( dPhiMin >= 0.1 && dPhiMin < 0.2 ) MHT_by_phislice[1]->Fill(mht, Weight);
-	else if ( dPhiMin >= 0.2 && dPhiMin < 0.3 ) MHT_by_phislice[2]->Fill(mht, Weight);
-	else if ( dPhiMin >= 0.3 && dPhiMin < 0.5 ) MHT_by_phislice[3]->Fill(mht, Weight);
-	else if ( dPhiMin >= 0.5 && dPhiMin < 0.8 ) MHT_by_phislice[4]->Fill(mht, Weight);
-	else if ( dPhiMin > 0.8 ) MHT_by_phislice[5]->Fill(mht, Weight);
-
-
-	//make PASS/FAIL plots with RA2 cut
-
-	if (dPhiMin>0.15) hPass[0]->Fill(mht, Weight);
-	else 	hFail[0]->Fill(mht, Weight);
-
-	if (dPhiMin>0.2)
-	{
-		hPass[1]->Fill(mht, Weight);
-	} else
-	{
-		hFail[1]->Fill(mht, Weight);
-		hFail[6]->Fill(mht, Weight);
-	}
-
-	if (dPhiMin>0.25) hPass[2]->Fill(mht, Weight);
-	else 	hFail[2]->Fill(mht, Weight);
-
-	if (dPhiMin>=0.3)
-	{
-		hPass[3]->Fill(mht, Weight);
-	} else
-	{
-		hFail[3]->Fill(mht, Weight);
-		hFail[7]->Fill(mht, Weight);
-	}
-
-	if (dPhiMin>=0.35) hPass[4]->Fill(mht, Weight);
-	else 	hFail[4]->Fill(mht, Weight);
-
-	if (dPhiMin>=0.4) hPass[5]->Fill(mht, Weight);
-	else 	hFail[5]->Fill(mht, Weight);
-
-
-	if (dPhiMin<0.2)
-	{
-		if ( (*htHandle) > 500) hFail[8]->Fill(mht, Weight);
-		if ( (*htHandle) > 800) hFail[9]->Fill(mht, Weight);
-		if ( (*htHandle) > 1000) hFail[10]->Fill(mht, Weight);
-		if ( (*htHandle) > 1200) hFail[11]->Fill(mht, Weight);
-		if ( (*htHandle) > 1400) hFail[12]->Fill(mht, Weight);
-
-		if ( (*htHandle) > 500  && (*htHandle) < 800) hFail[13]->Fill(mht, Weight);
-		if ( (*htHandle) > 800  && (*htHandle) < 1000) hFail[14]->Fill(mht, Weight);
-		if ( (*htHandle) > 1000 && (*htHandle) < 1200) hFail[15]->Fill(mht, Weight);
-		if ( (*htHandle) > 1200 && (*htHandle) < 1400) hFail[16]->Fill(mht, Weight);
-	}
-
-
-
-	//Pass selection with RA2 dphi cuts
-	bool passed = true;
-	passed = passed && (std::abs(reco::deltaPhi((*jetHandle)[0].phi(), (*mhtHandle)[0].phi())) > 0.5);
-	passed = passed && (std::abs(reco::deltaPhi((*jetHandle)[1].phi(), (*mhtHandle)[0].phi())) > 0.5);
-	passed = passed && (std::abs(reco::deltaPhi((*jetHandle)[2].phi(), (*mhtHandle)[0].phi())) > 0.3);
-
-	if (passed) 
-	{
-		hPass[6]->Fill(mht, Weight);
-		if ( (*htHandle) > 500)
-		{
-			hPass[7]->Fill(mht, Weight);
-			if (mht>200) hSignalRegion[0]->Fill(mht,Weight);
-			if (mht>350) hSignalRegion[1]->Fill(mht,Weight);
-			if (mht>500) hSignalRegion[2]->Fill(mht,Weight);
-		}
-		if ( (*htHandle) > 800) 
-		{
-			hPass[8]->Fill(mht, Weight);
-			if (mht>200) hSignalRegion[3]->Fill(mht,Weight);
-			if (mht>350) hSignalRegion[4]->Fill(mht,Weight);
-			if (mht>500) hSignalRegion[5]->Fill(mht,Weight);
-		}
-		if ( (*htHandle) > 1000) 
-		{
-			hPass[9]->Fill(mht, Weight);
-			if (mht>200) hSignalRegion[6]->Fill(mht,Weight);
-			if (mht>350) hSignalRegion[7]->Fill(mht,Weight);
-			if (mht>500) hSignalRegion[8]->Fill(mht,Weight);
-		}
-		if ( (*htHandle) > 1200) 
-		{
-			hPass[10]->Fill(mht, Weight);
-			if (mht>200) hSignalRegion[9]->Fill(mht,Weight);
-			if (mht>350) hSignalRegion[10]->Fill(mht,Weight);
-			if (mht>500) hSignalRegion[11]->Fill(mht,Weight);
-		}
-		if ( (*htHandle) > 1400) 
-		{
-			hPass[11]->Fill(mht, Weight);
-			if (mht>200) hSignalRegion[12]->Fill(mht,Weight);
-			if (mht>350) hSignalRegion[13]->Fill(mht,Weight);
-			if (mht>500) hSignalRegion[14]->Fill(mht,Weight);
-		}
-
-		if ( (*htHandle) > 500  && (*htHandle) < 800 )
-		{
-			hPass[12]->Fill(mht, Weight);
-			if (mht>200) hSignalRegion[15]->Fill(mht,Weight);
-			if (mht>350) hSignalRegion[16]->Fill(mht,Weight);
-			if (mht>500) hSignalRegion[17]->Fill(mht,Weight);
-		}
-		if ( (*htHandle) > 800  && (*htHandle) < 1000)
-		{
-			hPass[13]->Fill(mht, Weight);
-			if (mht>200) hSignalRegion[18]->Fill(mht,Weight);
-			if (mht>350) hSignalRegion[19]->Fill(mht,Weight);
-			if (mht>500) hSignalRegion[20]->Fill(mht,Weight);
-		}
-		if ( (*htHandle) > 1000 && (*htHandle) < 1200)
-		{
-			hPass[14]->Fill(mht, Weight);
-			if (mht>200) hSignalRegion[21]->Fill(mht,Weight);
-			if (mht>350) hSignalRegion[22]->Fill(mht,Weight);
-			if (mht>500) hSignalRegion[23]->Fill(mht,Weight);
-		}
-		if ( (*htHandle) > 1200 && (*htHandle) < 1400)
-		{
-			hPass[15]->Fill(mht, Weight);
-			if (mht>200) hSignalRegion[24]->Fill(mht,Weight);
-			if (mht>350) hSignalRegion[25]->Fill(mht,Weight);
-			if (mht>500) hSignalRegion[26]->Fill(mht,Weight);
-		}
-	}
-
-
-	/**************************************************/
-	//                 for systematics
-	/**************************************************/
-	passed = true;
-	if (jetHandle->size() >= 1) passed = passed && (std::abs(reco::deltaPhi((*jetHandle)[0].phi(), (*mhtHandle)[0].phi())) > 0.5);
-	if (jetHandle->size() >= 2) passed = passed && (std::abs(reco::deltaPhi((*jetHandle)[1].phi(), (*mhtHandle)[0].phi())) > 0.5);
-	if (jetHandle->size() >= 3) passed = passed && (std::abs(reco::deltaPhi((*jetHandle)[2].phi(), (*mhtHandle)[0].phi())) > 0.1);
+	hist.evt.pfmht->Fill(mht, Weight);
+	hist.evt.pfht->Fill(ht, Weight);
+	hist.evt.meff->Fill(mht+ht, Weight);
+	hist.evt.mht->Fill(mymht, Weight);
+	hist.evt.ht->Fill(myht, Weight);
 	
-	if (! passed)
+	const int njets = (*pf30eta50JetHandle).size();
+	const int maxJets =  (njets>10) ? 10 : njets;
+	for (int i=0; i < maxJets; ++i)
 	{
-		if ( (*htHandle) > 500) 
-		{
-			hFail[17]->Fill(mht, Weight);
-			hFail[18]->Fill(mht, Weight);
-		}
-		if ( (*htHandle) > 600)
-		{
-			hFail[19]->Fill(mht, Weight);
-			hFail[20]->Fill(mht, Weight);
-		}
-		if ( (*htHandle) > 800) 
-		{
-			hFail[25]->Fill(mht, Weight);
-			hFail[41]->Fill(mht, Weight);
-		}
-		if ( (*htHandle) > 1000) 
-		{
-			hFail[26]->Fill(mht, Weight);
-			hFail[42]->Fill(mht, Weight);
-		}
-		if ( (*htHandle) > 1200) 
-		{
-			hFail[27]->Fill(mht, Weight);
-			hFail[43]->Fill(mht, Weight);
-		}
-		if ( (*htHandle) > 1400) 
-		{
-			hFail[28]->Fill(mht, Weight);
-			hFail[44]->Fill(mht, Weight);
-		}
+		const float pt  = (*pf30eta50JetHandle)[i].pt();
+		const float phi = (*pf30eta50JetHandle)[i].phi();
+		const float eta = (*pf30eta50JetHandle)[i].eta();
+		const float dphi= fabs(TVector2::Phi_mpi_pi(phi - (*mhtHandle)[0].phi()));
 
-		if ( (*htHandle) > 500  && (*htHandle) < 800) 
-		{
-			hFail[29]->Fill(mht, Weight);
-			hFail[45]->Fill(mht, Weight);
-		}
-		if ( (*htHandle) > 800  && (*htHandle) < 1000) 
-		{
-			hFail[30]->Fill(mht, Weight);
-			hFail[46]->Fill(mht, Weight);
-		}
-		if ( (*htHandle) > 1000 && (*htHandle) < 1200) 
-		{
-			hFail[31]->Fill(mht, Weight);
-			hFail[47]->Fill(mht, Weight);
-		}
-		if ( (*htHandle) > 1200 && (*htHandle) < 1400) 
-		{
-			hFail[32]->Fill(mht, Weight);
-			hFail[48]->Fill(mht, Weight);
-		}
-
+		hist.jet[i].pt->Fill(pt, Weight);
+		hist.jet[i].phi->Fill(phi, Weight);
+		hist.jet[i].eta->Fill(eta, Weight);
+		hist.jet[i].delphi->Fill(dphi, Weight);
 	}
 
-
-	passed = true;
-	if (jetHandle->size() >= 1) passed = passed && (std::abs(reco::deltaPhi((*jetHandle)[0].phi(), (*mhtHandle)[0].phi())) > 0.4);
-	if (jetHandle->size() >= 2) passed = passed && (std::abs(reco::deltaPhi((*jetHandle)[1].phi(), (*mhtHandle)[0].phi())) > 0.4);
-	if (jetHandle->size() >= 3) passed = passed && (std::abs(reco::deltaPhi((*jetHandle)[2].phi(), (*mhtHandle)[0].phi())) > 0.2);
-	
-	if (! passed)
+	hist.evt.dphiMin->Fill(dPhiMin, Weight);
+	if (bRA2DphiCut) 
 	{
-		if ( (*htHandle) > 500) 
-		{
-			hFail[21]->Fill(mht, Weight);
-			hFail[22]->Fill(mht, Weight);
-		}
-		if ( (*htHandle) > 600)
-		{
-			hFail[23]->Fill(mht, Weight);
-			hFail[24]->Fill(mht, Weight);
-		}
+		hist.signal->Fill(mht,Weight);
+		hist.signalFineBin->Fill(mht,Weight);
+	}
 
-		if ( (*htHandle) > 800) 
+	for (unsigned i=0; i < vDphiVariations.size(); ++i)
+	{
+		if (dPhiMin > vDphiVariations.at(i)) 
 		{
-			hFail[33]->Fill(mht, Weight);
-			hFail[49]->Fill(mht, Weight);
-		}
-		if ( (*htHandle) > 1000) 
+			hist.pass[i]->Fill(mht, Weight);
+			hist.passFineBin[i]->Fill(mht, Weight);
+		} else 
 		{
-			hFail[34]->Fill(mht, Weight);
-			hFail[50]->Fill(mht, Weight);
-		}
-		if ( (*htHandle) > 1200) 
-		{
-			hFail[35]->Fill(mht, Weight);
-			hFail[51]->Fill(mht, Weight);
-		}
-		if ( (*htHandle) > 1400) 
-		{
-			hFail[36]->Fill(mht, Weight);
-			hFail[52]->Fill(mht, Weight);
-		}
-
-		if ( (*htHandle) > 500  && (*htHandle) < 800) 
-		{
-			hFail[37]->Fill(mht, Weight);
-			hFail[53]->Fill(mht, Weight);
-		}
-		if ( (*htHandle) > 800  && (*htHandle) < 1000) 
-		{
-			hFail[38]->Fill(mht, Weight);
-			hFail[54]->Fill(mht, Weight);
-		}
-		if ( (*htHandle) > 1000 && (*htHandle) < 1200) 
-		{
-			hFail[39]->Fill(mht, Weight);
-			hFail[55]->Fill(mht, Weight);
-		}
-		if ( (*htHandle) > 1200 && (*htHandle) < 1400) 
-		{
-			hFail[40]->Fill(mht, Weight);
-			hFail[56]->Fill(mht, Weight);
+			hist.fail[i]->Fill(mht, Weight);
+			hist.failFineBin[i]->Fill(mht, Weight);
 		}
 	}
 
 
-	if (iVerbose)
+	if (! bSidebandSyst1) //we want the denominator (or failed events)
 	{
-		std::cout << "delphi ordered (jetmet)= ";
-		for (std::vector<float>::const_iterator it = vDelPhi_jetmht.begin(); it != vDelPhi_jetmht.end(); ++it)
-		{
-			std::cout << "  " << (*it);
-		}
-		std::cout << std::endl;
+		hist.sidebandSyst[0]->Fill(mht, Weight);
+		hist.sidebandSystFineBin[0]->Fill(mht, Weight);
+	}
+	if (! bSidebandSyst2)
+	{
+		hist.sidebandSyst[1]->Fill(mht, Weight);
+		hist.sidebandSystFineBin[1]->Fill(mht, Weight);
 	}
 }
+
 
 void Factorization::PrintHeader()
 {
-	std::cout  << "======= Run/Event: " << kRunLumiEvent.run
-			<< ":" << kRunLumiEvent.evt << std::endl;
+	std::cout  << " >>>>>>>>>>>>>>>  Run:Lumi:Event: "
+			<< kRunLumiEvent.run << ":" << kRunLumiEvent.lumi 
+			<< ":" << kRunLumiEvent.evt 
+			<< "<<<<<<<<<<<<<<" << std::endl;
 }
-
 
 bool Factorization::storeHLT(const edm::Event& e, const edm::EventSetup& iSetup){
 	//////////////////////////////////////////////////////////////////////
