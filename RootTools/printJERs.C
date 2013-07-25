@@ -7,10 +7,6 @@
 #include "TH1.h"
 #include "TStyle.h"
 
-/**********************************
- * Dumps all the reconstructed JERs 
- * to a eps file. 
- * *******************************/
 void printJERs() {
 
 	vector<double> ptBins;
