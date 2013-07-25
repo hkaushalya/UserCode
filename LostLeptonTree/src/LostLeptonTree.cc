@@ -12,7 +12,7 @@ Implementation:
 */
 //
 // Original Author:  Samantha Hewamanage
-// $Id: LostLeptonTree.cc,v 1.2 2013/05/31 22:30:36 samantha Exp $
+// $Id: LostLeptonTree.cc,v 1.3 2013/06/03 04:34:54 samantha Exp $
 //
 //
 
@@ -98,7 +98,7 @@ class LostLeptonTree : public edm::EDAnalyzer {
 		int                  t_NJetsPt30Eta2p5, t_NJetsPt30Eta5p0, t_NJetsPt50Eta2p5, t_NJetsPt50Eta5p0;
 
 		std::vector<double > *t_genJetPt, *t_genJetEta, *t_genJetPhi, *t_genJetE;
-		std::vector<double > *t_genParPt, *t_genParEta, *t_genParPhi, *t_genParE;
+		std::vector<double > *t_genParPt, *t_genParEta, *t_genParPhi, *t_genParE, *t_genParStatus, *t_genParID;
 		double               t_minPFJetPt, t_minGenJetPt;
 		int 					  t_allFilters;
 		int                  t_beamHaloFilter, t_eeBadScFilter, t_eeNoiseFilter, t_greedyMuons;
@@ -379,6 +379,8 @@ void LostLeptonTree::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 			t_genParEta->push_back(gen.eta());    
 			t_genParPhi->push_back(gen.phi());
 			t_genParE  ->push_back(gen.energy());
+			t_genParStatus ->push_back((double)pdgStatus);
+			t_genParID ->push_back((double)pdgId);
 			//bool frombjet = find_mother( &gen, 5 );
 			//bool frombbarjet = find_mother( &gen, -5 );
 
@@ -559,10 +561,14 @@ void LostLeptonTree::BookHistograms() {
 	t_genParEta = new std::vector<double>();    
 	t_genParPhi = new std::vector<double>();
 	t_genParE   = new std::vector<double>();
+	t_genParStatus  = new std::vector<double>();
+	t_genParID  = new std::vector<double>();
 	tree->Branch("t_genParPt",  "vector<double>", &t_genParPt );
 	tree->Branch("t_genParEta", "vector<double>", &t_genParEta);
 	tree->Branch("t_genParPhi", "vector<double>", &t_genParPhi);
 	tree->Branch("t_genParE",   "vector<double>", &t_genParE  );
+	tree->Branch("t_genParStatus",  "vector<double>", &t_genParStatus );
+	tree->Branch("t_genParID",  "vector<double>", &t_genParID );
 
 
 	tree->Branch("t_beamHaloFilter", &t_beamHaloFilter, "t_beamHaloFilter/I");
@@ -604,6 +610,8 @@ void LostLeptonTree::clearTreeVectors() {
 	t_genParEta->clear();    
 	t_genParPhi->clear();
 	t_genParE->clear();
+	t_genParStatus->clear();
+	t_genParID->clear();
 
 	t_firedTrigs->clear();
 	t_firedTrigsPrescale->clear();
