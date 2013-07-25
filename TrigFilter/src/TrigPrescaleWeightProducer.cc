@@ -43,7 +43,9 @@ class TrigPrescaleWeightProducer : public edm::EDProducer{
 	 string highestPrescaledTriggerName;
 	 //to be added to event
 	 vector<string> trigsFired;
-	 int debug;
+	 int debug_;
+	vector<string> firedTrigNames;
+	vector<unsigned> firedTrigPrescales;
 
 };
 
@@ -52,11 +54,13 @@ TrigPrescaleWeightProducer::TrigPrescaleWeightProducer(const edm::ParameterSet &
 	triggerResults_ = iConfig.getParameter<edm::InputTag>("triggerResults");
 	processName_    = iConfig.getParameter<std::string> ("HLTProcess");
 	HLTPathsByName_ = iConfig.getParameter< std::vector<std::string > >("hltPaths");
-	debug           = iConfig.getUntrackedParameter<int> ("debug",0);
+	debug_           = iConfig.getParameter<int> ("debug");
 
   produces<double> ( "prescaleWeight" );
   produces<string> ( "highestPrescaledTriggerName" );
 
+  produces<std::vector<string > > ( "firedTrigNames" );
+  produces<std::vector<unsigned > > ( "firedTrigPrescales" );
 }
 
 TrigPrescaleWeightProducer::~TrigPrescaleWeightProducer() {
@@ -79,12 +83,12 @@ void TrigPrescaleWeightProducer::produce(edm::Event& iEvent, const edm::EventSet
 
 	bool accept = false;
 
-	if (debug) std::cout << "TriggerResults found, number of HLT paths: " << triggerResults->size() << std::endl;
+	if (debug_) std::cout << "\tTriggerResults found, number of HLT paths: " << triggerResults->size() << std::endl;
 	// get trigger names
 	const edm::TriggerNames & triggerNames = iEvent.triggerNames(*triggerResults);
-	if (debug) {
+	if (debug_) {
 		for (unsigned int i=0; i < triggerNames.size(); i++) {
-			if (debug) std::cout << "trigger path= " << triggerNames.triggerName(i) << std::endl;
+			std::cout << "\t\ttrigger path [" << i << "] = " << triggerNames.triggerName(i) << std::endl;
 		}
 	}
 
@@ -96,16 +100,19 @@ void TrigPrescaleWeightProducer::produce(edm::Event& iEvent, const edm::EventSet
 	vector<string> newHLTPathsByName;
 	WildCardRemove(newHLTPathsByName, triggerNames);
 
+	HLTPathsByIndex_.clear();
 	HLTPathsByIndex_.resize(newHLTPathsByName.size());
 
 	unsigned int n = newHLTPathsByName.size();
 
 	for (unsigned int i=0; i!=n; i++) {
 		HLTPathsByIndex_[i] = triggerNames.triggerIndex(newHLTPathsByName[i]);
+		if (debug_) cout << __LINE__ << ":HLTPathsByIndex_[" << i << "] = "  << HLTPathsByIndex_[i] << endl; 
 	}
 
-	vector<string> firedTrigNames;
-	vector<float> firedTrigPrescale;
+
+	firedTrigNames.clear();
+	firedTrigPrescales.clear();
 	unsigned highestHTtrigIndex = 99999;
 	int  highestHTprescale = 1.0;
 	float highestHT = 0.0;
@@ -115,11 +122,13 @@ void TrigPrescaleWeightProducer::produce(edm::Event& iEvent, const edm::EventSet
 		if (HLTPathsByIndex_.at(i) < triggerResults->size()) {
 			if (triggerResults->accept(HLTPathsByIndex_.at(i))) {
 				fired++;
-				//std::cout << "Fired HLT path= " << newHLTPathsByName[i] << std::endl;
 				accept = true;
 				const int currentPrescale = hltConfig_.prescaleValue(iEvent, iSetup, newHLTPathsByName.at(i));
-				if (debug) std::cout << "Fired HLT path= " << newHLTPathsByName[i] << " with prescale = " 
+				if (debug_) cout << "\t\t" << __LINE__ << ": Fired HLT path [" << i << "] = " << newHLTPathsByName[i] << " with prescale = " 
 							<< currentPrescale << std::endl;
+
+				firedTrigNames.push_back(newHLTPathsByName.at(i));
+				firedTrigPrescales.push_back(currentPrescale);
 
 				const float ht = GetHTthreshold(newHLTPathsByName.at(i));
 				if (ht > highestHT)
@@ -127,17 +136,23 @@ void TrigPrescaleWeightProducer::produce(edm::Event& iEvent, const edm::EventSet
 					highestHT = ht;
 					highestHTtrigIndex = i;
 					highestHTprescale = currentPrescale;
+					if (debug_)
+					{
+						cout << "\t\t"<< __LINE__<< ": highestHT/highestHTprescale=" << highestHT << "/" << highestHTprescale << endl;
+					}
 				}
 			}
 		}
 	}
+
+	//cout << "\t" << __LINE__ << ": highestHT/highestHTprescale=" << highestHT << "/" << highestHTprescale << endl;
 	if (highestHTtrigIndex < 99999)
 	{
-		if (debug) cout << "Highest trigger is: " << newHLTPathsByName.at(highestHTtrigIndex) << " with prescale = " << highestHTprescale << endl;
+		if (debug_) cout << "Highest trigger is: " << newHLTPathsByName.at(highestHTtrigIndex) << " with prescale = " << highestHTprescale << endl;
 		prescaleWeight = highestHTprescale;
 		highestPrescaledTriggerName = newHLTPathsByName.at(highestHTtrigIndex);
 	} else {
-		cout << __FILE__ << "::" << __FUNCTION__ << ":: WARNING!! NO triggers fired for this event!!!!" << endl;
+		//cout << __FILE__ << "::" << __FUNCTION__ << ":: WARNING!! NO triggers fired for this event!!!!" << endl;
 		prescaleWeight = 1;
 		highestPrescaledTriggerName = "";
 	}
@@ -147,7 +162,13 @@ void TrigPrescaleWeightProducer::produce(edm::Event& iEvent, const edm::EventSet
 	iEvent.put(pOut,"prescaleWeight");
 	iEvent.put(pOut2,"highestPrescaledTriggerName");
 
-	if (debug && fired > 1) cout <<  "\t :: accept = " << accept  << " /nFired = " << fired << endl;
+
+   auto_ptr<std::vector<std::string > > pOut3(new std::vector<std::string> (firedTrigNames));
+   auto_ptr<std::vector<unsigned > > pOut4(new std::vector<unsigned> (firedTrigPrescales));
+	iEvent.put(pOut3,"firedTrigNames");
+	iEvent.put(pOut4,"firedTrigPrescales");
+
+	if (debug_ && fired > 1) cout <<  "\t :: accept = " << accept  << " /nFired = " << fired << endl;
 }
 
 // ------------ method called once each job just before starting event loop  ------------
@@ -185,9 +206,10 @@ void TrigPrescaleWeightProducer::endRun(edm::Run &run, const edm::EventSetup& iS
 
 void TrigPrescaleWeightProducer::WildCardRemove(vector<string>& newHLTPathsByName, const edm::TriggerNames &trigNames)
 {
+	if (debug_) cout << "--------------------- "<< __FUNCTION__ << " ------------------" << endl; 
 	for (unsigned i=0; i< HLTPathsByName_.size(); ++i)
 	{
-		if (debug) cout << " HLTPathsByName_["<< i << "] = " << HLTPathsByName_.at(i) << endl;
+		if (debug_) cout << " HLTPathsByName_["<< i << "] = " << HLTPathsByName_.at(i) << endl;
 		
 		vector<string> name_parts = TokenizeByAsterix(HLTPathsByName_.at(i));
 		
@@ -210,7 +232,7 @@ void TrigPrescaleWeightProducer::WildCardRemove(vector<string>& newHLTPathsByNam
 		   if (match)
 			{
 				newHLTPathsByName.push_back(trigNames.triggerName(k));
-				//cout << "\t matching paths = " << trigNames.triggerName(k) << endl;
+				if (debug_) cout << "\t matching paths = " << trigNames.triggerName(k) << endl;
 			}
 		}
 	}
@@ -223,15 +245,18 @@ float TrigPrescaleWeightProducer::GetHTthreshold(const string trigName)
 //	int ndigits = 0; //max should be 4
 	
 	vector<size_t> pos;
-	const size_t p1 = trigName.find_first_of('_');
+	//const size_t p1 = trigName.find_first_of('_');
+	const size_t p1 = trigName.find_first_of("PFHT");
 	size_t p2 = string::npos;
 	if (p1 != string::npos) p2 = trigName.find('_',p1+1);
 	if (p2 == string::npos) cout << " p2 is not found! " << endl;
 	
-	string part = trigName.substr(p1+3, p2-6);
+	if (debug_) cout << __FUNCTION__ << ": p1, p2=  " << p1 << "," << p2 << endl;
+	//string part = trigName.substr(p1+3, p2-6);
+	string part = trigName.substr(p1+1, p2);
 
 	float num = atof(part.c_str());
-	//cout << trigName <<  " :: part = " << part  << ":: cut = " << num << endl;
+	if (debug_) cout << __FUNCTION__  << ":" << trigName <<  " :: part = " << part  << ":: cut = " << num << endl;
 
 	return num;
 
