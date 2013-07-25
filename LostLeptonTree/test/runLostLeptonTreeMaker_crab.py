@@ -3,7 +3,7 @@ import os
 
 runningOnMC = True
 outputFile="Ntuple.root"
-evts = -1
+evts = 1000
 
 process = cms.Process("treemaker")
 process.load("FWCore.MessageLogger.MessageLogger_cfi")
@@ -55,6 +55,7 @@ if runningOnMC == True :
 	#'/store/user/lpcsusyhad/53X_ntuples/samantha/QCD_Pt_1800_TuneZ2star_8TeV_pythia6_Summer12/samantha/QCD_Pt-1800_TuneZ2star_8TeV_pythia6/Summer12_DR53X_PU_S10_START53_V7A_53X_HEPtagger_OCT262012/0c2ca37b7b411866265a5953adbfd963/susypat_99_1_g01.root'
 	#'/store/user/lpcsusyhad/53X_ntuples/samantha/QCD_Pt_600to800_TuneZ2star_8TeV_pythia6_Summer12/samantha/QCD_Pt-600to800_TuneZ2star_8TeV_pythia6/Summer12_DR53X_PU_S10_START53_V7A_53X_HEPtagger_OCT262012/0c2ca37b7b411866265a5953adbfd963/susypat_92_1_9ry.root'
 	'file:/uscms_data/d3/lhx/tasks/recipes/directStop/allINone_535/src/UserCode/HadronicTau/workspace/forSync/onSpecialPattuple/susypat.root'
+	#'file:/uscms_data/d3/lhx/tasks/recipes/directStop/allINone_535/src/UserCode/METscan/forSam/susypat.root'
 		)
 	)
 else :
@@ -167,7 +168,7 @@ process.ra2PBNR.taggingMode = False
 
 #process.load("SandBox.Skims.ecalLaserCorrFilter_cfi")
 process.load("RecoMET.METFilters.ecalLaserCorrFilter_cfi")
-process.ecalLaserCorrFilter.Debug = True
+process.ecalLaserCorrFilter.Debug = False
 process.ecalLaserCorrFilter.taggingMode = False
 
 

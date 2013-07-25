@@ -153,6 +153,7 @@ else :
 	process.preseq = cms.Sequence(
 					#process.HCALLaserEvtFilterList2012 *
 					process.ra2Electrons *   #for new JECs
+					process.ra2NoiseCleaning *
 					process.LeptonVeto *
 					process.trigProd * 
 					process.newra2PFchsJets *  #new JECs. must use the new correct GTs

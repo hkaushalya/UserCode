@@ -10,7 +10,7 @@ set datasetname3 = "MG_QCD_HT_1000ToInf"
 #set mainDir = "/uscms_data/d3/samantha/SUSYRA2work/CMSSW_5_3_5/src/UserCode/LostLeptonTree/test/NtupleMaking/01282013"
 #set outDir = "/uscmst1b_scratch/lpc1/3DayLifetime/samantha/NewNtuples/01282013"
 set mainDir = "/uscms_data/d3/samantha/NtupleMaking/"
-set outDir = "/uscms_data/d3/samantha/NtupleMaking/03042013"
+set outDir = "/uscms_data/d3/samantha/NtupleMaking/20130711_PatJetsWithMetPhiCorr"
 
 #set mainDir = "/eos/uscms/store/user/samantha/NtupleMaking"
 #set outDir = "/eos/uscms/store/user/samantha/NtupleMaking/03102013"
@@ -30,7 +30,8 @@ foreach dir ( $dirlist )
 		cp -r -v fnalCondorPrep.sh $dir
 		cp -r -v fnalCondorSubmit.csh $dir
 		cp -r -v fnalMakeSplitInputs.pl $dir
-		cp -r -v runLostLeptonTreeMaker_condor.py $dir
+#		cp -r -v runLostLeptonTreeMaker_condor.py $dir
+		cp -r -v runLostLeptonTreeMaker_pfjets_condor.py $dir
 		cp -r -v DataPileupHistogram_RA2Summer12_190456-208686_ABCD.root $dir
 
 		if ( $i == 1 ) then
@@ -45,7 +46,7 @@ foreach dir ( $dirlist )
 			#./fnalCondorSubmit.csh 1 2 $fileList $i $rootdir 
 			./fnalCondorSubmit.csh 170 30 $fileList $i $rootdir 
 			cd $curDir
-			#exit
+			exit
 		else if ( $i == 2 ) then
 			cp -r QCD_HT_500To1000_MGPythia_v1_lpc1.list $dir
 			cd $dir

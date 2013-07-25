@@ -49,8 +49,10 @@ initialdir = ${currDir}
 Output = ${configSpecStr}_\$(Cluster)_\$(Process).stdout
 Error = ${configSpecStr}_\$(Cluster)_\$(Process).stderr
 Log = ${configSpecStr}_\$(Cluster)_\$(Process).log
-transfer_input_files = $currDir/runLostLeptonTreeMaker_condor.py, $currDir/$inputlist, $currDir/DataPileupHistogram_RA2Summer12_190456-208686_ABCD.root 
-Arguments = runLostLeptonTreeMaker_condor.py $filetail $inputlist \$(Cluster) ${configSpecStr} ${dataset} ${_CONDOR_SCRATCH_DIR}
+#transfer_input_files = $currDir/runLostLeptonTreeMaker_condor.py, $currDir/$inputlist, $currDir/DataPileupHistogram_RA2Summer12_190456-208686_ABCD.root 
+#Arguments = runLostLeptonTreeMaker_condor.py $filetail $inputlist \$(Cluster) ${configSpecStr} ${dataset} ${_CONDOR_SCRATCH_DIR}
+transfer_input_files = $currDir/runLostLeptonTreeMaker_pfjets_condor.py, $currDir/$inputlist, $currDir/DataPileupHistogram_RA2Summer12_190456-208686_ABCD.root 
+Arguments = runLostLeptonTreeMaker_pfjets_condor.py $filetail $inputlist \$(Cluster) ${configSpecStr} ${dataset} ${_CONDOR_SCRATCH_DIR}
 
 
 Queue 
