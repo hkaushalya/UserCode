@@ -17,8 +17,6 @@
 using namespace std;
 
 const static float fDATA_LUMI  = 4650.0; //pb-1
-//const static float fDATA_LUMI  = 1150.0; //pb-1
-//const static float fEWK_LUMI   = 81352581.0/31300.0; // 31300 pb for NLO xsec and total number of events is 81352581 (sample1+sample2)
 //const static float fTTBAR_LUMI = 3701947.0/165.0;
 //const static float fZNN_LUMI   = 3067017.0/42.8;     //x-sec from note, Anwar hd used 32.92 pb-1 LO
 																	  //2-23-12, Seema said this should be 42.8 not 42.2
@@ -38,11 +36,11 @@ const static float fWJETS_HT250TO300_LUMI =  9831277.0 / (248.7 * 0.14);
 const static float fWJETS_HT300TOINF_LUMI =  5363746.0 / (317.0 * 0.153); 
 const static float fTTBAR_LUMI = 59590147/165.0;
 const static float fZNN_LUMI   = 3067017.0/42.8;     //x-sec from note, Anwar hd used 32.92 pb-1 LO
-const static string sDATA_FILE_NAME  = "Data_465_PrescaleWgted_DphiBugFixed_03012012.root"; 
-const static string sWJET_HT250TO300_FILE_NAME  = "Wjets_HT250to300_Fall11_PUwgted_DphiBugFixed_03012012.root";  //Fall 11 sample
-const static string sWJET_HT300TOINF_FILE_NAME  = "Wjets_HT300toInf_Fall11_PUwgted_DphiBugFixed_03012012.root";  //Fall 11 sample
-const static string sTTBAR_FILE_NAME = "TTbar_Fall11_PUwgted_DphiBugFixed_03012012.root";  // Fall 11 sample
-const static string sZNN_FILE_NAME   = "Zjets_Summ11_PUwgted_DphiBugFixed_03012012.root";    // Summer 11 sample
+const static string sDATA_FILE_NAME  = "Data_465_PrescaleWgted_03162012.root"; 
+const static string sWJET_HT250TO300_FILE_NAME  = "Wjets_HT250to300_Fall11_PUwgted_03162012.root";  //Fall 11 sample
+const static string sWJET_HT300TOINF_FILE_NAME  = "Wjets_HT300toInf_Fall11_PUwgted_03162012.root";  //Fall 11 sample
+const static string sTTBAR_FILE_NAME = "TTbar_Fall11_PUwgted_03162012.root";  // Fall 11 sample
+const static string sZNN_FILE_NAME   = "Zjets_Summ11_PUwgted_03162012.root";    // Summer 11 sample
 
 
 const static float passFailRatio_fitrange_xmin = 50.0;
@@ -71,23 +69,63 @@ struct Predictions_t
 		float excl_fitErr[nMHTbins-1];
 };
 
-void PrintExclPredictions(const Predictions_t& res)
+void PrintExclPredictions(const Predictions_t& res, const bool header=true)
 {
 
-	cout << setprecision(3) << setw(15) << " MHT "
-					<< setw(10) << " mean " 
-					<< setw(10) << "stat"
-					<< endl;
+	if (header)
+	{
+		cout << setprecision(3) << setw(15) << " MHT "
+			<< setw(10) << " mean " 
+			<< setw(10) << "stat"
+			<< endl;
+	}
 	for (int i=0; i< nMHTbins -1 ; ++i)
 	{
 			const float mean    = res.excl_mean[i]; 
 			const float statErr = res.excl_statErr[i];
 
 		cout << setprecision(3) << setw(15) << incMHTBins.at(i) << "<MHT<" << incMHTBins.at(i+1) 
-					<< setw(10) << mean << " $\\pm$ " 
+					//<< setw(10) << mean << " $\\pm$ " 
+					<< setw(10) << mean << " +/- " 
 					<< setw(10) << statErr
 					<< endl;
 	}
+}
+
+void PrintBackgrounds(
+					const Predictions_t& data_b4, 
+					const Predictions_t& data_a4, 
+					const Predictions_t& ewk, 
+					const Predictions_t& ttbar,
+					const Predictions_t& znn
+					)
+{
+	cout << ">>>>>> Backgrounds in MHT bins <<<<<<<<" << std::endl;
+			cout 
+			<< setw(5) << " MHT "
+			<< setw(20) << "data+/-stat (b4)" 
+			<< setw(20) << "wjet+/-stat" 
+			<< setw(20) << "ttbar/-stat" 
+			<< setw(20) << "znn +/-stat" 
+			<< setw(20) << "data+/-stat (a4)" 
+			<< endl;
+	//const string seperator("$\\pm$");
+	const string seperator(" +/- ");
+	//const string elogOption("");
+	const string elogOption(" | ");
+	for (int i=0; i< nMHTbins -1 ; ++i)
+	{
+		cout << setprecision(0) 
+			<< setw(5) << incMHTBins.at(i) << "<MHT<" << incMHTBins.at(i+1) 
+			<< setprecision(1) 
+			<< setw(20) << data_b4.excl_mean[i] << seperator << data_b4.excl_statErr[i] << elogOption
+			<< setw(15) << ewk.excl_mean[i]     << seperator << ewk.excl_statErr[i] << elogOption
+			<< setw(15) << ttbar.excl_mean[i]   << seperator << ttbar.excl_statErr[i] << elogOption
+			<< setw(15) << znn.excl_mean[i]     << seperator << znn.excl_statErr[i] << elogOption
+			<< setw(20) << data_a4.excl_mean[i] << seperator << data_a4.excl_statErr[i] << elogOption
+			<< endl;
+	}
+
 }
 
 
@@ -203,7 +241,7 @@ void PrintResults(const Predictions_t& res,
  *******************/
 Predictions_t GetExlcusiveBinContents(const TH1* hist)
 {
-	assert(hist != NULL && "GetPredictions:: hist not found!");
+	assert(hist != NULL && "GetExlcusiveBinContents:: hist not found!");
 
 	double mean[incMHTBins.size()-1];
 	double statErr[incMHTBins.size()-1];
@@ -262,8 +300,12 @@ Predictions_t GetExlcusiveBinContents(const TH1* hist)
 		if (mhtBin+1<incMHTBins.size())
 		{
 			std::stringstream excl_pred;
-			excl_pred << setprecision(3) << setw(10) << incMHTBins.at(mhtBin) << "<MHT<" << incMHTBins.at(mhtBin+1)
-				<< mean[mhtBin]<< "&$\\pm$" << statErr[mhtBin];
+			excl_pred << setprecision(3) 
+				<< setw(10) << incMHTBins.at(mhtBin) << "<MHT<" << incMHTBins.at(mhtBin+1)
+				<< mean[mhtBin] 
+				//<< "&$\\pm$" 
+				<< " +/- " 
+				<< statErr[mhtBin];
 			//std::cout << excl_pred.str() << std::endl;
 			results.excl_mean[mhtBin]    = mean[mhtBin];
 			results.excl_statErr[mhtBin] = statErr[mhtBin];
@@ -274,10 +316,6 @@ Predictions_t GetExlcusiveBinContents(const TH1* hist)
 	return results;
 }
 
-void ScaleWJetsByLumi(TH1* hist)
-{
-//	hist->Scale(fDATA_LUMI/fEWK_LUMI);	
-}
 void ScaleTTbarByLumi(TH1* hist)
 {
 	hist->Scale(fDATA_LUMI/fTTBAR_LUMI);	
@@ -322,7 +360,7 @@ Predictions_t SubstractZnn(TH1* hist, const string histname)
 	const float int_b4 = znnHist->Integral(); 
 	const float scale  = fDATA_LUMI/fZNN_LUMI;
 	znnHist->Scale(scale);
-//	std::cout << __FUNCTION__ << ": scale = " << scale<< ":: Znn Integral b4/a4= "<< int_b4  << "/" << znnHist->Integral() << std::endl; 
+	std::cout << __FUNCTION__ << ": scale = " << scale<< ":: Znn Integral b4/a4= "<< int_b4  << "/" << znnHist->Integral() << std::endl; 
 
 /*	new TCanvas();
 	znnHist->SetLineColor(kGreen);
@@ -351,7 +389,7 @@ Predictions_t SubstractTTbar(TH1* hist, const string histname)
 	const float int_b4 = ttbarHist->Integral(); 
 	const float scale  = fDATA_LUMI/fTTBAR_LUMI;
 	ttbarHist->Scale(scale);
-//	std::cout << __FUNCTION__ << ": scale = " << scale<< ":: TTbar Integral b4/a4= "<< int_b4  << "/" << ttbarHist->Integral() << std::endl; 
+	std::cout << __FUNCTION__ << ": scale = " << scale<< ":: TTbar Integral b4/a4= "<< int_b4  << "/" << ttbarHist->Integral() << std::endl; 
 
 /*	new TCanvas();
 	ttbarHist->SetLineColor(kGreen);
@@ -418,7 +456,7 @@ double GetFitFunctionError(TF1* f1, double x) {
 
 void DumpHist(const TH1* hist)
 {
-	assert (hist != NULL && "DumpHist:: hist passed is null!"); 
+	assert (hist != NULL && "DumpHist:: hist is null!"); 
 	cout << std::setw(5) << "bin " << std::setw(15) << "[edges]" << std::setw(10) << "content" << std::setw(10) << "error" << endl;
 	double sum = 0;
 	for (int bin = 0; bin <= hist->GetNbinsX()+1; ++bin)
@@ -429,11 +467,11 @@ void DumpHist(const TH1* hist)
 			<< hist->GetBinLowEdge(bin) << ", " << hist->GetXaxis()->GetBinUpEdge(bin)<< "]" 
 			<< std::setw(10) << hist->GetBinContent(bin) 
 			<< std::setw(10) << hist->GetBinError(bin) << endl;
-			if (hist->GetBinCenter(bin) > 500) sum += hist->GetBinContent(bin);
+//			if (hist->GetBinCenter(bin) > 500) sum += hist->GetBinContent(bin);
 		}
 	}
 
-	cout << "Sum (>500) = " << sum << endl;
+//	cout << "Sum (>500) = " << sum << endl;
 
 }
 
@@ -701,8 +739,8 @@ TF1* FitPassFailRatio(const int htBin, const int model, TH1* hist,
 	else return expFitResult;
 }
 
-void makeExpModelPredFromData(const int htBin=1, const int model = 1,
-      const float fitrange_xmin = 50, const float fitrange_xmax = 150) 
+void makeExpModelPredFromData(const int htBin=1, const int model = 1)
+//      const float fitrange_xmin = 50, const float fitrange_xmax = 150) 
 {
 
 	incMHTBins.clear();
@@ -720,88 +758,63 @@ void makeExpModelPredFromData(const int htBin=1, const int model = 1,
 	if (ttbarRootFile->IsZombie()) { cout << "ttbar root file not found!" <<  endl; assert (false); }
 	if (znnRootFile->IsZombie()) { cout << "znn root file not found!" <<  endl; assert (false); }
 
-	std::string numerHistName, denomHistName;
-	std::string QCDsyst1_numerHistName, QCDsyst1_denomHistName;
-	std::string QCDsyst2_numerHistName, QCDsyst2_denomHistName;
-	std::string qcdsyst1_sidebandHistName, qcdsyst2_sidebandHistName;
-	std::string sideband_hist_name;
+	std::string numerHistName(""), denomHistName("");
+	std::string QCDsyst1_numerHistName(""), QCDsyst1_denomHistName("");
+	std::string QCDsyst2_numerHistName(""), QCDsyst2_denomHistName("");
+	std::string qcdsyst1_sidebandHistName(""), qcdsyst2_sidebandHistName("");
+	std::string sideband_hist_name("");
 	std::string HTlabel("");
+	std::string dirName("");
 
 	if (htBin == 1) { //ht>500 GeV
-		HTlabel = 500;
-		numerHistName = "factorization_ht500/Pass_RA2dphi_HT500";
-		denomHistName = "factorization_ht500/Fail_1";
-		QCDsyst1_numerHistName = numerHistName;
-		QCDsyst1_denomHistName = "factorization_ht500/Syst1_Fail_ht500";
-		qcdsyst1_sidebandHistName = "factorization_ht500/Syst1_Fail_500HT800_fineBin";
-		QCDsyst2_numerHistName = numerHistName;
-		QCDsyst2_denomHistName = "factorization_ht500/Syst2_Fail_ht500";
-		qcdsyst2_sidebandHistName = "factorization_ht500/Syst2_Fail_500HT800_fineBin";
-		sideband_hist_name   = "factorization_ht500/Fail_lt_point2_500HT800";
+		HTlabel += "500";
+		dirName = "factorization/HT500to800/";
 	} else if (htBin == 2) { //ht>800
-		HTlabel += 800;
-		numerHistName = "factorization_ht800/Pass_RA2dphi_HT800";
-		denomHistName = "factorization_ht800/Fail_1";
-	
-		QCDsyst1_numerHistName    = numerHistName;
-		QCDsyst1_denomHistName    = "factorization_ht800/Syst1_Fail_ht800";
-		//QCDsyst1_denomHistName    = "factorization_ht500/Syst1_Fail_ht500";
-		qcdsyst1_sidebandHistName = "factorization_ht800/Syst1_Fail_800HT1000_fineBin";
-		QCDsyst2_numerHistName    = numerHistName;
-		QCDsyst2_denomHistName    = "factorization_ht800/Syst2_Fail_ht800";
-		qcdsyst2_sidebandHistName = "factorization_ht800/Syst2_Fail_800HT1000_fineBin";
-		sideband_hist_name        = "factorization_ht800/Fail_lt_point2_800HT1000";
-
+		HTlabel += "800";
+		dirName = "factorization/HT800to1000/";
 
 	} else if (htBin == 3) { //ht>1000
 		HTlabel += 1000;
-		numerHistName = "factorization_ht1000/Pass_RA2dphi_HT1000";
-		denomHistName = "factorization_ht1000/Fail_1";
-
-		QCDsyst1_numerHistName    = numerHistName;
-		QCDsyst1_denomHistName    = "factorization_ht1000/Syst1_Fail_ht1000";
-		//QCDsyst1_denomHistName    = "factorization_ht500/Syst1_Fail_ht500";
-		qcdsyst1_sidebandHistName = "factorization_ht1000/Syst1_Fail_1000HT1200_fineBin";
-		QCDsyst2_numerHistName    = numerHistName;
-		QCDsyst2_denomHistName    = "factorization_ht1000/Syst2_Fail_ht1000";
-		qcdsyst2_sidebandHistName = "factorization_ht1000/Syst2_Fail_1000HT1200_fineBin";
-		sideband_hist_name        = "factorization_ht1000/Fail_lt_point2_1000HT1200";
+		dirName = "factorization/HT1000to1200/";
 
 	} else if (htBin == 4) { //ht>1200
 		HTlabel += 1200;
-		numerHistName = "factorization_ht1200/Pass_RA2dphi_HT1200";
-		denomHistName = "factorization_ht1200/Fail_1";
-
-		QCDsyst1_numerHistName    = numerHistName;
-		QCDsyst1_denomHistName    = "factorization_ht1200/Syst1_Fail_ht1200";
-		//QCDsyst1_denomHistName    = "factorization_ht500/Syst1_Fail_ht500";
-		qcdsyst1_sidebandHistName = "factorization_ht1200/Syst1_Fail_1200HT1400_fineBin";
-		QCDsyst2_numerHistName    = numerHistName;
-		QCDsyst2_denomHistName    = "factorization_ht1200/Syst2_Fail_ht1200";
-		qcdsyst2_sidebandHistName = "factorization_ht1200/Syst2_Fail_1200HT1400_fineBin";
-		sideband_hist_name        = "factorization_ht1200/Fail_lt_point2_1200HT1400";
-
+		dirName = "factorization/HT1200to1400/";
 
 	} else if (htBin == 5) { //ht>1400
 		HTlabel += 1400;
-		numerHistName = "factorization_ht1400/Pass_RA2dphi_HT1400";
-		denomHistName = "factorization_ht1400/Fail_1";
-
-		QCDsyst1_numerHistName    = numerHistName;
-		QCDsyst1_denomHistName    = "factorization_ht1400/Syst1_Fail_HT1400";
-		//QCDsyst1_denomHistName    = "factorization_ht500/Syst1_Fail_ht500";
-		qcdsyst1_sidebandHistName = "factorization_ht1400/Syst1_Fail_HT1400_fineBin";
-		QCDsyst2_numerHistName    = numerHistName;
-		QCDsyst2_denomHistName    = "factorization_ht1400/Syst2_Fail_HT1400";
-		qcdsyst2_sidebandHistName = "factorization_ht1400/Syst2_Fail_HT1400_fineBin";
-		sideband_hist_name        = "factorization_ht1400/Fail_lt_point2";
-
+		dirName = "factorization/HT1400to7000/";
 
 	} else 
 	{
 		assert (false && "This HT bin is not defined!!!");
 	}
 
+	if (dirName.length()<1) assert(false && "dirName is empty!!");
+
+	numerHistName             += dirName; 
+	denomHistName             += dirName; 
+	QCDsyst1_denomHistName    += dirName; 
+	qcdsyst1_sidebandHistName += dirName; 
+	QCDsyst2_denomHistName    += dirName; 
+	qcdsyst2_sidebandHistName += dirName; 
+	sideband_hist_name        += dirName;   
+
+
+	numerHistName             += "signal";
+	denomHistName             += "fail1";
+	QCDsyst1_numerHistName     = numerHistName;
+	QCDsyst1_denomHistName    += "sidebandSyst1";
+	qcdsyst1_sidebandHistName += "sidebandSyst1_fineBin";
+	QCDsyst2_numerHistName     = numerHistName;
+	QCDsyst2_denomHistName    += "sidebandSyst2";
+	qcdsyst2_sidebandHistName += "sidebandSyst2_fineBin";
+	sideband_hist_name        += "failFineBin1";
+
+
+
+	cout << "Using numerHistName = " << numerHistName << endl;
+	cout << "Using denomHistName = " << denomHistName << endl;
 
 	histPassOrig = dynamic_cast<TH1*> (dataRootFile->Get(numerHistName.c_str()));
 	histFailOrig = dynamic_cast<TH1*> (dataRootFile->Get(denomHistName.c_str()));
@@ -839,14 +852,24 @@ void makeExpModelPredFromData(const int htBin=1, const int model = 1,
 	/********************************************/
 	//substract EWK contamination
 	/********************************************/
+	Predictions_t dataInNumer_b4 = GetExlcusiveBinContents(HIST_numer);
+	Predictions_t dataInDenom_b4 = GetExlcusiveBinContents(HIST_denom);
 
-	SubstractEWK  (HIST_numer, numerHistName);
-	SubstractTTbar(HIST_numer, numerHistName);
-	SubstractZnn  (HIST_numer, numerHistName);
-	SubstractEWK  (HIST_denom, denomHistName);
-	SubstractTTbar(HIST_denom, denomHistName);
-	SubstractZnn  (HIST_denom, denomHistName);
+	Predictions_t ewkInNumerator   = SubstractEWK  (HIST_numer, numerHistName);
+	Predictions_t ttbarInNumerator = SubstractTTbar(HIST_numer, numerHistName);
+	Predictions_t znnInNumerator   = SubstractZnn  (HIST_numer, numerHistName);
+	Predictions_t ewkInDenom   = SubstractEWK  (HIST_denom, denomHistName);
+	Predictions_t ttbarInDenom = SubstractTTbar(HIST_denom, denomHistName);
+	Predictions_t znnInDenom   = SubstractZnn  (HIST_denom, denomHistName);
+
+	Predictions_t dataInNumer_a4 = GetExlcusiveBinContents(HIST_numer);
+	Predictions_t dataInDenom_a4 = GetExlcusiveBinContents(HIST_denom);
+
 	HIST_numer->Divide(HIST_denom);
+
+
+	Predictions_t dataRatio = GetExlcusiveBinContents(HIST_numer);
+
 	HIST_numer->GetXaxis()->SetRangeUser(50,500);
 
 
@@ -945,6 +968,9 @@ void makeExpModelPredFromData(const int htBin=1, const int model = 1,
 
 	TH1* qcdsyst1_sideband_hist    = dynamic_cast<TH1*> (dataRootFile->Get(qcdsyst1_sidebandHistName.c_str()));
 	assert(qcdsyst1_sideband_hist != NULL && "Syst1_Fail_500HT800 not found!");
+	SubstractEWK  (qcdsyst1_sideband_hist, qcdsyst1_sidebandHistName);
+	SubstractTTbar(qcdsyst1_sideband_hist, qcdsyst1_sidebandHistName);
+	SubstractZnn  (qcdsyst1_sideband_hist, qcdsyst1_sidebandHistName);
 	Predictions_t pred_HT500to800_qcdSyst1 = GetPredictions(qcdsyst1_sideband_hist, QCDsyst1_gausFitFunc);
 	
 //	TH1* qcdsyst2_sideband_hist    = dynamic_cast<TH1*> (dataRootFile->Get(qcdsyst2_sideband_hist.c_str()));
@@ -961,6 +987,7 @@ void makeExpModelPredFromData(const int htBin=1, const int model = 1,
 
 	if (model == 1) cout << " ================ GAUS MODEL ==================";
 	else cout << " ================ EXPO MODEL ==================";
+
 	if (htBin == 1) cout << "\n\n >>>>>> 500<HT<800 PREDICTIONS " << endl; 
 	else if (htBin == 2) cout << "\n\n >>>>>> 800<HT<1000 PREDICTIONS " << endl; 
 	else if (htBin == 3) cout << "\n\n >>>>>> 1000<HT<1200 PREDICTIONS " << endl; 
@@ -968,7 +995,17 @@ void makeExpModelPredFromData(const int htBin=1, const int model = 1,
 	else if (htBin == 5) cout << "\n\n >>>>>> HT>1400 PREDICTIONS " << endl; 
 
 	PrintResults(pred_HT500to800, pred_HT500to800_qcdSyst1, pred_HT500to800_Cup_syst, pred_HT500to800_Cdown_syst);
+	PrintBackgrounds(dataInNumer_b4, dataInNumer_a4, ewkInNumerator, ttbarInNumerator, znnInNumerator);
+	PrintBackgrounds(dataInDenom_b4, dataInDenom_a4, ewkInDenom, ttbarInDenom, znnInDenom);
+	cout << "====== Final Ratio Plot Values =======" << endl;
+	PrintExclPredictions(dataRatio);
 
 
 }
 
+
+void makeAllPlots()
+{
+for (int bin=1; bin <=5; ++bin)
+	 makeExpModelPredFromData(bin, 1);
+}

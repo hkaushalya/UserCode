@@ -3,8 +3,11 @@
 *  framework and when I make the final hitsts.
 *  Author: Sam Hewamanage <samantha@fnal.gov>
 ********************************************************************
-*	$Id: CommonTools.cc,v 1.3 2010/03/18 15:34:45 samantha Exp $
+*	$Id: CommonTools.cc,v 1.1 2012/03/16 16:21:23 samantha Exp $
 *	$Log: CommonTools.cc,v $
+*	Revision 1.1  2012/03/16 16:21:23  samantha
+*	my tools package.
+*
 *	Revision 1.3  2010/03/18 15:34:45  samantha
 *	ADDED: 1. Two overloaded GetMaxBinContent() method to find the contents of the
 *	maximum bin in a hist or a set of hists.
@@ -528,3 +531,6 @@ TCanvas* MakeNicePlot(TH1* PLOT1, TH1* PLOT2, const bool logScale)
 
 	return c1;
 }
+
+
+

@@ -24,11 +24,12 @@ const static float fDATA_LUMI  = 4650.0; //pb-1
 const static float fZNN_LUMI   = 3067017.0/42.8;              //x-sec from note, Anwar hd used 32.92 pb-1 LO
 //const static string sDATA_FILE_NAME = "Data_MyPrescaleWgted.root"; //used in AN 02-08-2011
 //PU wgted samples
-const static string sDATA_FILE_NAME  = "Data_465_PrescaleWgted_DphiBugFixed_03012012.root"; 
-const static string sWJET_HT250TO300_FILE_NAME  = "Wjets_HT250to300_Fall11_PUwgted_DphiBugFixed_03012012.root";  //Fall 11 sample
-const static string sWJET_HT300TOINF_FILE_NAME  = "Wjets_HT300toInf_Fall11_PUwgted_DphiBugFixed_03012012.root";  //Fall 11 sample
-const static string sTTBAR_FILE_NAME = "TTbar_Fall11_PUwgted_DphiBugFixed_03012012.root";  // Fall 11 sample
-const static string sZNN_FILE_NAME   = "Zjets_Summ11_PUwgted_DphiBugFixed_03012012.root";    // Summer 11 sample
+const static string sDATA_FILE_NAME  = "Data_465_PrescaleWgted_03162012.root"; 
+const static string sWJET_HT250TO300_FILE_NAME  = "Wjets_HT250to300_Fall11_PUwgted_03162012.root";  //Fall 11 sample
+const static string sWJET_HT300TOINF_FILE_NAME  = "Wjets_HT300toInf_Fall11_PUwgted_03162012.root";  //Fall 11 sample
+const static string sTTBAR_FILE_NAME = "TTbar_Fall11_PUwgted_03162012.root";  // Fall 11 sample
+const static string sZNN_FILE_NAME   = "Zjets_Summ11_PUwgted_03162012.root";    // Summer 11 sample
+
 const static float fWJETS_HT250TO300_LUMI =  9831277.0 / (248.7 * 0.14); 
 const static float fWJETS_HT300TOINF_LUMI =  5363746.0 / (317.0 * 0.153); 
 const static float fTTBAR_LUMI = 59590147/165.0;
@@ -201,7 +202,7 @@ void DumpHist(const TH1* hist)
 	cout << "Sum (>500) = " << sum << endl;
 }
 
-void overLayBackgrounds(const string histname, const string title, const int rebin=1, const string epsname="") 
+void overLayBackgrounds(const string histname, const string title, const int rebin=1, const string epsname="", const bool logScale =1) 
 {
 
 	TH1 *histDataOrig = 0;
@@ -325,7 +326,7 @@ void overLayBackgrounds(const string histname, const string title, const int reb
 
 
 	new TCanvas();
-	gPad->SetLogy();
+	if (logScale) gPad->SetLogy();
 	hs->Draw("HIST");
 	totBgHist->Draw("same");
 	histDataOrig->Draw("same");
@@ -338,6 +339,27 @@ void overLayBackgrounds(const string histname, const string title, const int reb
 
 void overLayBackgrounds()
 {
+
+	const bool logScale = 0;
+	const int rebin = 4;
+	overLayBackgrounds("factnomht/HT500to800/dphiMin", "500<HT<800 GeV, MHT>0 GeV;#delta #phi_{min};Events;", rebin, "HT500to800_nomht_dphimin_linear.eps", logScale);
+	overLayBackgrounds("factnomht/HT800to1000/dphiMin", "800<HT<1000 GeV, MHT>0 GeV;#delta #phi_{min};Events;", rebin, "HT800to1000_nomht_dphimin_linear.eps", logScale);
+	overLayBackgrounds("factnomht/HT1000to1200/dphiMin", "1000<HT<1200 GeV, MHT>0 GeV;#delta #phi_{min};Events;", rebin, "HT1000to1200_nomht_dphimin_linear.eps", logScale);
+	overLayBackgrounds("factnomht/HT1200to1400/dphiMin", "1200<HT<1400 GeV, MHT>0 GeV;#delta #phi_{min};Events;", rebin, "HT1200to1400_nomht_dphimin_linear.eps", logScale);
+	overLayBackgrounds("factnomht/HT1400to7000/dphiMin", "HT>1400 GeV, MHT>0 GeV;#delta#phi_{min};Events;", rebin, "HT1400to7000_nomht_dphimin_linear.eps", logScale);
+
+	overLayBackgrounds("factmht200/HT500to800/dphiMin", "500<HT<800 GeV, MHT>200 GeV;#delta #phi_{min};Events;", rebin, "HT500to800_MHT200_dphimin_linear.eps", logScale);
+	overLayBackgrounds("factmht200/HT800to1000/dphiMin", "800<HT<1000 GeV, MHT>200 GeV;#delta #phi_{min};Events;", rebin, "HT800to1000_MHT200_dphimin_linear.eps", logScale);
+	overLayBackgrounds("factmht200/HT1000to1200/dphiMin", "1000<HT<1200 GeV, MHT>200 GeV;#delta #phi_{min};Events;", rebin, "HT1000to1200_MHT200_dphimin_linear.eps", logScale);
+	overLayBackgrounds("factmht200/HT1200to1400/dphiMin", "1200<HT<1400 GeV, MHT>200 GeV;#delta #phi_{min};Events;", rebin, "HT1200to1400_MHT200_dphimin_linear.eps", logScale);
+	overLayBackgrounds("factmht200/HT1400to7000/dphiMin", "HT>1400 GeV, MHT>200 GeV;#delta#phi_{min};Events;", rebin, "HT1400to7000_MHT200_dphimin_linear.eps", logScale);
+
+	overLayBackgrounds("factmht350/HT500to800/dphiMin", "500<HT<800 GeV, MHT>350 GeV;#delta #phi_{min};Events;", rebin, "HT500to800_MHT350_dphimin_linear.eps", logScale);
+	overLayBackgrounds("factmht350/HT800to1000/dphiMin", "800<HT<1000 GeV, MHT>350 GeV;#delta #phi_{min};Events;", rebin, "HT800to1000_MHT350_dphimin_linear.eps", logScale);
+	overLayBackgrounds("factmht350/HT1000to1200/dphiMin", "1000<HT<1200 GeV, MHT>350 GeV;#delta #phi_{min};Events;", rebin, "HT1000to1200_MHT350_dphimin_linear.eps", logScale);
+	overLayBackgrounds("factmht350/HT1200to1400/dphiMin", "1200<HT<1400 GeV, MHT>350 GeV;#delta #phi_{min};Events;", rebin, "HT1200to1400_MHT350_dphimin_linear.eps", logScale);
+	overLayBackgrounds("factmht350/HT1400to7000/dphiMin", "HT>1400 GeV, MHT>350 GeV;#delta#phi_{min};Events;", rebin, "HT1400to7000_MHT350_dphimin_linear.eps", logScale);
+
 //	overLayBackgrounds("factorization_ht500/Pass_RA2dphi_HT500", "HT>500 GeV: Events passing |#Delta#phi(jet 1-2, MHT)|>0.5 & |#Delta#phi(jet 3, MHT)|>0.3;MHT [GeV];Events;", 1, "ht500_pass.eps");
 //	overLayBackgrounds("factorization_ht500/Fail_1", "HT>500 GeV: Events passing |#Delta#phi(jet 1-3, MHT)|<0.2;MHT [GeV];Events;", 1, "ht500_fail.eps");
 //	overLayBackgrounds("factorization_ht500/mht", "HT>500 GeV: Events passing RA2 Selection Except #Delta#Phi;MHT [GeV];Events;", 8, "ht500_mht.eps");
@@ -360,7 +382,7 @@ void overLayBackgrounds()
 	overLayBackgrounds("factorization_ht800/pf30_jet3_pt", "HT>800 GeV: Events passing RA2 Selection Except #Delta#Phi;Jet3 P_{T} [GeV];Events;", 4, "ht800_jet3pt.eps");
 */
 
-	overLayBackgrounds("factorization_ht1000/mht", "HT>1000 GeV: Events passing RA2 Selection Except #Delta#Phi;MHT [GeV];Events;", 8, "ht1000_mht.eps");
+/*	overLayBackgrounds("factorization_ht1000/mht", "HT>1000 GeV: Events passing RA2 Selection Except #Delta#Phi;MHT [GeV];Events;", 8, "ht1000_mht.eps");
 	overLayBackgrounds("factorization_ht1000/ht", "HT>1000 GeV: Events passing RA2 Selection Except #Delta#Phi; HT [GeV];Events;", 1, "ht1000_ht.eps");
 	overLayBackgrounds("factorization_ht1000/njet_et50eta24", "HT>1000 GeV: Events passing RA2 Selection Except #Delta#Phi;NJet [E_{T}>50 GeV & | #eta |<2.5];Events;", 1, "ht1000_njet.eps");
 	overLayBackgrounds("factorization_ht1000/pf30_jet1_pt", "HT>1000 GeV: Events passing RA2 Selection Except #Delta#Phi;Jet1 P_{T} [GeV];Events;", 4, "ht1000_jet1pt.eps");
@@ -373,4 +395,5 @@ void overLayBackgrounds()
 	overLayBackgrounds("factorization_ht1200/pf30_jet1_pt", "HT>1200 GeV: Events passing RA2 Selection Except #Delta#Phi;Jet1 P_{T} [GeV];Events;", 4, "ht1200_jet1pt.eps");
 	overLayBackgrounds("factorization_ht1200/pf30_jet2_pt", "HT>1200 GeV: Events passing RA2 Selection Except #Delta#Phi;Jet2 P_{T} [GeV];Events;", 4, "ht1200_jet2pt.eps");
 	overLayBackgrounds("factorization_ht1200/pf30_jet3_pt", "HT>1200 GeV: Events passing RA2 Selection Except #Delta#Phi;Jet3 P_{T} [GeV];Events;", 4, "ht1200_jet3pt.eps");
+*/
 }

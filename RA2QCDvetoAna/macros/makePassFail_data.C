@@ -17,30 +17,53 @@
 using namespace std;
 
 const static float fDATA_LUMI  = 4650.0; //pb-1
-//const static float fDATA_LUMI  = 1150.0; //pb-1
-const static float fEWK_LUMI   = 81352581.0/31300.0;        // 31300 pb for NLO xsec and total number of events is 81352581 (sample1+sample2)
-const static float fTTBAR_LUMI = 3701947.0/165.0;
-const static float fZNN_LUMI   = 3067017.0/42.2;              //x-sec from note, Anwar hd used 32.92 pb-1 LO
+//const static float fWJETS_LUMI   = 81352581.0/31300.0; // 31300 pb for NLO xsec and total number of events is 81352581 (sample1+sample2)
+//const static float fTTBAR_LUMI = 3701947.0/165.0;
+//const static float fZNN_LUMI   = 3067017.0/42.8;     //x-sec from note, Anwar hd used 32.92 pb-1 LO
+																	  //2-23-12, Seema said this should be 42.8 not 42.2
 //const static string sDATA_FILE_NAME  = "Data.root";
 //const static string sDATA_FILE_NAME  = "Data_SmearedJetsNoPrescaleWgts.root";
 //const static string sDATA_FILE_NAME  = "Data_PreScaleWgted.root";
 //const static string sDATA_FILE_NAME  = "Data_1stfb_12052011.root";
 //const static string sWJET_FILE_NAME  = "EWKmc.root";
 //const static string sDATA_FILE_NAME = "SmearedJetsWithPrescaleWgts.root";
-const static string sDATA_FILE_NAME = "Data_MyPrescaleWgted.root";
-const static string sWJET_FILE_NAME  = "WJetsMC.root";
-const static string sTTBAR_FILE_NAME = "TTbarMC.root";
-const static string sZNN_FILE_NAME   = "ZnnMC.root";
+//const static string sDATA_FILE_NAME = "Data_MyPrescaleWgted.root"; //used in AN 02-08-2011
+//const static string sDATA_FILE_NAME = "Data_SmearedRecoJetsWithPrescaleWgts.root";
+//const static string sWJET_FILE_NAME  = "WJetsMC.root";
+//const static string sTTBAR_FILE_NAME = "TTbarMC.root";
+//const static string sZNN_FILE_NAME   = "ZnnMC.root";
+//PU wgted samples
+//const static string sWJET_FILE_NAME  = "Wjets_PUwgted.root";
+//const static string sTTBAR_FILE_NAME = "TTbar_PUwgted.root";
+//const static string sZNN_FILE_NAME   = "Znn_PUwgted.root";
+
+//PU weighted, MHT binned, Fall 11 samples, dPhi calculated using all jets Et>30 GeV && |eta|<5.0
+const static float fWJETS_HT250TO300_LUMI =  9831277.0 / (248.7 * 0.14); 
+const static float fWJETS_HT300TOINF_LUMI =  5363746.0 / (317.0 * 0.153); 
+const static float fTTBAR_LUMI = 59590147/165.0;
+const static float fZNN_LUMI   = 3067017.0/42.8;     //x-sec from note, Anwar hd used 32.92 pb-1 LO
+const static string sDATA_FILE_NAME  = "Data_465_PrescaleWgted_DphiBugFixed_03012012.root"; 
+const static string sWJET_HT250TO300_FILE_NAME  = "Wjets_HT250to300_Fall11_PUwgted_DphiBugFixed_03012012.root";  //Fall 11 sample
+const static string sWJET_HT300TOINF_FILE_NAME  = "Wjets_HT300toInf_Fall11_PUwgted_DphiBugFixed_03012012.root";  //Fall 11 sample
+const static string sTTBAR_FILE_NAME = "TTbar_Fall11_PUwgted_DphiBugFixed_03012012.root";  // Fall 11 sample
+const static string sZNN_FILE_NAME   = "Zjets_Summ11_PUwgted_DphiBugFixed_03012012.root";    // Summer 11 sample
+
 const static float passFailRatio_fitrange_xmin = 50.0;
 const static float passFailRatio_fitrange_xmax = 150.0;
 std::vector<float> incMHTBins;
 const static int nMHTbins = 5;
 const static float arrMHTbins[nMHTbins] = {200,350,500,600,7000};
 float CONST_C      = 0.0217;
-//float CONST_C      = 0.03;
-float CONST_C_UP   = 0.07;
-float CONST_C_DOWN = 0.012;
-//float CONST_C = 0.03;
+//float CONST_C_UP   = 0.07;  //2010 values
+//float CONST_C_DOWN = 0.012; //2010 values
+//float CONST_C_UP   = 0.0304145;
+//oat CONST_C_DOWN = CONST_C_UP - CONST_C;
+
+//ASSIGN 100% ERROR see TWIKI answer we provided (Jan 26th, 2012)
+const float CONST_C_UP 	 = CONST_C + CONST_C;
+const float CONST_C_DOWN = CONST_C - CONST_C;
+
+
 struct Predictions_t
 {
 		float incl_mean[nMHTbins];
@@ -64,7 +87,7 @@ void PrintExclPredictions(const Predictions_t& res)
 			const float statErr = res.excl_statErr[i];
 
 		cout << setprecision(3) << setw(15) << incMHTBins.at(i) << "<MHT<" << incMHTBins.at(i+1) 
-					<< setw(10) << mean << " $&\\pm$ " 
+					<< setw(10) << mean << " $\\pm$ " 
 					<< setw(10) << statErr
 					<< endl;
 	}
@@ -250,13 +273,44 @@ Predictions_t GetExlcusiveBinContents(const TH1* hist)
 	return results;
 }
 
+void ScaleWJetsByLumi(TH1* hist)
+{
+//	hist->Scale(fDATA_LUMI/fWJETS_LUMI);	
+}
+void ScaleTTbarByLumi(TH1* hist)
+{
+	hist->Scale(fDATA_LUMI/fTTBAR_LUMI);	
+}
+void ScaleZnnByLumi(TH1* hist)
+{
+	hist->Scale(fDATA_LUMI/fZNN_LUMI);	
+}
 
+//this is to get backgrounds in signal reagions to compare with others
+void BackgroundsInSignalRegions(const std::string hist, Predictions_t& wjetsPred,
+                              Predictions_t& ttbarPred,
+                              Predictions_t& znnPred)
+{
+/*	TH1* ht500to800_wjets_signal    = dynamic_cast<TH1*> (wjetsRootFile->Get(ht500SignalRegionHist.c_str()));
+	assert(ht500to800_wjets_signal != NULL && "sWJET_FILE_NAME:: Fail_lt_point2_500HT800 not found!");
+	TH1* ht500to800_ttbar_signal    = dynamic_cast<TH1*> (ttbarRootFile->Get(ht500SignalRegionHist.c_str()));
+	assert(ht500to800_ttbar_signal != NULL && "sTTBAR_FILE_NAME:: Fail_lt_point2_500HT800 not found!");
+	TH1* ht500to800_znn_signal    = dynamic_cast<TH1*> (znnRootFile->Get(ht500SignalRegionHist.c_str()));
+	assert(ht500to800_znn_signal != NULL && "sZNN_FILE_NAME:: Fail_lt_point2_500HT800 not found!");
+	ht500to800_wjets_signal->Scale(fDATA_LUMI/fWJETS_LUMI);
+	ht500to800_ttbar_signal->Scale(fDATA_LUMI/fTTBAR_LUMI);
+	ht500to800_znn_signal->Scale(fDATA_LUMI/fZNN_LUMI);
 
+	Predictions_t ht500to800_wjetsInSignalRegions = GetExlcusiveBinContents(ht500to800_wjets_signal);
+	Predictions_t ht500to800_ttbarInSignalRegions = GetExlcusiveBinContents(ht500to800_ttbar_signal);
+	Predictions_t ht500to800_znnInSignalRegions = GetExlcusiveBinContents(ht500to800_znn_signal);
+*/
+}
 
 
 Predictions_t SubstractZnn(TH1* hist, const string histname)
 {
-	TFile* znnFile = new TFile(sTTBAR_FILE_NAME.c_str());
+	TFile* znnFile = new TFile(sZNN_FILE_NAME.c_str());
 	if (znnFile->IsZombie()) { cout << "TTbar file not found!" << endl; assert (false); }
 
 	TH1* znnHist = dynamic_cast<TH1*> (znnFile->Get(histname.c_str()));
@@ -275,7 +329,7 @@ Predictions_t SubstractZnn(TH1* hist, const string histname)
 	hist->DrawCopy("same");
 */
 	Predictions_t znnBinCont =  GetExlcusiveBinContents(znnHist);
-	//PrintExclPredictions(ewkBinCont);
+   PrintExclPredictions(znnBinCont);
 
 	hist->Add(znnHist, -1);
 
@@ -304,7 +358,7 @@ Predictions_t SubstractTTbar(TH1* hist, const string histname)
 	hist->DrawCopy("same");
 */
 	Predictions_t ttbarBinCont =  GetExlcusiveBinContents(ttbarHist);
-	//PrintExclPredictions(ewkBinCont);
+	PrintExclPredictions(ttbarBinCont);
 
 	hist->Add(ttbarHist, -1);
 
@@ -314,25 +368,34 @@ Predictions_t SubstractTTbar(TH1* hist, const string histname)
 
 Predictions_t SubstractEWK(TH1* hist, const string ewkhistname)
 {
-	TFile* ewkFile = new TFile(sWJET_FILE_NAME.c_str());
-	if (ewkFile->IsZombie()) { cout << "EWK file not found!" << endl; assert (false); }
+	//TFile* ewkFile = new TFile(sWJET_FILE_NAME.c_str());
+	TFile* ewkFile1 = new TFile(sWJET_HT250TO300_FILE_NAME.c_str());
+	TFile* ewkFile2 = new TFile(sWJET_HT300TOINF_FILE_NAME.c_str());
+	if (ewkFile1->IsZombie()) { cout << "EWK file 1 not found!" << endl; assert (false); }
+	if (ewkFile2->IsZombie()) { cout << "EWK file 2 not found!" << endl; assert (false); }
 
-	TH1* ewkHist = dynamic_cast<TH1*> (ewkFile->Get(ewkhistname.c_str()));
-	if (ewkHist == NULL) { cout << "EWK hist " << ewkhistname << " not found!" << endl; assert (false); }
-	ewkHist->Sumw2();
+	TH1* ewkHist1 = dynamic_cast<TH1*> (ewkFile1->Get(ewkhistname.c_str()));
+	if (ewkHist1 == NULL) { cout << "EWK hist " << ewkhistname << " not found in ewkFile 1!" << endl; assert (false); }
+	ewkHist1->Sumw2();
+	TH1* ewkHist2 = dynamic_cast<TH1*> (ewkFile2->Get(ewkhistname.c_str()));
+	if (ewkHist2 == NULL) { cout << "EWK hist " << ewkhistname << " not found in ewkFile 2!" << endl; assert (false); }
+	ewkHist2->Sumw2();
 	//new TCanvas();
 	//ewkHist->DrawCopy();
 
-	const float int_b4 = ewkHist->Integral(); 
-	const float scale  = fDATA_LUMI/fEWK_LUMI;
+	const float int_b4 = ewkHist1->Integral(); 
+	const float scale1  = fDATA_LUMI/fWJETS_HT250TO300_LUMI;
+	const float scale2  = fDATA_LUMI/fWJETS_HT300TOINF_LUMI;
 
-	ewkHist->Scale(scale);
-	std::cout << __FUNCTION__ << ": scale = " << scale<< ":: EWK Integral b4/a4= "<< int_b4  << "/" << ewkHist->Integral() << std::endl; 
+	ewkHist1->Scale(scale1);
+	ewkHist2->Scale(scale2);
+	ewkHist1->Add(ewkHist2,1);
+	std::cout << __FUNCTION__ << ": scale1/scale2 = " << scale1 << "/" << scale2 << ":: EWK Integral b4/a4= "<< int_b4  << "/" << ewkHist1->Integral() << std::endl; 
 
-	Predictions_t ewkBinCont =  GetExlcusiveBinContents(ewkHist);
-	//PrintExclPredictions(ewkBinCont);
+	Predictions_t ewkBinCont =  GetExlcusiveBinContents(ewkHist1);
+	PrintExclPredictions(ewkBinCont);
 
-	hist->Add(ewkHist, -1);
+	hist->Add(ewkHist1, -1);
 
 	return ewkBinCont;
 }
@@ -377,12 +440,26 @@ void DumpHist(const TH1* hist)
 double expFitFunc(double *x, double *par)
 {
 	double fitval=0.0;
-	//if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + 0.03;
-	//if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + 0.0217;
 	if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + CONST_C;
 	else fitval=-1.0E6;
 	return fitval;
 }
+double expFitFunc_Cup(double *x, double *par)
+{
+	double fitval=0.0;
+	if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + CONST_C_UP;
+	else fitval=-1.0E6;
+	return fitval;
+}
+double expFitFunc_Cdown(double *x, double *par)
+{
+	double fitval=0.0;
+	if(x[0]>0.0) fitval=par[0] * exp(par[1] * x[0]) + CONST_C_DOWN;
+	else fitval=-1.0E6;
+	return fitval;
+}
+
+
 
 double gausFitFunc(double *x, double *par)
 {
@@ -522,8 +599,8 @@ TF1* FitPassFailRatio(TH1* hist,
 
 	//fit range
 	stringstream newtitle;
-	newtitle << "Fit Range " << passFailRatio_fitrange_xmin << "--" << passFailRatio_fitrange_xmax << " GeV " << title;
-	//newtitle << ";MHT;Ratio (r)";
+	//newtitle << "Fit Range " << passFailRatio_fitrange_xmin << "--" << passFailRatio_fitrange_xmax << " GeV " << title;
+	newtitle << ";#slash{H}_{T} [GeV];Ratio (r);";
 	cout << __FUNCTION__ << ":: Fitting Range = " << passFailRatio_fitrange_xmin << " - " << passFailRatio_fitrange_xmax << endl;
 
 	gStyle->SetOptStat(0);
@@ -539,7 +616,19 @@ TF1* FitPassFailRatio(TH1* hist,
 	gStyle->SetOptFit(1);
 	//hist->SetStats(0);
 	hist->GetYaxis()->SetRangeUser(1e-2,10);
+	hist->GetXaxis()->SetRangeUser(50,490);
 	hist->Draw();
+
+	TF1 *expFit=new TF1("fit_1",expFitFunc,passFailRatio_fitrange_xmin,passFailRatio_fitrange_xmax,2);
+	expFit->SetParameter(0,0.09);
+	expFit->SetParameter(1,-0.0002);
+	hist->Fit(expFit,"E0","",passFailRatio_fitrange_xmin, passFailRatio_fitrange_xmax);
+	gPad->Modified();
+	gPad->Update();
+	TPaveStats *e_stats = (TPaveStats*) hist->FindObject("stats");
+	e_stats->SetTextColor(kRed);
+	TPaveStats *exp_stats = (TPaveStats*) e_stats->Clone("exp_stats");
+
 
 	TF1 *gausFit = new TF1("gausFit",gausFitFunc, passFailRatio_fitrange_xmin, passFailRatio_fitrange_xmax,2);
 	gausFit->SetParameter(0,0.09); 
@@ -552,17 +641,33 @@ TF1* FitPassFailRatio(TH1* hist,
 	TPaveStats *gaus_stats = (TPaveStats*) hist->FindObject("stats");
 	gaus_stats->SetTextColor(kGreen);
 
+	TF1 *expFitResult=new TF1("fit_2",expFitFunc,50,1000.0,2);
+	expFitResult->SetParameter(0,expFit->GetParameter(0));
+	expFitResult->SetParameter(1,expFit->GetParameter(1));
+	expFitResult->SetLineColor(kRed);
+	expFitResult->SetLineWidth(2);
+	expFitResult->SetParameters( expFit->GetParameters()); 
+	expFitResult->SetParErrors ( expFit->GetParErrors() );
+	expFitResult->SetChisquare ( expFit->GetChisquare() );
+	expFitResult->SetNDF       ( expFit->GetNDF()       );
+	expFitResult->SetLineColor ( kRed                    );
+	expFitResult->SetLineWidth ( 2                       );
+	expFitResult->DrawCopy     ( "same"                  );
+
+
+
 	TF1 *gausFitResult = new TF1("GausFitResult",gausFitFunc,50,1000.0,2);
 	gausFitResult->SetParameters( gausFit->GetParameters()); 
 	gausFitResult->SetParErrors ( gausFit->GetParErrors() );
 	gausFitResult->SetChisquare ( gausFit->GetChisquare() );
 	gausFitResult->SetNDF       ( gausFit->GetNDF()       );
 	gausFitResult->SetLineColor ( kGreen                  );
-	gausFitResult->SetLineWidth ( 1                       );
+	gausFitResult->SetLineWidth ( 2                       );
 	gausFitResult->DrawCopy     ( "same"                  );
 
-	TLegend *leg  = new TLegend(0.7,0.8,0.9,0.9);
+	TLegend *leg  = new TLegend(0.68,0.7,0.9,0.9);
 	leg->AddEntry(gausFitResult,"Gaussian Model");
+	leg->AddEntry(expFitResult,"Exponential Model");
 	leg->Draw();
 
 	const float xmin=0.2, xmax=0.45, ymin=0.7, ymax=0.9;
@@ -571,12 +676,20 @@ TF1* FitPassFailRatio(TH1* hist,
 	gaus_stats->SetY1NDC(ymin);
 	gaus_stats->SetY2NDC(ymax);
 	gaus_stats->Draw("same");
+	exp_stats->SetX1NDC(xmax);
+	exp_stats->SetX2NDC(xmax+0.22);
+	exp_stats->SetY1NDC(ymin);
+	exp_stats->SetY2NDC(ymax);
+	exp_stats->Draw("same");
+	//overlay the exponential model as well
+
 
 	stringstream epsname;
 	epsname << printName << "_fitrange_" << passFailRatio_fitrange_xmin << "to" << passFailRatio_fitrange_xmax << ".eps";
 	gPad->Print(epsname.str().c_str());
 
-	return gausFitResult;
+	//return gausFitResult;
+	return expFitResult;
 }
 
 void makePassFail_data(const float fitrange_xmin = 50, const float fitrange_xmax = 150) 
@@ -588,15 +701,24 @@ void makePassFail_data(const float fitrange_xmin = 50, const float fitrange_xmax
 	TH1 *histPassOrig = 0;
 	TH1 *histFailOrig = 0;
 
-	TFile* dataRootFile = new TFile (sDATA_FILE_NAME.c_str());
-	if (dataRootFile->IsZombie())
-	{
-		cout << "Data root file not found!" <<  endl;
-		assert (false);
-	}
+	TFile* dataRootFile  = new TFile (sDATA_FILE_NAME.c_str());
+//	TFile* wjetsRootFile = new TFile (sWJET_FILE_NAME.c_str());
+	TFile* ttbarRootFile = new TFile (sTTBAR_FILE_NAME.c_str());
+	TFile* znnRootFile   = new TFile (sZNN_FILE_NAME.c_str());
+	if (dataRootFile->IsZombie()) { cout << "Data root file not found!" <<  endl; assert (false); }
+//	if (wjetsRootFile->IsZombie()) { cout << "wjets root file not found!" <<  endl; assert (false); }
+	if (ttbarRootFile->IsZombie()) { cout << "ttbar root file not found!" <<  endl; assert (false); }
+	if (znnRootFile->IsZombie()) { cout << "znn root file not found!" <<  endl; assert (false); }
 
 	const std::string numerHistName("factorization_ht500/Pass_RA2dphi_HT500");
 	const std::string denomHistName("factorization_ht500/Fail_1");
+
+	//const std::string numerHistName("factorization_ht800/Pass_RA2dphi_HT800");
+	//const std::string denomHistName("factorization_ht800/Fail_1");
+	//const std::string numerHistName("factorization_ht1000/Pass_RA2dphi_HT1000");
+	//const std::string denomHistName("factorization_ht1000/Fail_1");
+	//const std::string numerHistName("factorization_ht1200/Pass_RA2dphi_HT1200");
+	//const std::string denomHistName("factorization_ht1200/Fail_1");
 
 	histPassOrig = dynamic_cast<TH1*> (dataRootFile->Get(numerHistName.c_str()));
 	histFailOrig = dynamic_cast<TH1*> (dataRootFile->Get(denomHistName.c_str()));
@@ -654,16 +776,67 @@ void makePassFail_data(const float fitrange_xmin = 50, const float fitrange_xmax
 	SubstractTTbar(HIST_denom, denomHistName);
 	SubstractZnn  (HIST_denom, denomHistName);
 	HIST_numer->Divide(HIST_denom);
-	
-	const string title = " : HT>500 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
-	TF1 *gausFit2 =  FitPassFailRatio(HIST_numer, title, "FactorizationHT500");
-	if (gausFit2 == NULL) { cout << __LINE__ << "::functions null! " << endl; assert (false); }
+	HIST_numer->GetXaxis()->SetRangeUser(50,500);
 
-	//These two are for const 'c' systematic derivations only!
-	TF1 *gausFit_Cup = new TF1("gausFit_Cup",gausFitFunc_Cup,passFailRatio_fitrange_xmin, 1500,2);
-	gausFit_Cup->SetParameters( gausFit2->GetParameters()); 
-	TF1 *gausFit_Cdown = new TF1("gausFit_Cup",gausFitFunc_Cdown, passFailRatio_fitrange_xmin, 1500,2);
-	gausFit_Cdown->SetParameters( gausFit2->GetParameters()); 	
+	/*for (int i=1; i < HIST_numer->GetNbinsX()+1; ++i)
+	{
+		cout << i  << "\t[" << HIST_numer->GetBinLowEdge(i) << "] = " << HIST_numer->GetBinContent(i)
+		 		<< "+/-" << HIST_numer->GetBinError(i) << endl;
+
+	}
+
+	HIST_numer->Draw();
+	return;
+*/
+
+	
+	//const string title = " : HT>500 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
+	//const string title = "HT>500 GeV;#slash{H}_{T} [GeV];Ratio (r);";
+
+	const bool useGaussian = true;
+
+   /***************************
+	 * this is all gaussian
+	 * ************************/
+	//if (useGaussian)
+	//{
+	/*	const string title = ";#slash{H}_{T} [GeV];Ratio (r);";
+		TF1 *gausFit2 =  FitPassFailRatio(HIST_numer, title, "FactorizationHT500");
+		if (gausFit2 == NULL) { cout << __LINE__ << "::functions null! " << endl; assert (false); }
+*/
+		//These two are for const 'c' systematic derivations only!
+	/*	cout << "gausFit_C MEAN is using c = " << CONST_C << endl;
+		cout << "gausFit_Cup is using    c+= " << CONST_C_UP << endl;
+		TF1 *gausFit_Cup = new TF1("gausFit_Cup",gausFitFunc_Cup,passFailRatio_fitrange_xmin, 1500,2);
+		gausFit_Cup->SetParameters( gausFit2->GetParameters()); 
+		cout << "gausFit_Cdown is using  c-= " << CONST_C_DOWN << endl;
+		TF1 *gausFit_Cdown = new TF1("gausFit_Cup",gausFitFunc_Cdown, passFailRatio_fitrange_xmin, 1500,2);
+		gausFit_Cdown->SetParameters( gausFit2->GetParameters()); 	
+*/
+//	} else {
+		/***************************
+		 * this is all exponetial
+		 * ************************/
+		const string title = ";#slash{H}_{T} [GeV];Ratio (r);";
+		TF1 *gausFit2 =  FitPassFailRatio(HIST_numer, title, "FactorizationHT500");
+		if (gausFit2 == NULL) { cout << __LINE__ << "::functions null! " << endl; assert (false); }
+
+		//These two are for const 'c' systematic derivations only!
+		cout << "gausFit_C MEAN is using c = " << CONST_C << endl;
+		cout << "gausFit_Cup is using    c+= " << CONST_C_UP << endl;
+		TF1 *gausFit_Cup = new TF1("gausFit_Cup",expFitFunc_Cup,passFailRatio_fitrange_xmin, 1500,2);
+		gausFit_Cup->SetParameters( gausFit2->GetParameters()); 
+		cout << "gausFit_Cdown is using  c-= " << CONST_C_DOWN << endl;
+		TF1 *gausFit_Cdown = new TF1("gausFit_Cup",expFitFunc_Cdown, passFailRatio_fitrange_xmin, 1500,2);
+		gausFit_Cdown->SetParameters( gausFit2->GetParameters()); 	
+//	}
+
+
+
+
+
+
+
 
 	/*gausFit_Cup->SetLineColor(kRed);
 	gausFit_Cdown->SetLineColor(kRed);
@@ -809,6 +982,11 @@ void makePassFail_data(const float fitrange_xmin = 50, const float fitrange_xmax
 	SubstractZnn  (ht500to800_fail, ht500to800_fail_name);
 	Predictions_t pred_HT500to800        = GetPredictions(ht500to800_fail, gausFit2);
 	Predictions_t pred_HT500to800_htSyst = GetPredictions(ht500to800_fail, HTsyst_gausFit);
+	//collection backgrounds predictions in search regions
+	const std::string ht500SignalRegionHist("factorization_ht500/Pass_RA2dphi_HT500");
+//	Predictions_t ht500to800_wjetsInSignalRegions, ht500to800_ttbarInSignalRegions, ht500to800_znnInSignalRegions;
+//   BackgroundsInSignalRegions(ht500SignalRegionHist, wjetsPred, ttbarPred, znnPred);
+
 
 	TH1* qcdsyst1_ht500to800_fail    = dynamic_cast<TH1*> (dataRootFile->Get("factorization_ht500/Syst1_Fail_500HT800_fineBin"));
 	assert(qcdsyst1_ht500to800_fail != NULL && "Syst1_Fail_500HT800 not found!");
@@ -884,6 +1062,13 @@ void makePassFail_data(const float fitrange_xmin = 50, const float fitrange_xmax
 
 	cout << "\n\n >>>>>> 500<HT<800 PREDICTIONS " << endl; 
 	PrintResults(pred_HT500to800, pred_HT500to800_htSyst, pred_HT500to800_qcdSyst1, pred_HT500to800_Cup_syst, pred_HT500to800_Cdown_syst);
+	cout << "\n\n\n\n >>>>>> backgrounds PREDICTIONS in Signal Regions" << endl; 
+	cout << "\n\n\n\n >>>>>> WJETS " << endl; 
+//   PrintExclPredictions(ht500to800_wjetsInSignalRegions);
+	cout << "\n\n\n\n >>>>>> TTbar " << endl; 
+//   PrintExclPredictions(ht500to800_ttbarInSignalRegions);
+	cout << "\n\n\n\n >>>>>> Znn " << endl; 
+//   PrintExclPredictions(ht500to800_znnInSignalRegions);
 	cout << "\n >>>>>> 800<HT<1000 PREDICTIONS " << endl; 
 	PrintResults(pred_HT800to1000, pred_HT800to1000_htSyst, pred_HT800to1000_qcdSyst1, pred_HT800to1000_Cup_syst, pred_HT800to1000_Cdown_syst);
 	cout << "\n >>>>>> 1000<HT<1200 PREDICTIONS " << endl; 

@@ -203,10 +203,12 @@ TH1* GetHist(const std::string histname, const float scaleTo=1.0)
 		{
 
 			hists[i] = dynamic_cast<TH1*> (files[i]->Get(histname.c_str()));
-			if (i<2)
+			//this is just to exclude the lowest two ht bins.
+			/*if (i<2)
 			{
 				hists[i]->Reset("ICESM");
 			}
+			*/
 
 			if (hists[i] == 0 )
 			{
@@ -409,37 +411,40 @@ void makePassFail_Pythia(const int HTbin = 1, const float fitrange_xmin = 50, co
 	std::string numeHistName("");
 	std::string denoHistName("");
 
-	float HTval = 0;
+	string HTrange("");
 	if (HTbin == 1)   //500gev
 	{
-		title +=" : HT>500 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
-		numeHistName += "factorization_ht500/Pass_RA2dphi";
-		denoHistName += "factorization_ht500/Fail_1";
-		HTval = 500;
-	} else if (HTbin == 2)  //600gev
+		title +=" : 500<HT<800 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
+		numeHistName += "factnomht/HT500to800/signal";
+		denoHistName += "factnomht/HT500to800/fail1";
+		HTrange += "500<HT<800";
+	} else if (HTbin == 2)  //800gev
 	{
-		title +=" : HT>600 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
-		numeHistName += "factorization_ht600/Pass_RA2dphi";
-		denoHistName += "factorization_ht600/Fail_1";
-		HTval = 600;
-	} else if (HTbin == 3)  //800gev
+		title +=" : 800<HT<1000 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
+		numeHistName += "factnomht/HT800to1000/signal";
+		denoHistName += "factnomht/HT800to1000/fail1";
+		HTrange = 800;
+		HTrange += "800<HT<1000";
+	} else if (HTbin == 3)  //1000gev
 	{
-		title +=" : HT>800 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
-		numeHistName += "factorization_ht800/Pass_RA2dphi";
-		denoHistName += "factorization_ht800/Fail_1";
-		HTval = 800;
-	} else if (HTbin == 4)  //1000gev
+		title +=" : 1000<HT<1200 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
+		numeHistName += "factnomht/HT1000to1200/signal";
+		denoHistName += "factnomht/HT1000to1200/fail1";
+		HTrange = 1000;
+		HTrange += "1000<HT<1200";
+	} else if (HTbin == 4)  //1200gev
 	{
-		title +=" : HT>1000 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
-		numeHistName += "factorization_ht1000/Pass_RA2dphi";
-		denoHistName += "factorization_ht1000/Fail_1";
-		HTval = 1000;
-	} else if (HTbin == 5)  //1200gev
+		title +=" : 1200<HT<1400 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
+		numeHistName += "factnomht/HT1200to1400/signal";
+		denoHistName += "factnomht/HT1200to1400/fail1";
+		HTrange = 1200;
+		HTrange += "1200<HT<1400";
+	} else if (HTbin == 5)  //1400gev
 	{
-		title +=" : HT>1200 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
-		numeHistName += "factorization_ht1200/Pass_RA2dphi";
-		denoHistName += "factorization_ht1200/Fail_1";
-		HTval = 1200;
+		title +=" : HT>1400 GeV;#slash{H}_{T};Ratio (r) = Pass(RA2 dPhi cuts) / Fail(#Delta #phi_{min}< 0.2);";
+		numeHistName += "factnomht/HT1400to7000/signal";
+		denoHistName += "factnomht/HT1400to7000/fail1";
+		HTrange += "HT>1400";
 	}
 
 	TH1 *Hist_pass = GetHist(numeHistName, scaleTo);
@@ -478,7 +483,7 @@ void makePassFail_Pythia(const int HTbin = 1, const float fitrange_xmin = 50, co
 	stringstream newtitle;
 	//newtitle << "MC Smeared Jets (Fit Range " << fitrange_xmin << "--" << fitrange_xmax << " GeV)";
 	//<< title;
-	newtitle << "HT>" << HTval << " GeV;MHT [GeV];Ratio (r);";
+	newtitle << HTrange << " GeV;MHT [GeV];Ratio (r);";
 
 
 	gStyle->SetOptStat(0);

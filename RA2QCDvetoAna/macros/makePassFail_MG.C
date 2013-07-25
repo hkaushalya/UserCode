@@ -323,6 +323,10 @@ void makePassFail_MG(const float fitrange_xmin = 50, const float fitrange_xmax =
 	pt1->AddText(exp_fit_res.str().c_str());
 //	pt1->Draw("same");
 
+
+	cout << Hist_pass->GetBinContent(Hist_pass->GetNbinsX()) << "/" << Hist_pass->GetBinError(Hist_pass->GetNbinsX());
+
+
 	stringstream epsname;
 	epsname << "factorization_fitrange_" << fitrange_xmin << "to" << fitrange_xmax << ".eps";
 	gPad->Print(epsname.str().c_str());
