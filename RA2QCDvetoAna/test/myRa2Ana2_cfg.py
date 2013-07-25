@@ -19,8 +19,8 @@ process.options = cms.untracked.PSet(
 
 
 evts2Process = 100000
-#runningOnMC = True 
-runningOnMC = False
+runningOnMC = True 
+#runningOnMC = False
 
 process.load("Configuration.StandardSequences.Geometry_cff")
 process.load("Configuration.StandardSequences.MagneticField_cff")
