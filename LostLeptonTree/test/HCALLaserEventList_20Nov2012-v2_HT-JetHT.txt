@@ -1,0 +1,393 @@
+
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<!-- ViewVC :: http://www.viewvc.org/ -->
+<head>
+<title>[CMSSW] Log of /UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt</title>
+<meta name="generator" content="ViewVC 1.0.9" />
+<link rel="stylesheet" href="/cgi-bin/cmssw.cgi/*docroot*/styles.css" type="text/css" />
+
+</head>
+<body>
+<div class="vc_navheader">
+
+<form method="get" action="/cgi-bin/cmssw.cgi/">
+
+<table style="padding:0.1em;">
+<tr>
+<td>
+<strong>
+
+<a href="/cgi-bin/cmssw.cgi/">
+
+[CMSSW]</a>
+/
+
+<a href="/cgi-bin/cmssw.cgi/UserCode/">
+
+UserCode</a>
+/
+
+<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/">
+
+kheine</a>
+/
+
+<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/">
+
+RA2Classic</a>
+/
+
+<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/">
+
+AdditionalInputFiles</a>
+/
+
+
+
+HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt
+
+
+</strong>
+
+</td>
+<td style="text-align:right;">
+
+
+<strong>Repository:</strong>
+<select name="root" onchange="submit()">
+
+
+<option value="*viewroots*">Repository Listing</option>
+
+
+
+
+
+
+
+
+
+
+<optgroup label="CVS Repositories"><option selected="selected">CMSSW</option></optgroup>
+
+
+</select>
+<input type="submit" value="Go" />
+
+</td>
+</tr>
+</table>
+
+</form>
+
+</div>
+<div style="float: right; padding: 5px;"><a href="http://www.viewvc.org/"><img src="/cgi-bin/cmssw.cgi/*docroot*/images/logo.png" alt="ViewVC logotype" width="128" height="48" /></a></div>
+<h1>Log of /UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt</h1>
+
+<p style="margin:0;">
+
+<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/"><img src="/cgi-bin/cmssw.cgi/*docroot*/images/back_small.png" width="16" height="16" alt="Parent Directory" /> Parent Directory</a>
+
+
+| <a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?view=graph"><img src="/cgi-bin/cmssw.cgi/*docroot*/images/cvsgraph_16x16.png" width="16" height="16" alt="View Revision Graph" /> Revision Graph</a>
+
+
+
+</p>
+
+<hr />
+<table class="auto">
+
+
+
+<tr>
+<td>Links to HEAD:</td>
+<td>
+(<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?view=markup">view</a>)
+(<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?view=co">download</a>)
+
+(<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?view=annotate">annotate</a>)
+</td>
+</tr>
+
+
+
+<tr>
+<td>Sticky Tag:</td>
+<td><form method="get" action="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt" style="display: inline">
+<div style="display: inline">
+<input type="hidden" name="view" value="log" />
+
+
+<select name="pathrev" onchange="submit()">
+<option value=""></option>
+
+<optgroup label="Branches">
+
+
+<option>MAIN</option>
+
+
+</optgroup>
+
+<optgroup label="Non-branch tags">
+
+
+<option>RA2_2013-01-24c</option>
+
+
+
+<option>RA2_2013-01-24b</option>
+
+
+
+<option>RA2_2013-01-24a</option>
+
+
+
+<option>RA2_2013-01-23</option>
+
+
+
+<option>RA2_2013-01-22c</option>
+
+
+
+<option>RA2_2013-01-22b</option>
+
+
+
+<option>RA2_2013-01-22</option>
+
+
+
+<option>HEAD</option>
+
+
+</optgroup>
+
+</select>
+
+<input type="submit" value="Set" />
+</div>
+</form>
+
+</td>
+</tr>
+</table>
+ 
+
+
+
+
+
+
+
+
+<div>
+<hr />
+
+<a name="rev1.1"></a>
+<a name="RA2_2013-01-22b"></a>
+<a name="RA2_2013-01-22c"></a>
+<a name="RA2_2013-01-24b"></a>
+<a name="RA2_2013-01-24c"></a>
+<a name="RA2_2013-01-24a"></a>
+<a name="RA2_2013-01-23"></a>
+<a name="RA2_2013-01-22"></a>
+<a name="HEAD"></a>
+
+
+Revision <strong>1.1</strong> -
+
+(<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?revision=1.1&amp;view=markup">view</a>)
+
+(<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?revision=1.1">download</a>)
+
+(<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?annotate=1.1">annotate</a>)
+
+
+
+- <a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?r1=1.1&amp;view=log">[select for diffs]</a>
+
+
+
+
+<br />
+
+<em>Tue Jan 22 08:58:30 2013 UTC</em> (5 weeks, 3 days ago) by <em>mschrode</em>
+
+
+<br />Branch:
+
+<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?view=log&amp;pathrev=MAIN"><strong>MAIN</strong></a>
+
+
+
+<br />CVS Tags:
+
+<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?view=log&amp;pathrev=HEAD"><strong>HEAD</strong></a>,
+
+<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?view=log&amp;pathrev=RA2_2013-01-22"><strong>RA2_2013-01-22</strong></a>,
+
+<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?view=log&amp;pathrev=RA2_2013-01-22b"><strong>RA2_2013-01-22b</strong></a>,
+
+<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?view=log&amp;pathrev=RA2_2013-01-22c"><strong>RA2_2013-01-22c</strong></a>,
+
+<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?view=log&amp;pathrev=RA2_2013-01-23"><strong>RA2_2013-01-23</strong></a>,
+
+<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?view=log&amp;pathrev=RA2_2013-01-24a"><strong>RA2_2013-01-24a</strong></a>,
+
+<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?view=log&amp;pathrev=RA2_2013-01-24b"><strong>RA2_2013-01-24b</strong></a>,
+
+<a href="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt?view=log&amp;pathrev=RA2_2013-01-24c"><strong>RA2_2013-01-24c</strong></a>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<pre class="vc_log">List of events polluted by HCAL calibration-laser signals
+</pre>
+</div>
+
+ 
+
+
+
+ <hr />
+<p><a name="diff"></a>
+This form allows you to request diffs between any two revisions of this file.
+For each of the two "sides" of the diff,
+
+select a symbolic revision name using the selection box, or choose
+'Use Text Field' and enter a numeric revision.
+
+</p>
+<form method="get" action="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt" id="diff_select">
+<table cellpadding="2" cellspacing="0" class="auto">
+<tr>
+<td>&nbsp;</td>
+<td>
+<input type="hidden" name="view" value="diff" />
+Diffs between
+
+<select name="r1">
+<option value="text" selected="selected">Use Text Field</option>
+
+<option value="1.1:RA2_2013-01-24c">RA2_2013-01-24c</option>
+
+<option value="1.1:RA2_2013-01-24b">RA2_2013-01-24b</option>
+
+<option value="1.1:RA2_2013-01-24a">RA2_2013-01-24a</option>
+
+<option value="1.1:RA2_2013-01-23">RA2_2013-01-23</option>
+
+<option value="1.1:RA2_2013-01-22c">RA2_2013-01-22c</option>
+
+<option value="1.1:RA2_2013-01-22b">RA2_2013-01-22b</option>
+
+<option value="1.1:RA2_2013-01-22">RA2_2013-01-22</option>
+
+<option value="1.1:MAIN">MAIN</option>
+
+<option value="1.1:HEAD">HEAD</option>
+
+</select>
+<input type="text" size="12" name="tr1"
+value="1.1"
+onchange="document.getElementById('diff_select').r1.selectedIndex=0" />
+
+and
+
+<select name="r2">
+<option value="text" selected="selected">Use Text Field</option>
+
+<option value="1.1:RA2_2013-01-24c">RA2_2013-01-24c</option>
+
+<option value="1.1:RA2_2013-01-24b">RA2_2013-01-24b</option>
+
+<option value="1.1:RA2_2013-01-24a">RA2_2013-01-24a</option>
+
+<option value="1.1:RA2_2013-01-23">RA2_2013-01-23</option>
+
+<option value="1.1:RA2_2013-01-22c">RA2_2013-01-22c</option>
+
+<option value="1.1:RA2_2013-01-22b">RA2_2013-01-22b</option>
+
+<option value="1.1:RA2_2013-01-22">RA2_2013-01-22</option>
+
+<option value="1.1:MAIN">MAIN</option>
+
+<option value="1.1:HEAD">HEAD</option>
+
+</select>
+<input type="text" size="12" name="tr2"
+value="1.1"
+onchange="document.getElementById('diff_select').r2.selectedIndex=0" />
+
+</td>
+</tr>
+<tr>
+<td>&nbsp;</td>
+<td>
+Type of Diff should be a
+<select name="diff_format" onchange="submit()">
+<option value="h" selected="selected">Colored Diff</option>
+<option value="l" >Long Colored Diff</option>
+<option value="u" >Unidiff</option>
+<option value="c" >Context Diff</option>
+<option value="s" >Side by Side</option>
+</select>
+<input type="submit" value=" Get Diffs " />
+</td>
+</tr>
+</table>
+</form>
+
+
+<form method="get" action="/cgi-bin/cmssw.cgi/UserCode/kheine/RA2Classic/AdditionalInputFiles/HCALLaserEventList_20Nov2012-v2_HT-JetHT.txt">
+<div>
+<hr />
+<a name="logsort"></a>
+<input type="hidden" name="view" value="log" />
+Sort log by:
+<select name="logsort" onchange="submit()">
+<option value="cvs" >Not sorted</option>
+<option value="date" selected="selected">Commit date</option>
+<option value="rev" >Revision</option>
+</select>
+<input type="submit" value=" Sort " />
+</div>
+</form>
+
+
+<hr />
+<table>
+<tr>
+<td><address><a href="http://lcgcvs.web.cern.ch/lcgcvs">CERN LCG CVS service</a></address></td>
+<td style="text-align: right;"><strong><a href="/cgi-bin/cmssw.cgi/*docroot*/help_log.html">ViewVC Help</a></strong></td>
+</tr>
+<tr>
+<td>Powered by <a href="http://viewvc.tigris.org/">ViewVC 1.0.9</a></td>
+<td style="text-align: right;">&nbsp;</td>
+</tr>
+</table>
+</body>
+</html>
+
+
