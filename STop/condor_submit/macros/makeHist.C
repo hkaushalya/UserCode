@@ -112,11 +112,16 @@ void makeHist(const string title="")
 	else if (sample==4) title += "All Stop cuts applied + Inverted #Delta#Phi (use b-Jet JERs)";
 	else if (sample==5) title += "No cuts applied";
 */
+	unsigned bitMaskArray[] = {0,1,2,3,129,130,131,195,257,258,269,323};
+	vector<unsigned> vBitMaskArray(bitMaskArray, bitMaskArray + sizeof(bitMaskArray) / sizeof(unsigned));
+
+
+
 	stringstream unclmet_title;
 	unclmet_title << title << "Unclutered MET";
-	hist2print.push_back(Hist("met",title,2,100.0, 400.0,1));
+	hist2print.push_back(Hist("met",title,2,0.0, 400.0,1));
 	hist2print.push_back(Hist("unclmet",unclmet_title.str().c_str(),2,0.0, 100.0,1));
-	hist2print.push_back(Hist("mht",title,2,100.0, 400.0,1));
+	hist2print.push_back(Hist("mht",title,2,0.0, 400.0,1));
 	hist2print.push_back(Hist("ht",title,2,0,2000,1));
 	hist2print.push_back(Hist("njet30eta5p0",title,1,0,15,1));
 	hist2print.push_back(Hist("nbjets",title,1,0,10,1));
@@ -179,145 +184,168 @@ void makeHist(const string title="")
 	gStyle->SetOptStat(0);
 	gPad->Print("samples.eps[");
 
-	for (unsigned ihist=0; ihist < hist2print.size(); ++ihist)
+	for (unsigned i=0;i<vBitMaskArray.size(); ++i)
 	{
-		stringstream path, reco_hist_name, gen_hist_name, smear_hist_name;
-		stringstream reco_hist, gen_hist, smear_hist;
-		stringstream folder;
-		folder << "Hist/Njet0to1000HT0to8000MHT0to8000/";
-		//cout << "folder = " << folder.str() << endl;
-
-	/*	if ((hist2print.at(ihist).Name()).find("Jet"))
+		unsigned mask = vBitMaskArray.at(i);
+		for (unsigned ihist=0; ihist < hist2print.size(); ++ihist)
 		{
-			reco_hist_name << folder.str() << "reco" << hist2print.at(ihist).Name() << "_copy";
-			reco_hist << folder.str() << "reco" << hist2print.at(ihist).Name();
-			smear_hist_name << folder.str() << "smeared" << hist2print.at(ihist).Name() << "_copy";
-			smear_hist << folder.str() << "smeared" << hist2print.at(ihist).Name();
-			gen_hist_name << folder.str() << "gen" << hist2print.at(ihist).Name() << "_copy";
-			gen_hist << folder.str() << "gen" << hist2print.at(ihist).Name();
-		} else
-	*/	{
-			reco_hist_name << folder.str() << "reco_" << hist2print.at(ihist).Name() << "_copy";
-			reco_hist << folder.str() << "reco_" << hist2print.at(ihist).Name();
-			smear_hist_name << folder.str() << "smeared_" << hist2print.at(ihist).Name() << "_copy";
-			smear_hist << folder.str() << "smeared_" << hist2print.at(ihist).Name();
-			gen_hist_name << folder.str() << "gen_" << hist2print.at(ihist).Name() << "_copy";
-			gen_hist << folder.str() << "gen_" << hist2print.at(ihist).Name();
+			stringstream path, reco_hist_name, gen_hist_name, smear_hist_name;
+			stringstream reco_hist, gen_hist, smear_hist;
+			stringstream folder;
+			folder << "Hist/Mask"<< mask << "HT0to8000MHT0to8000/";
+			//cout << "folder = " << folder.str() << endl;
+
+			/*	if ((hist2print.at(ihist).Name()).find("Jet"))
+				{
+				reco_hist_name << folder.str() << "reco" << hist2print.at(ihist).Name() << "_copy";
+				reco_hist << folder.str() << "reco" << hist2print.at(ihist).Name();
+				smear_hist_name << folder.str() << "smeared" << hist2print.at(ihist).Name() << "_copy";
+				smear_hist << folder.str() << "smeared" << hist2print.at(ihist).Name();
+				gen_hist_name << folder.str() << "gen" << hist2print.at(ihist).Name() << "_copy";
+				gen_hist << folder.str() << "gen" << hist2print.at(ihist).Name();
+				} else
+				*/	{
+					reco_hist_name << folder.str() << "reco_" << hist2print.at(ihist).Name() << "_copy";
+					reco_hist << folder.str() << "reco_" << hist2print.at(ihist).Name();
+					smear_hist_name << folder.str() << "smeared_" << hist2print.at(ihist).Name() << "_copy";
+					smear_hist << folder.str() << "smeared_" << hist2print.at(ihist).Name();
+					gen_hist_name << folder.str() << "gen_" << hist2print.at(ihist).Name() << "_copy";
+					gen_hist << folder.str() << "gen_" << hist2print.at(ihist).Name();
+				}
+
+				TH1* hreco = (TH1*) (outRootFile->Get(reco_hist.str().c_str()));
+				if (hreco == NULL) { cout << "hreco = " << reco_hist.str() << " was not found!" << endl; assert(false); } 
+				hreco->SetDirectory(0);
+				TH1* hsmear = (TH1*) (outRootFile->Get(smear_hist.str().c_str()));
+				if (hsmear == NULL) { cout << "hsmear = " << smear_hist.str() << " was not found!" << endl; assert(false); } 
+				hsmear->SetDirectory(0);
+				TH1* hgen = (TH1*) (outRootFile->Get(gen_hist.str().c_str()));
+				//->Clone(gen_hist_name.str().c_str()));
+				if (hgen == NULL) { cout << "hgen = " << gen_hist.str() << " was not found!" << endl; assert(false); } 
+				hgen->SetDirectory(0);
+
+				hreco->Sumw2();
+				hsmear->Sumw2();
+				hgen->Sumw2();
+
+				const int rebin = hist2print.at(ihist).Rebin();
+				const string title = hist2print.at(ihist).Title();
+				const double xmin = hist2print.at(ihist).Xmin();
+				const double xmax = hist2print.at(ihist).Xmax();
+
+				if (rebin>1)
+				{
+					hreco->Rebin(rebin);
+					hsmear->Rebin(rebin);
+					hgen->Rebin(rebin);
+				}
+				if (title.length()>0)
+				{
+					hreco->SetTitle(title.c_str());
+					hsmear->SetTitle(title.c_str());
+					hgen->SetTitle(title.c_str());
+				}
+				if (xmin != LargeNegNum || xmax != LargeNegNum)
+				{
+					hreco->GetXaxis()->SetRangeUser(xmin,xmax);
+					hsmear->GetXaxis()->SetRangeUser(xmin,xmax);
+					hgen->GetXaxis()->SetRangeUser(xmin,xmax);
+				}
+
+				const double reco_max_y  = hreco->GetBinContent(hreco->GetMaximumBin());
+				const double smear_max_y = hsmear->GetBinContent(hsmear->GetMaximumBin());
+				const double y_max = max(reco_max_y, smear_max_y);
+				double y_min = 9999.0;
+				for (unsigned bin=1; bin<hreco->GetNbinsX(); ++bin)
+				{
+					const double v1 = hreco->GetBinContent(bin);
+					const double v2 = hsmear->GetBinContent(bin);
+					const double minv = min(v1,v2);
+					if (minv != 0 && minv < y_min) y_min = minv;
+					
+				}
+
+				cout << hreco->GetName() << "->ymin/max = " << y_min << "(" << y_min/2.0 << ")/" << y_max << "(" << y_max*2.0 << ")" << endl;
+				hreco->GetYaxis()->SetRangeUser(y_min/2.0, y_max*2.0);
+				hsmear->GetYaxis()->SetRangeUser(y_min/2.0, y_max*2.0);
+
+
+				hgen->SetLineColor(kBlue);
+				hgen->SetMarkerColor(kBlue);
+				hgen->SetMarkerStyle(24);
+				hgen->SetLineWidth(2);
+				hsmear->SetLineColor(kRed);
+				hsmear->SetMarkerColor(kRed);
+				hsmear->SetMarkerStyle(24);
+				hsmear->SetLineWidth(2);
+				hreco->SetLineWidth(2);
+				hreco->SetMarkerStyle(kDot);
+				hreco->SetLineColor(kBlack);
+				hreco->SetMarkerColor(kBlack);
+				//hreco->GetXaxis()->SetRangeUser(0,300);
+				//hsmear->GetXaxis()->SetRangeUser(0,300);
+
+
+				hreco->GetYaxis()->CenterTitle(1);
+				hreco->SetLabelFont(42,"XYZ");
+				hreco->SetTitleFont(42,"XYZ");
+				hreco->GetYaxis()->SetTitleOffset(0.8);
+				hreco->SetLabelSize(0.05,"XYZ");
+				hreco->SetTitleSize(0.06,"XYZ");
+
+
+				TH1 *hsmeartoreco_ratio = (TH1*) (hsmear->Clone("hsmear_copy"));
+				hsmeartoreco_ratio->Divide(hreco);
+				hsmeartoreco_ratio->SetTitle("");
+				hsmeartoreco_ratio->GetYaxis()->SetTitle("Smear/Reco");
+				hsmeartoreco_ratio->GetYaxis()->SetRangeUser(0,2.);
+
+				hsmeartoreco_ratio->GetYaxis()->SetTitleOffset(0.4);
+				hsmeartoreco_ratio->GetXaxis()->SetTitleOffset(0.9);
+				hsmeartoreco_ratio->GetYaxis()->CenterTitle(1);
+				hsmeartoreco_ratio->GetXaxis()->CenterTitle(1);
+				hsmeartoreco_ratio->SetLabelSize(0.125,"XYZ");
+				hsmeartoreco_ratio->SetTitleSize(0.125,"XYZ");
+				//	hsmeartoreco_ratio->SetLabelFont(labelfont,"XYZ");
+				//	hsmeartoreco_ratio->SetTitleFont(titlefont,"XYZ");
+				hsmeartoreco_ratio->GetXaxis()->SetTickLength(0.07);
+
+
+
+				stringstream recoleg,smearleg, genleg;
+				const double sum_reco  = hreco->Integral(1, hreco->GetNbinsX()+1);
+				const double sum_smear = hsmear->Integral(1, hsmear->GetNbinsX()+1);
+				const double sum_gen   = hgen->Integral(1, hgen->GetNbinsX()+1);
+				const double err_reco  = StatErr(hreco);
+				const double err_smear = StatErr(hsmear);
+
+
+				cout << setprecision(1) << fixed;
+
+				recoleg << "Reco (" << sum_reco << "#pm" << err_reco << ")";
+				smearleg << "Smear (" << sum_smear << "#pm" << err_smear << ")";
+				genleg << "Gen (" << sum_gen << ")";
+				cout <<  smear_hist_name.str() << "::reco/smear = " << sum_reco << "/" << sum_smear << endl;
+
+				TLegend *l2 = new TLegend(0.6,0.6,0.9,0.9);
+				l2->AddEntry(hreco, recoleg.str().c_str());
+				//l2->AddEntry(hgen, genleg.str().c_str());
+				l2->AddEntry(hsmear, smearleg.str().c_str());
+
+				c1_1->cd();
+				gPad->SetLogy(hist2print.at(ihist).LogY());
+
+				hreco->DrawCopy();
+				//hgen->DrawCopy("same");
+				hsmear->DrawCopy("same");
+				l2->Draw();
+				//tx->Draw();
+				c1_2->cd();
+				hsmeartoreco_ratio->DrawCopy();
+				c->cd();
+				gPad->Print("samples.eps");
+
 		}
-
-		TH1* hreco = (TH1*) (outRootFile->Get(reco_hist.str().c_str()));
-		if (hreco == NULL) { cout << "hreco = " << reco_hist.str() << " was not found!" << endl; assert(false); } 
-		hreco->SetDirectory(0);
-		TH1* hsmear = (TH1*) (outRootFile->Get(smear_hist.str().c_str()));
-		if (hsmear == NULL) { cout << "hsmear = " << smear_hist.str() << " was not found!" << endl; assert(false); } 
-		hsmear->SetDirectory(0);
-		TH1* hgen = (TH1*) (outRootFile->Get(gen_hist.str().c_str()));
-		//->Clone(gen_hist_name.str().c_str()));
-		if (hgen == NULL) { cout << "hgen = " << gen_hist.str() << " was not found!" << endl; assert(false); } 
-		hgen->SetDirectory(0);
-
-		hreco->Sumw2();
-		hsmear->Sumw2();
-		hgen->Sumw2();
-
-		const int rebin = hist2print.at(ihist).Rebin();
-		const string title = hist2print.at(ihist).Title();
-		const double xmin = hist2print.at(ihist).Xmin();
-		const double xmax = hist2print.at(ihist).Xmax();
-
-		if (rebin>1)
-		{
-			hreco->Rebin(rebin);
-			hsmear->Rebin(rebin);
-			hgen->Rebin(rebin);
-		}
-		//if (title.length()>0)
-		{
-			hreco->SetTitle(title.c_str());
-			hsmear->SetTitle(title.c_str());
-			hgen->SetTitle(title.c_str());
-		}
-		if (xmin != LargeNegNum || xmax != LargeNegNum)
-		{
-			hreco->GetXaxis()->SetRangeUser(xmin,xmax);
-			hsmear->GetXaxis()->SetRangeUser(xmin,xmax);
-			hgen->GetXaxis()->SetRangeUser(xmin,xmax);
-		}
-
-		hgen->SetLineColor(kBlue);
-		hgen->SetMarkerColor(kBlue);
-		hgen->SetMarkerStyle(24);
-		hgen->SetLineWidth(2);
-		hsmear->SetLineColor(kRed);
-		hsmear->SetMarkerColor(kRed);
-		hsmear->SetMarkerStyle(24);
-		hsmear->SetLineWidth(2);
-		hreco->SetLineWidth(2);
-		hreco->SetMarkerStyle(kDot);
-		hreco->SetLineColor(kBlack);
-		hreco->SetMarkerColor(kBlack);
-		//hreco->GetXaxis()->SetRangeUser(0,300);
-		//hsmear->GetXaxis()->SetRangeUser(0,300);
-
-
-		hreco->GetYaxis()->CenterTitle(1);
-		hreco->SetLabelFont(42,"XYZ");
-		hreco->SetTitleFont(42,"XYZ");
-		hreco->GetYaxis()->SetTitleOffset(0.8);
-		hreco->SetLabelSize(0.05,"XYZ");
-		hreco->SetTitleSize(0.06,"XYZ");
-
-
-
-		TH1 *hsmeartoreco_ratio = (TH1*) (hsmear->Clone("hsmear_copy"));
-		hsmeartoreco_ratio->Divide(hreco);
-		hsmeartoreco_ratio->SetTitle("");
-		hsmeartoreco_ratio->GetYaxis()->SetTitle("Smear/Reco");
-		hsmeartoreco_ratio->GetYaxis()->SetRangeUser(0,2.);
-
-		hsmeartoreco_ratio->GetYaxis()->SetTitleOffset(0.4);
-		hsmeartoreco_ratio->GetXaxis()->SetTitleOffset(0.9);
-		hsmeartoreco_ratio->GetYaxis()->CenterTitle(1);
-		hsmeartoreco_ratio->GetXaxis()->CenterTitle(1);
-		hsmeartoreco_ratio->SetLabelSize(0.125,"XYZ");
-		hsmeartoreco_ratio->SetTitleSize(0.125,"XYZ");
-		//	hsmeartoreco_ratio->SetLabelFont(labelfont,"XYZ");
-		//	hsmeartoreco_ratio->SetTitleFont(titlefont,"XYZ");
-		hsmeartoreco_ratio->GetXaxis()->SetTickLength(0.07);
-
-		stringstream recoleg,smearleg, genleg;
-		const double sum_reco  = hreco->Integral(1, hreco->GetNbinsX()+1);
-		const double sum_smear = hsmear->Integral(1, hsmear->GetNbinsX()+1);
-		const double sum_gen   = hgen->Integral(1, hgen->GetNbinsX()+1);
-		const double err_reco = StatErr(hreco);
-		const double err_smear = StatErr(hsmear);
-		
-
-		cout << setprecision(1) << fixed;
-
-		recoleg << "Reco (" << sum_reco << "#pm" << err_reco << ")";
-		smearleg << "Smear (" << sum_smear << "#pm" << err_smear << ")";
-		genleg << "Gen (" << sum_gen << ")";
-		cout <<  smear_hist_name.str() << "::reco/smear = " << sum_reco << "/" << sum_smear << endl;
-
-		TLegend *l2 = new TLegend(0.6,0.6,0.9,0.9);
-		l2->AddEntry(hreco, recoleg.str().c_str());
-		//l2->AddEntry(hgen, genleg.str().c_str());
-		l2->AddEntry(hsmear, smearleg.str().c_str());
-
-		c1_1->cd();
-		gPad->SetLogy(hist2print.at(ihist).LogY());
-	
-		hreco->DrawCopy();
-		//hgen->DrawCopy("same");
-		hsmear->DrawCopy("same");
-		l2->Draw();
-		//tx->Draw();
-		c1_2->cd();
-		hsmeartoreco_ratio->DrawCopy();
-		c->cd();
-		gPad->Print("samples.eps");
-
 	}
 
 	gPad->Print("samples.eps]");

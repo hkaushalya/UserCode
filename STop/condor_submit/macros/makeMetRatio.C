@@ -110,11 +110,45 @@ void makeMetRatio(const string title="")
 	else if (sample==4) mtitle += "All Stop cuts applied + Inverted #Delta#Phi (use b-Jet JERs)";
 */
 
-	//hist2print.push_back(Hist("met","Smeared Gen-Jets (QCD MG)",2,150.0, 400.0));
-	hist2print.push_back(Hist("met",title,4,150.0, 400.0));
 
-	TFile *outRootFile_num = new TFile("StopDphiCut.root");
-	TFile *outRootFile_den = new TFile("StopInvrtDphiCut.root");
+	vector<pair<unsigned, unsigned> > vBitMasks;
+			
+	//unsigned bitMaskArray[] = {0,1,2,3,129,130,131,195,257,258,259,323};
+	vBitMasks.push_back(make_pair(128,256));
+	vBitMasks.push_back(make_pair(129,257));
+	vBitMasks.push_back(make_pair(130,258));
+	vBitMasks.push_back(make_pair(131,259));
+	vBitMasks.push_back(make_pair(195,323));
+
+
+	//hist2print.push_back(Hist("met","Smeared Gen-Jets (QCD MG)",2,150.0, 400.0));
+	hist2print.push_back(Hist("met",title,4,0.0, 500.0));
+	hist2print.push_back(Hist("met1",title,4,0.0, 500.0));
+	hist2print.push_back(Hist("met2",title,4,0.0, 500.0));
+	hist2print.push_back(Hist("met3",title,4,0.0, 500.0));
+	hist2print.push_back(Hist("met4",title,4,0.0, 500.0));
+	hist2print.push_back(Hist("dphiMin_met",title));
+	hist2print.push_back(Hist("dphiMin_mht",title));
+	hist2print.push_back(Hist("mht",title,4,0.0, 500.0));
+	hist2print.push_back(Hist("unclmet",title,4,0.0, 500.0));
+	hist2print.push_back(Hist("jet1_pt",title,4,0.0, 500.0));
+	hist2print.push_back(Hist("jet1_eta",title,2));
+	hist2print.push_back(Hist("jet1_phi",title,2));
+	hist2print.push_back(Hist("jet1_dphimet",title,2));
+	hist2print.push_back(Hist("jet1_dphimht",title,2));
+	hist2print.push_back(Hist("jet2_pt",title,4,0.0, 500.0));
+	hist2print.push_back(Hist("jet2_eta",title,2));
+	hist2print.push_back(Hist("jet2_phi",title,2));
+	hist2print.push_back(Hist("jet2_dphimet",title,2));
+	hist2print.push_back(Hist("jet2_dphimht",title,2));
+	hist2print.push_back(Hist("jet3_pt",title,4,0.0, 500.0));
+	hist2print.push_back(Hist("jet3_eta",title,2));
+	hist2print.push_back(Hist("jet3_phi",title,2));
+	hist2print.push_back(Hist("jet3_dphimet",title,2));
+	hist2print.push_back(Hist("jet3_dphimht",title,2));
+
+	TFile *outRootFile_num = new TFile("Merged.root");
+//	TFile *outRootFile_den = new TFile("StopInvrtDphiCut.root");
 
    TCanvas *c = new TCanvas("c1");
    c->Range(0,0,1,1);
@@ -150,159 +184,172 @@ void makeMetRatio(const string title="")
 	gStyle->SetOptStat(0);
 	gPad->Print("met_ratio.eps[");
 
+	
+	for (unsigned j=0;j<hist2print.size(); ++j)
 	{
-		stringstream path, smear_num_hist_name, reco_num_hist_name;
-		stringstream smear_num_hist, reco_num_hist;
-		stringstream folder;
-		folder << "Hist/Njet0to1000HT0to8000MHT0to8000/";
-		//cout << "folder = " << folder.str() << endl;
-
-		smear_num_hist_name << folder.str() << "smeared_" << hist2print.at(0).Name() << "_copy";
-		smear_num_hist << folder.str() << "smeared_" << hist2print.at(0).Name();
-		reco_num_hist << folder.str() << "reco_" << hist2print.at(0).Name();
-
-		TH1* hsmear_num = (TH1*) (outRootFile_num->Get(smear_num_hist.str().c_str()));
-		if (hsmear_num == NULL) { cout << "hsmear_num = " << smear_num_hist.str() << " was not found!" << endl; assert(false); } 
-		hsmear_num->SetDirectory(0);
-		hsmear_num->Sumw2();
-
-		TH1* hsmear_den = (TH1*) (outRootFile_den->Get(smear_num_hist.str().c_str()));
-		if (hsmear_den == NULL) { cout << "hsmear_den = " << smear_num_hist.str() << " was not found!" << endl; assert(false); } 
-		hsmear_den->SetDirectory(0);
-		hsmear_den->Sumw2();
-
-
-		TH1* hreco_num = (TH1*) (outRootFile_num->Get(reco_num_hist.str().c_str()));
-		if (hreco_num == NULL) { cout << "hreco_num = " << reco_num_hist.str() << " was not found!" << endl; assert(false); } 
-		hreco_num->SetDirectory(0);
-		hreco_num->Sumw2();
-
-		TH1* hreco_den = (TH1*) (outRootFile_den->Get(reco_num_hist.str().c_str()));
-		if (hreco_den == NULL) { cout << "hreco_den = " << reco_num_hist.str() << " was not found!" << endl; assert(false); } 
-		hreco_den->SetDirectory(0);
-		hreco_den->Sumw2();
-
-
-
-		const int rebin = hist2print.at(0).Rebin();
-		const string title = hist2print.at(0).Title();
-		const double xmin = hist2print.at(0).Xmin();
-		const double xmax = hist2print.at(0).Xmax();
-
-		if (rebin>1)
+		for (unsigned i=0;i<vBitMasks.size(); ++i)
 		{
-			hsmear_num->Rebin(rebin);
-			hsmear_den->Rebin(rebin);
-			hreco_num->Rebin(rebin);
-			hreco_den->Rebin(rebin);
+			const unsigned mask1 = vBitMasks.at(i).first;
+			const unsigned mask2 = vBitMasks.at(i).second;
+
+			stringstream path, reco_num_hist_name;
+			stringstream smear_num_hist, reco_num_hist;
+			stringstream smear_den_hist, reco_den_hist;
+			stringstream num_folder, den_folder;
+			num_folder << "Hist/Mask"<< mask1 <<"HT0to8000MHT0to8000/";
+			den_folder << "Hist/Mask"<< mask2 <<"HT0to8000MHT0to8000/";
+			//cout << "folder = " << folder.str() << endl;
+
+			smear_num_hist << num_folder.str() << "smeared_" << hist2print.at(j).Name();
+			reco_num_hist  << num_folder.str() << "reco_"    << hist2print.at(j).Name();
+			smear_den_hist << den_folder.str() << "smeared_" << hist2print.at(j).Name();
+			reco_den_hist  << den_folder.str() << "reco_"    << hist2print.at(j).Name();
+
+			TH1* hsmear_num = (TH1*) (outRootFile_num->Get(smear_num_hist.str().c_str()));
+			if (hsmear_num == NULL) { cout << "hsmear_num = " << smear_num_hist.str() << " was not found!" << endl; assert(false); } 
+			hsmear_num->SetDirectory(0);
+			hsmear_num->Sumw2();
+
+			TH1* hsmear_den = (TH1*) (outRootFile_num->Get(smear_den_hist.str().c_str()));
+			if (hsmear_den == NULL) { cout << "hsmear_den = " << smear_den_hist.str() << " was not found!" << endl; assert(false); } 
+			hsmear_den->SetDirectory(0);
+			hsmear_den->Sumw2();
+
+
+			TH1* hreco_num = (TH1*) (outRootFile_num->Get(reco_num_hist.str().c_str()));
+			if (hreco_num == NULL) { cout << "hreco_num = " << reco_num_hist.str() << " was not found!" << endl; assert(false); } 
+			hreco_num->SetDirectory(0);
+			hreco_num->Sumw2();
+
+			TH1* hreco_den = (TH1*) (outRootFile_num->Get(reco_den_hist.str().c_str()));
+			if (hreco_den == NULL) { cout << "hreco_den = " << reco_den_hist.str() << " was not found!" << endl; assert(false); } 
+			hreco_den->SetDirectory(0);
+			hreco_den->Sumw2();
+
+
+
+			const int rebin = hist2print.at(j).Rebin();
+			//const string title = hist2print.at(j).Title();
+			const string title("");
+
+			const double xmin = hist2print.at(j).Xmin();
+			const double xmax = hist2print.at(j).Xmax();
+
+			if (rebin>1)
+			{
+				hsmear_num->Rebin(rebin);
+				hsmear_den->Rebin(rebin);
+				hreco_num->Rebin(rebin);
+				hreco_den->Rebin(rebin);
+			}
+			if (title.length()>0)
+			{
+				hsmear_num->SetTitle(title.c_str());
+				hsmear_den->SetTitle(title.c_str());
+				hreco_num->SetTitle(title.c_str());
+				hreco_den->SetTitle(title.c_str());
+			}
+			if (xmin != LargeNegNum || xmax != LargeNegNum)
+			{
+				hsmear_num->GetXaxis()->SetRangeUser(xmin,xmax);
+				hsmear_den->GetXaxis()->SetRangeUser(xmin,xmax);
+				hreco_num->GetXaxis()->SetRangeUser(xmin,xmax);
+				hreco_den->GetXaxis()->SetRangeUser(xmin,xmax);
+			}
+
+			hsmear_num->SetLineColor(kRed);
+			hsmear_num->SetMarkerColor(kRed);
+			hsmear_num->SetMarkerStyle(26);
+			hsmear_num->SetLineWidth(2);
+			//hsmear_num->GetXaxis()->SetRangeUser(0,300);
+
+			hsmear_den->SetLineColor(kRed);
+			hsmear_den->SetMarkerColor(kRed);
+			hsmear_den->SetMarkerStyle(20);
+			hsmear_den->SetLineWidth(2);
+			//hsmear_den->GetXaxis()->SetRangeUser(0,300);
+
+
+			hreco_num->SetLineColor(kBlack);
+			hreco_num->SetMarkerColor(kBlack);
+			hreco_num->SetMarkerStyle(26);
+			hreco_num->SetLineWidth(2);
+			//hreco_num->GetXaxis()->SetRangeUser(0,300);
+
+			hreco_den->SetLineColor(kBlack);
+			hreco_den->SetMarkerColor(kBlack);
+			hreco_den->SetMarkerStyle(20);
+			hreco_den->SetLineWidth(2);
+			//hreco_den->GetXaxis()->SetRangeUser(0,300);
+
+
+			hsmear_num->GetYaxis()->CenterTitle(1);
+			hsmear_num->SetLabelFont(42,"XYZ");
+			hsmear_num->SetTitleFont(42,"XYZ");
+			hsmear_num->GetYaxis()->SetTitleOffset(0.8);
+			hsmear_num->SetLabelSize(0.05,"XYZ");
+			hsmear_num->SetTitleSize(0.06,"XYZ");
+
+
+			TH1 *hratio = (TH1*) (hsmear_num->Clone("hnum_copy"));
+			hratio->Divide(hsmear_den);
+			hratio->SetTitle("");
+			hratio->GetYaxis()->SetTitle("#frac{Stop cuts}{Stop cuts+Invt. #Delta#Phi}");
+			hratio->GetYaxis()->SetRangeUser(0,2);
+
+			TH1 *hratio_reco = (TH1*) (hreco_num->Clone("hnum_copy"));
+			hratio_reco->Divide(hreco_den);
+			hratio_reco->SetTitle("");
+			hratio_reco->GetYaxis()->SetRangeUser(0,0.2);
+
+
+			hratio->GetYaxis()->SetTitleOffset(0.4);
+			hratio->GetXaxis()->SetTitleOffset(0.9);
+			hratio->GetYaxis()->CenterTitle(1);
+			hratio->GetXaxis()->CenterTitle(1);
+			hratio->SetLabelSize(0.125,"XYZ");
+			hratio->SetTitleSize(0.1,"XYZ");
+			//	hratio->SetLabelFont(labelfont,"XYZ");
+			//	hratio->SetTitleFont(titlefont,"XYZ");
+			hratio->GetXaxis()->SetTickLength(0.08);
+
+			stringstream numleg, denleg, reco_numleg, reco_denleg;
+			const double sum_num = hsmear_num->Integral(1, hsmear_num->GetNbinsX()+1);
+			const double sum_den = hsmear_den->Integral(1, hsmear_den->GetNbinsX()+1);
+			const double sum_reco_num = hreco_num->Integral(1, hreco_num->GetNbinsX()+1);
+			const double sum_reco_den = hreco_den->Integral(1, hreco_den->GetNbinsX()+1);
+
+			const double staterr_num = StatErr(hsmear_num);
+			const double staterr_den = StatErr(hsmear_den);
+			const double staterr_reco_num = StatErr(hreco_num);
+			const double staterr_reco_den = StatErr(hreco_den);
+
+			numleg << "Smear[#Delta#Phi] (" << setprecision(1) << fixed << sum_num << "#pm" << staterr_num << ")";
+			denleg << "Smear[Inv.#Delta#Phi] ("<< setprecision(1) << fixed  << sum_den  << "#pm" << staterr_den << ")";
+			reco_numleg << "Reco[#Delta#Phi] ("<< setprecision(1) << fixed  << sum_reco_num << "#pm" << staterr_reco_num  << ")";
+			reco_denleg << "Reco[Inv.#Delta#Phi] ("<< setprecision(1) << fixed  << sum_reco_den  << "#pm" << staterr_reco_den << ")";
+
+			TLegend *l2 = new TLegend(0.6,0.6,0.9,0.9);
+			l2->AddEntry(hsmear_num, numleg.str().c_str());
+			l2->AddEntry(hsmear_den, denleg.str().c_str());
+			l2->AddEntry(hreco_num, reco_numleg.str().c_str());
+			l2->AddEntry(hreco_den, reco_denleg.str().c_str());
+
+			c1_1->cd();
+			gPad->SetLogy();
+			hsmear_num->DrawCopy();
+			hsmear_den->DrawCopy("same");
+			hreco_num->DrawCopy("same");
+			hreco_den->DrawCopy("same");
+			l2->Draw();
+			//tx->Draw();
+			c1_2->cd();
+			hratio->DrawCopy();
+			hratio_reco->DrawCopy("same");
+			c->cd();
+			gPad->Print("met_ratio.eps");
+
 		}
-		//if (title.length()>0)
-		{
-			hsmear_num->SetTitle(title.c_str());
-			hsmear_den->SetTitle(title.c_str());
-			hreco_num->SetTitle(title.c_str());
-			hreco_den->SetTitle(title.c_str());
-		}
-		if (xmin != LargeNegNum || xmax != LargeNegNum)
-		{
-			hsmear_num->GetXaxis()->SetRangeUser(xmin,xmax);
-			hsmear_den->GetXaxis()->SetRangeUser(xmin,xmax);
-			hreco_num->GetXaxis()->SetRangeUser(xmin,xmax);
-			hreco_den->GetXaxis()->SetRangeUser(xmin,xmax);
-		}
-
-		hsmear_num->SetLineColor(kRed);
-		hsmear_num->SetMarkerColor(kRed);
-		hsmear_num->SetMarkerStyle(26);
-		hsmear_num->SetLineWidth(2);
-		//hsmear_num->GetXaxis()->SetRangeUser(0,300);
-
-		hsmear_den->SetLineColor(kRed);
-		hsmear_den->SetMarkerColor(kRed);
-		hsmear_den->SetMarkerStyle(20);
-		hsmear_den->SetLineWidth(2);
-		//hsmear_den->GetXaxis()->SetRangeUser(0,300);
-
-
-		hreco_num->SetLineColor(kBlack);
-		hreco_num->SetMarkerColor(kBlack);
-		hreco_num->SetMarkerStyle(26);
-		hreco_num->SetLineWidth(2);
-		//hreco_num->GetXaxis()->SetRangeUser(0,300);
-
-		hreco_den->SetLineColor(kBlack);
-		hreco_den->SetMarkerColor(kBlack);
-		hreco_den->SetMarkerStyle(20);
-		hreco_den->SetLineWidth(2);
-		//hreco_den->GetXaxis()->SetRangeUser(0,300);
-
-
-		hsmear_num->GetYaxis()->CenterTitle(1);
-		hsmear_num->SetLabelFont(42,"XYZ");
-		hsmear_num->SetTitleFont(42,"XYZ");
-		hsmear_num->GetYaxis()->SetTitleOffset(0.8);
-		hsmear_num->SetLabelSize(0.05,"XYZ");
-		hsmear_num->SetTitleSize(0.06,"XYZ");
-
-
-		TH1 *hratio = (TH1*) (hsmear_num->Clone("hnum_copy"));
-		hratio->Divide(hsmear_den);
-		hratio->SetTitle("");
-		hratio->GetYaxis()->SetTitle("#frac{Stop cuts}{Stop cuts+Invt. #Delta#Phi}");
-		hratio->GetYaxis()->SetRangeUser(0,0.2);
-
-		TH1 *hratio_reco = (TH1*) (hreco_num->Clone("hnum_copy"));
-		hratio_reco->Divide(hreco_den);
-		hratio_reco->SetTitle("");
-		hratio_reco->GetYaxis()->SetRangeUser(0,0.2);
-
-
-		hratio->GetYaxis()->SetTitleOffset(0.4);
-		hratio->GetXaxis()->SetTitleOffset(0.9);
-		hratio->GetYaxis()->CenterTitle(1);
-		hratio->GetXaxis()->CenterTitle(1);
-		hratio->SetLabelSize(0.125,"XYZ");
-		hratio->SetTitleSize(0.1,"XYZ");
-		//	hratio->SetLabelFont(labelfont,"XYZ");
-		//	hratio->SetTitleFont(titlefont,"XYZ");
-		hratio->GetXaxis()->SetTickLength(0.07);
-
-		stringstream numleg, denleg, reco_numleg, reco_denleg;
-		const double sum_num = hsmear_num->Integral(1, hsmear_num->GetNbinsX()+1);
-		const double sum_den = hsmear_den->Integral(1, hsmear_den->GetNbinsX()+1);
-		const double sum_reco_num = hreco_num->Integral(1, hreco_num->GetNbinsX()+1);
-		const double sum_reco_den = hreco_den->Integral(1, hreco_den->GetNbinsX()+1);
-
-		const double staterr_num = StatErr(hsmear_num);
-		const double staterr_den = StatErr(hsmear_den);
-		const double staterr_reco_num = StatErr(hreco_num);
-		const double staterr_reco_den = StatErr(hreco_den);
-
-		numleg << "Smear[#Delta#Phi] (" << setprecision(1) << fixed << sum_num << "#pm" << staterr_num << ")";
-		denleg << "Smear[Inv.#Delta#Phi] ("<< setprecision(1) << fixed  << sum_den  << "#pm" << staterr_den << ")";
-		reco_numleg << "Reco[#Delta#Phi] ("<< setprecision(1) << fixed  << sum_reco_num << "#pm" << staterr_reco_num  << ")";
-		reco_denleg << "Reco[Inv.#Delta#Phi] ("<< setprecision(1) << fixed  << sum_reco_den  << "#pm" << staterr_reco_den << ")";
-
-		TLegend *l2 = new TLegend(0.6,0.6,0.9,0.9);
-		l2->AddEntry(hsmear_num, numleg.str().c_str());
-		l2->AddEntry(hsmear_den, denleg.str().c_str());
-		l2->AddEntry(hreco_num, reco_numleg.str().c_str());
-		l2->AddEntry(hreco_den, reco_denleg.str().c_str());
-
-		c1_1->cd();
-		gPad->SetLogy();
-		hsmear_num->DrawCopy();
-		hsmear_den->DrawCopy("same");
-		hreco_num->DrawCopy("same");
-		hreco_den->DrawCopy("same");
-		l2->Draw();
-		//tx->Draw();
-		c1_2->cd();
-		hratio->DrawCopy();
-		hratio_reco->DrawCopy("same");
-		c->cd();
-		gPad->Print("met_ratio.eps");
-
 	}
 
 	gPad->Print("met_ratio.eps]");
