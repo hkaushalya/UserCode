@@ -116,16 +116,17 @@ void FactorizationBySmearing::EventLoop(const char *datasetname,
 	}
 
 	const double dDATA_LUMI = 19458.0; //used in MC lumi weighing
-	bNON_STD_MODE        = 0;  //not using HO filter
-	sNON_STD_MODE_EXPLAIN = "Excluding trig wgt>1000 by setting it to 1!";
-	bRUNNING_ON_MC       = 0; 
-	bDO_TRIG_SELECTION   = 1;   //DATA
-	bDO_TRIG_PRESCALING  = 1;   //DATA
+	bNON_STD_MODE        = 1;  //not using HO filter
+	//sNON_STD_MODE_EXPLAIN = "Excluding trig wgt>1000 by setting it to 1!";
+	sNON_STD_MODE_EXPLAIN = "STop njet cut applied";
+	bRUNNING_ON_MC       = 1; 
+	bDO_TRIG_SELECTION   = 0;   //DATA
+	bDO_TRIG_PRESCALING  = 0;   //DATA
 	bAPPLY_DPHI_CUT      = 0; 
 	bDO_PU_WEIGHING      = false;  //MC
 	bDO_LUMI_WEIGHING    = false;  //MC 
-	bDO_GENJET_SMEARING  = 0;  //MC
-	uNTRIES              = 5000; //number of pseudo experiments per event
+	bDO_GENJET_SMEARING  = 1;  //MC
+	uNTRIES              = 10; //number of pseudo experiments per event
 	bDEBUG               = false;
 
 
@@ -1004,7 +1005,22 @@ bool FactorizationBySmearing::FillHistogram(const vector<TLorentzVector>& jets,
 	//0=reco
 	//1=gen
 	//2=smeared
-	
+	/*=======================================================*/
+	//to test STOP smearing njet cut
+	const int  njet_pt30 = CountJets(jets,30.0, 2.4); 
+	//const int  njet_pt50 = CountJets(jets,50.0, 2.4); 
+	const int  njet_pt50 = CountJets(jets,50.0, 2.5); 
+	const int  njet_pt70 = CountJets(jets,70.0, 2.4); 
+
+	//const bool pass_njetcut       = (njet_pt70>=2 && njet_pt50>=4 && njet_pt30>=5) ? true : false;           // 0000001 = 1
+	const bool pass_njetcut       = (njet_pt50>=3) ? true : false;           // 0000001 = 1
+	if (! pass_njetcut) return 0;
+	const double myht         = HT(jets);
+	if (myht<300.0) return 0;
+	/*=======================================================*/
+
+
+
 	const TLorentzVector mhtvec(MHT(jets)); 
 	const double mht        = mhtvec.Pt(); 
 	const double ht         = HT(jets);
@@ -2033,7 +2049,7 @@ FactorizationBySmearing::FactorizationBySmearing(
 	Init(tree);
 
 	smearFunc_ = 0;
-	//HtBins_.push_back(0);
+	HtBins_.push_back(0);
 	HtBins_.push_back(500);
 	HtBins_.push_back(800);
 	HtBins_.push_back(1000);
@@ -2056,7 +2072,7 @@ FactorizationBySmearing::FactorizationBySmearing(
 	JetBins_.push_back(make_pair(3,5));	
 	JetBins_.push_back(make_pair(6,7));	
 	JetBins_.push_back(make_pair(8,1000));	
-	//JetBins_.push_back(make_pair(3,1000));	
+//	JetBins_.push_back(make_pair(0,1000));	
 
 	bNON_STD_MODE = false;
 	nRecoJetEvts  = 0;
