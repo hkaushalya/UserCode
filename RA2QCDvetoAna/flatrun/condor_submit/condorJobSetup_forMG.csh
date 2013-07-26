@@ -1,7 +1,7 @@
 #! /bin/csh
 
-#foreach systVariation (0 1 2 3 4 5 6)
-foreach systVariation (0)
+foreach systVariation (0 1 2 3 4 5 6)
+#foreach systVariation (0)
 
 if ( $systVariation == 0 ) then
 	set subdir = "Mean"
@@ -10,7 +10,7 @@ else
 endif
 
 set curDir = `pwd`
-set mainDir = "/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/condor_submit/02062013_MG_500/${subdir}"
+set mainDir = "/share/store/users/samantha/CMSSW_5_2_5/src/UserCode/RA2QCDvetoAna/flatrun/condor_submit/03152013_MG_3k/${subdir}"
 set dirlist = "$mainDir/qcd1 $mainDir/qcd2 $mainDir/qcd3"
 set i = 0
 
@@ -24,28 +24,28 @@ foreach dir ( $dirlist )
 		cp -v fnalMakeSplitInputs.pl $dir
 		cp -v ../runsmear $dir
 		if ( $i == 1 ) then
-			cp ../input_files/QCD_HT_250To500_MGPythia_v1_lpc1_wFilters_farm.files $dir
+			cp ../input_files/MG_QCD_HT_250To500_wFilters_farm_v03012013.files $dir
 			cd $dir
 			set fileList =  `ls -1 *.files`
 			echo "$PWD -> $fileList"
 			#./fnalCondorSubmit.csh 4 4 $fileList ${i} 
-			./fnalCondorSubmit.csh 37 2 $fileList $systVariation 
+			./fnalCondorSubmit.csh 84 2 $fileList $systVariation 
 
 			cd $curDir
 			#exit
 		else if ( $i == 2 ) then
-			cp ../input_files/QCD_HT_500To1000_MGPythia_v1_lpc1_wFilters_farm.files $dir
+			cp ../input_files/MG_QCD_HT_500To1000_wFilters_farm_v03012013.files $dir
 			cd $dir
 			set fileList =  `ls -1 *.files`
 			echo "$PWD -> $fileList"
-			./fnalCondorSubmit.csh 41 2 $fileList $systVariation 
+			./fnalCondorSubmit.csh 67 2 $fileList $systVariation 
 			cd $curDir
 		else if ( $i == 3 ) then
-			cp ../input_files/QCD_HT_1000ToInf_MGPythia_v1_lpc1_wFilters_farm.files $dir
+			cp ../input_files/MG_QCD_HT_1000ToInf_wFilters_farm_v03012013.files $dir
 			cd $dir
 			set fileList =  `ls -1 *.files`
 			echo "$PWD -> $fileList"
-			./fnalCondorSubmit.csh 16 2  $fileList $systVariation 
+			./fnalCondorSubmit.csh 37 2  $fileList $systVariation 
 			cd $curDir
 		endif
 

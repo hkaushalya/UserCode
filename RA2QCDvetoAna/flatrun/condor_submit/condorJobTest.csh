@@ -32,19 +32,23 @@ foreach dir ( $argv )
 
 		set sucess = 1
 		echo $outfiles
+		set tot_found = 0;
+		set tot_processs = 0
 		foreach out ( $outfiles )
 			#echo "processing $out"
 			set p1 = `cat $out | grep 'Entries found' | cut -d ' ' -f4` 
 			set p2 = `cat $out | grep 'Entries found' | cut -d ' ' -f6` 
 			#echo "$p1 / $p2 "
+			@ tot_found += $p1
+			@ tot_processs += $p2
 			if ( $p1 != $p2 ) then
-				echo "\033[31m entries found /processed mismathc: $p1 / $p2 in job file $out \033[0m"
+				echo "\033[31m entries found /processed mismatch: $p1 / $p2 in job file $out \033[0m"
 				@ sucess = 0
 				exit
 			endif
 		end
 		if ( $sucess == 1 ) then
-			echo "\033[32m All events present are processed. \033[0m"
+			echo "\033[32m All events present are processed. $tot_found/$tot_processs \033[0m"
 		endif
 	
 
