@@ -107,3 +107,12 @@ endif
 if ($resubmitfailed == 1) then
 	echo "nJobsResubmitted = $nJobsResubmitted"
 endif
+
+#try to Merge root files after successful completiong of all jobs
+#if ( `$#logs -eq $nJobsDoneWithSuccess` ) then
+#	set haddfile = "${CMSSW_BASE}/condor_submit/haddInf/haddinf"
+#	echo "$haddfile"
+#	if ( -e $haddfile && ! -e Merged.root) then
+#		`haddfile *.root`
+#	endif
+#endif

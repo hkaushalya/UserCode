@@ -5,6 +5,7 @@ export systVariation=$2
 export cutmask=$3
 export totevts=-1
 #export totevts=10
+echo "fnalCondorPred: cutmask=$3"
 
 export filetail="_"$configSpecStr
 
@@ -45,6 +46,7 @@ initialdir = ${outputDir}
 Output = ${logDir}_${configSpecStr}_\$(Cluster)_\$(Process).stdout
 Error = ${logDir}_${configSpecStr}_\$(Cluster)_\$(Process).stderr
 Log = ${logDir}_${configSpecStr}_\$(Cluster)_\$(Process).log
+#Arguments = $inputlist \$(Cluster).root ${totevts} ${systVariation} ${MASKS[@]} 
 Arguments = $inputlist \$(Cluster).root ${totevts} ${systVariation} ${cutmask} 
 
 Queue 

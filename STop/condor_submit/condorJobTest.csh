@@ -8,7 +8,7 @@ foreach dir ( $argv )
 		cd -v $dir
 		set nLogFiles = `ls -l *.log | wc -l`
 		echo "log files = $nLogFiles"
-		set nRootFiles = `ls -l *.root | wc -l`
+		set nRootFiles = `ls -l [0-9]*.root | wc -l`
 		echo "root/log files = $nRootFiles/$nLogFiles"
 		if ( $nLogFiles != $nRootFiles ) then
 			echo "\033[1;31m WARN SRC tobe processed does not match to the given! \033[0m"
@@ -57,7 +57,7 @@ foreach dir ( $argv )
 		if ( -e "Merged.root" ) then
 			echo "\033[1;31m File name Merged.root already exitst. Not merging! \033[0m"
 		else 
-			hadd Merged.root [0-9]*.root
+			#hadd Merged.root [0-9]*.root
 		endif
 
 		cd $curDir
