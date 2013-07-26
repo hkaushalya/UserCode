@@ -2,7 +2,7 @@ ROOTCFLAGS  = $(shell $(ROOTSYS)/bin/root-config --cflags)
 ROOTLIBS    = $(shell $(ROOTSYS)/bin/root-config --libs)
 ROOTGLIBS   = $(shell $(ROOTSYS)/bin/root-config --glibs)
 
-CXX         = g++ -m32
+CXX         = g++ -m64
 #CXX         = g++
 #CXXFLAGS    = -g -fPIC -Wno-deprecated -0 -ansi -D_GNU_SOURCE -g -02
 CXXFLAGS    = -Wno-deprecated
