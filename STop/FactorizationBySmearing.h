@@ -26,12 +26,15 @@
 class FactorizationBySmearing : public NtupleSelector {
 
 	public:
-		FactorizationBySmearing(const TString &inputFileList="foo.txt", 
-								const char *outFileName="histo.root");
+		FactorizationBySmearing(
+								const std::vector<unsigned> vCutMasks, 
+								const TString &inputFileList="foo.txt", 
+								const char *outFileName="histo.root"
+								);
 		~FactorizationBySmearing();
 		Bool_t   FillChain(TChain *chain, const TString &inputFileList);
 		Long64_t LoadTree(Long64_t entry);
-		void     EventLoop(const char * datasetname, const int evt2Process, const unsigned cutmask, const int systVariations);
+		void     EventLoop(const char * datasetname, const int evt2Process, const int systVariations);
 		//void     BookHistogram(const char *);
 		void     BookHistogram(TFile *oFile, const bool mcFlag);
 		double   DeltaPhi(double, double);
@@ -62,40 +65,39 @@ class FactorizationBySmearing : public NtupleSelector {
 			TH1D *h_Jet_pt;
 			TH1D *h_Jet_eta;
 			TH1D *h_Jet_phi;
-			TH1D *h_Jet_dphi;
+			TH1D *h_Jet_dphimet;
+			TH1D *h_Jet_dphimht;
 		};
 		struct CommonHist_t {
 			TH1D *h_evtWeight;
 			TH1D *h_nVtx;
 			TH1D *h_Njet50eta2p5;
 			TH1D *h_Njet30eta5p0;
-			TH1D *h_Mht;      //this Mht/Ht plots are for cut confirmations. Total HT/MHT plots are separately made
+			TH1D *h_Njet70eta2p4;
+			TH1D *h_Njet50eta2p4;
+			TH1D *h_Njet30eta2p4;
+			TH1D *h_Mht;
 			TH1D *h_Met;
+			TH1D *h_Met1;
+			TH1D *h_Met2;
+			TH1D *h_Met3;
+			TH1D *h_Met4;
 			TH1D *h_UnclMet;
  			TH1D *h_Ht;
-			TH1D *h_DphiMin_mht;
-			TH1D *h_DphiMin_met;
-			TH2D *h_DphiMinVsMht;
+ 			TH1D *h_dPhiMin_met;
+ 			TH1D *h_dPhiMin_mht;
 			TH1D *h_nbjets;
 			TH1D *h_bjetMass;
 			TH1D *h_bjetPt;
 			TH1D *h_M123;
-			TH1D *h_M23OverM123;
 			TH1D *h_MT2;
 			TH1D *h_MTb;
 			TH1D *h_MTt;
 			TH1D *h_MTb_p_MTt;
-			vector<TH1D*> pass;
-			vector<TH1D*> passFineBin;
-			vector<TH1D*> pass_trigPrescales;
-			vector<TH1D*> fail;
-			vector<TH1D*> fail_trigPrescales;
-			vector<TH1D*> failFineBin;
-			TH1D* signal;
-			TH1D* signalFineBin;
-			TH1D* signal_trigPrescales;
-			TH1D* sidebandSyst[2];
-			TH1D* sidebandSystFineBin[2];
+			TH1D* h_passDphi;
+			TH1D* h_passDphiFineBin;
+			TH1D* h_failDphi;
+			TH1D* h_failDphiFineBin;
 		};
 
 
@@ -108,6 +110,7 @@ class FactorizationBySmearing : public NtupleSelector {
 			vector<JetHist_t> hv_SmearedJets;
 		};
 
+		enum CutMasks { NoCutMask_=0, NjetCutMask_= 1, metCutMask_=2, tripletCutMask_=4, topmassCutMask_=8, topplusbjetCutMask_=16, mt2CutMask_=32, minbjetCutMask_=64, dphiCutMask_=128, invdphiCutMask_=256};
 
 	private:
 		TFile *outRootFile;
@@ -130,16 +133,14 @@ class FactorizationBySmearing : public NtupleSelector {
 		double LowerTailScaling_variation_;
 		double UpperTailScaling_variation_;
 		bool absoluteTailScaling_;
-		bool bAPPLY_DPHI_CUT, bAPPLY_NJET_CUT, bAPPLY_MET_CUT, bAPPLY_TRIPLET_CUT, bAPPLY_TOPMASS_CUT, bAPPLY_TOPPLUSBJET_CUT, bAPPLY_MT2_CUT, bAPPLY_BJET_CUT; 
-		bool bAPPLY_INVERT_DPHI_CUT;
 		unsigned uMinNjet70Eta2p4_, uMinNjet50Eta2p4_, uMinNjet30Eta2p4_, uMinTriplets_, uMinBjets_;
-		double dMinMet_, dMinTopMass_, dMaxTopMass_, dMinTopPlusBjetMass_, dMinMt2_;
+		double dMinMet_, dMaxMet_, dMinTopMass_, dMaxTopMass_, dMinTopPlusBjetMass_, dMinMt2_;
 		unsigned nBadEcalLaserEvts;
 
-		std::vector<double> HtBins_, MhtBins_;
-		vector < pair<unsigned, unsigned> >JetBins_;
+		vector<double> HtBins_, MhtBins_;
+		vector <unsigned> BitMaskBins_;
 		vector<vector<vector<Hist_t> > > Hist; //for each njet/HT/MHT bins
-		std::vector<double> vDphiVariations;
+		vector<double> vDphiVariations;
 		double nRecoJetEvts, nGenJetEvts, nSmearedJetEvts, nVectorInexWarnings;
 		vector<string> vTriggersToUse; 
 
@@ -152,7 +153,7 @@ class FactorizationBySmearing : public NtupleSelector {
 							const TLorentzVector& met) const;
 		vector<unsigned> FindBjets(const vector<TLorentzVector>& jets, const vector<double>& bDisc);
 		void GetHist(TDirectory *dir, Hist_t& hist, 
-					const pair<unsigned, unsigned> njetrange,
+					const string bitMaskString,
 					const pair<unsigned, unsigned> htrange,
 					const pair<unsigned, unsigned> mhtrange,
 					const bool mcFlag
@@ -167,7 +168,8 @@ class FactorizationBySmearing : public NtupleSelector {
 		int CountJets(const std::vector<TLorentzVector>& vjets, 
 			const double minPt, const double maxEta);		
 		void FillJetHistogram(const vector<TLorentzVector>& jets, 
-				vector<JetHist_t> hist, const int jetcoll, const TLorentzVector& mhtvec, const double& wgt=1.0); 
+				vector<JetHist_t> hist, const int jetcoll, 
+				const TLorentzVector& metvec, const TLorentzVector& mhtvec, const double& wgt=1.0); 
 		double DelPhiMin(const vector<TLorentzVector>& jets, 
 					const TLorentzVector& mhtVec, const unsigned& njet50min);
 		bool PassDphiCut(const vector<TLorentzVector>& jets, 
@@ -184,6 +186,9 @@ class FactorizationBySmearing : public NtupleSelector {
    	void TripletSelector(const std::vector<TLorentzVector> & , const std::vector<double> bDisc, std::vector<TLorentzVector> & , std::vector<TLorentzVector> & , std::vector<TLorentzVector> & , double & , double & );
 		topTagger::type3TopTagger* topt;
 		unsigned nreco, ngen, nsmear;
+		string GetMaskString(const unsigned& bitMask);
+		unsigned GetMaskBin(const unsigned& passBitMask);
+		unsigned tnjetonly, tmetonly, tnjetmetonly, tnjetmetdphionly;
 };
 #endif
 

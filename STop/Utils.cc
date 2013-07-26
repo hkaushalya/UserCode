@@ -93,3 +93,4 @@ void printProgBar( int percent ){
   std::cout.width( 3 );
   std::cout<< percent << "%     " << std::flush;
 }
+

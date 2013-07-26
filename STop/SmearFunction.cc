@@ -22,7 +22,7 @@ SmearFunction::SmearFunction()
 	//set a new seed for each job. This is good for jobs starting 
 	//more than second apart or so.
 	gRandom->SetSeed();
-//	cout << "first rand#" << gRandom->Rndm() << endl;
+	cout << __FUNCTION__ << ":" << __LINE__ << ":first rand#" << gRandom->Rndm() << endl;
 
    // get parameters from config
    LowerTailScaling_variation_   = 1.0; 
