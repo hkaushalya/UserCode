@@ -88,6 +88,7 @@ class Factorization : public edm::EDFilter {
 			TH1F* nvtx;
 			TH1F* mht;
 			TH1F* pfmht;
+			TH1F* pfmet;
 			TH1F* ht;	//calculated by hand
 			TH1F* pfht; //ht in PAT
 			TH1F* njet30;
@@ -146,10 +147,11 @@ class Factorization : public edm::EDFilter {
 								const float htMax, Hist_t& hist);
 
 		void FillHistograms(
-				edm::Handle<reco::VertexCollection> vertexHandle,
+				//edm::Handle<reco::VertexCollection> vertexHandle,
 				edm::Handle<std::vector<pat::Jet> > pf30eta50JetHandle,
 				edm::Handle<std::vector<pat::Jet> > pf50eta25JetHandle,
 				edm::Handle<edm::View<reco::MET> > mhtHandle,
+				edm::Handle<std::vector<reco::PFMET> >pfMetHandle,
 				edm::Handle<double> htHandle, const float& myht, const float& mymht,
 				const float dPhiMin, 
 				const bool bRA2DphiCut, 
@@ -161,8 +163,9 @@ class Factorization : public edm::EDFilter {
 				);
 		// ----------member data ---------------------------
 		//jet collections
-		edm::InputTag mhtInputTag_, htInputTag_;
+		edm::InputTag mhtInputTag_, htInputTag_, metInputTag_;
 		edm::Handle<edm::View<reco::MET> > mhtHandle;
+		edm::Handle<std::vector<reco::PFMET> >pfMetHandle;
 		edm::Handle<double> htHandle;
 		edm::InputTag prescaleWeightInputTag;
 
@@ -188,7 +191,6 @@ class Factorization : public edm::EDFilter {
 		float DelPhiMin(edm::Handle<std::vector<pat::Jet> > jetHandle
 				, edm::Handle<edm::View<reco::MET> > mhtHandle);
 		TLorentzVector vMetVec;
-		edm::Handle<std::vector<reco::PFMET> >pfMetHandle;
 		unsigned uFailMinHTCut, uFailMinPFMHTCut;
 
 		edm::LumiReWeighting LumiWeights_;
@@ -234,6 +236,7 @@ Factorization::Factorization(const edm::ParameterSet& iConfig)
 	patJetsPFPt50Eta25InputTag_ = iConfig.getParameter<edm::InputTag>("patJetsPFPt50Eta25InputTag");
 	patJetsPFPt30Eta50InputTag_ = iConfig.getParameter<edm::InputTag>("patJetsPFPt30Eta50InputTag");
 	mhtInputTag_    = iConfig.getParameter<edm::InputTag>("mhtInputTag");
+	metInputTag_    = iConfig.getParameter<edm::InputTag>("metInputTag");
 	htInputTag_     = iConfig.getParameter<edm::InputTag>("htInputTag");
 	//outputFile      = iConfig.getUntrackedParameter<double>("outputFile","Default.root");
 	dMinHT          = iConfig.getUntrackedParameter<double>("dMinHT",0.0);
@@ -299,21 +302,23 @@ void Factorization::BookCommonHistograms(TFileDirectory& dir, const float htMin,
 
 	//ht/mht/jet et,eta,phi,dphi-jet-mht, jet mass
 
-	const double evt_mht_max = 1500, evt_mht_bins = 750;
+	const double evt_mht_max = 500, evt_mht_bins = 100;
 	const double evt_ht_max = 4000, evt_ht_bins = 800;
 	hist.evt.nvtx   = dir.make<TH1F> ("nvtx"  ,"RA2 Good Vertices; N Vtx;Events;", 40, 0, 40);
-	hist.evt.pfmht  = dir.make<TH1F> ("pfmht","MHT from PFmetHandle;MHT [GeV];Events;", evt_mht_bins, 0, evt_mht_max);
+	hist.evt.pfmht  = dir.make<TH1F> ("pfmht","MHT from mhtMetHandle;MHT [GeV];Events;", evt_mht_bins, 0, evt_mht_max);
+	hist.evt.pfmet  = dir.make<TH1F> ("pfmet","MET from pfMet Hnadle;MET [GeV];Events;", evt_mht_bins, 0, evt_mht_max);
 	hist.evt.mht    = dir.make<TH1F> ("mht"  ,"Calculated MHT;MHT [GeV];Events;", evt_mht_bins, 0, evt_mht_max);
 	hist.evt.ht     = dir.make<TH1F> ("ht"   ,"HT from pfHT Handle ;pfHT [GeV];Events;", evt_ht_bins, 0, evt_ht_max);
-	hist.evt.pfht   = dir.make<TH1F> ("pfht" ,"HT from Jets ET>50 GeV && |#Eta|<2.4;HT [GeV];Events;", evt_ht_bins, 0, evt_ht_max);
-	hist.evt.njet30 = dir.make<TH1F> ("njet30" ,"Njets (Et>30 GeV && | #Eta |<5.0;NJETS;Events;", 20, 0, 20);
-	hist.evt.njet50 = dir.make<TH1F> ("njet50" ,"Njets (Et>50 GeV && | #Eta |<2.4;NJETS;Events;", 20, 0, 20);
+	hist.evt.pfht   = dir.make<TH1F> ("pfht" ,"HT from Jets ET>50 GeV && |#eta |<2.4;HT [GeV];Events;", evt_ht_bins, 0, evt_ht_max);
+	hist.evt.njet30 = dir.make<TH1F> ("njet30" ,"Njets (Et>30 GeV && | #eta |<5.0;NJETS;Events;", 20, 0, 20);
+	hist.evt.njet50 = dir.make<TH1F> ("njet50" ,"Njets (Et>50 GeV && | #eta |<2.4;NJETS;Events;", 20, 0, 20);
 	hist.evt.meff   = dir.make<TH1F> ("meff" ,"RA2:;MEff;Events;", 50, 0, 5000);
 	hist.evt.prescaleWeights = dir.make<TH1F> ("prescaleWeights","Prescale Weights",2000,0,2000);
 	hist.evt.eventWeights    = dir.make<TH1F> ("totalEventWeights","Total Event Weights",2000,0,2000);
 	hist.evt.dphiMin = dir.make<TH1F> ("dphiMin"  ,"RA2: #Delta#Phi_{min}" , 150, 0, 3);
 
 	hist.evt.pfmht->Sumw2();
+	hist.evt.pfmet->Sumw2();
 	hist.evt.mht->Sumw2();
 	hist.evt.ht->Sumw2();
 	hist.evt.pfht->Sumw2();
@@ -323,7 +328,7 @@ void Factorization::BookCommonHistograms(TFileDirectory& dir, const float htMin,
 	hist.evt.prescaleWeights->Sumw2();
 	hist.evt.eventWeights->Sumw2();
 
-	const double pt_bins = 200, pt_max = 2000;
+	const double pt_bins = 100, pt_max = 500;
 	for (int i =0; i < 10; ++i)
 	{
 		const int jetnum = i+1;
@@ -339,7 +344,7 @@ void Factorization::BookCommonHistograms(TFileDirectory& dir, const float htMin,
 
 		hist.jet[i].pt  = dir.make<TH1F> (pt_name.str().c_str(),pt_title.str().c_str(), pt_bins, 0, pt_max);
 		hist.jet[i].eta = dir.make<TH1F> (eta_name.str().c_str(),eta_title.str().c_str(), 100, -5, 5);
-		hist.jet[i].phi = dir.make<TH1F> (phi_name.str().c_str(),phi_title.str().c_str(), 160, -8, 8);
+		hist.jet[i].phi = dir.make<TH1F> (phi_name.str().c_str(),phi_title.str().c_str(), 100, -5, 5);
 		hist.jet[i].delphi = dir.make<TH1F> (dphi_name.str().c_str(),dphi_title.str().c_str(), 40, 0, 4);
 
 		hist.jet[i].pt->Sumw2();
@@ -433,13 +438,14 @@ Factorization::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 			<< ":" << kRunLumiEvent.evt << std::endl;
 
 	//vertex cut is applied in the RA2Cleanning process.
-	Handle<reco::VertexCollection> vertexHandle;
+	/*Handle<reco::VertexCollection> vertexHandle;
 	iEvent.getByLabel("goodVerticesRA2", vertexHandle);
    if (! vertexHandle.isValid())
 	{
 		std::cout << __FUNCTION__ << ":" << __LINE__ << ":vertexHandle handle not found!" << std::endl;
 		assert(false);
 	}
+	*/
 
 	Weight = 1;
 
@@ -523,6 +529,17 @@ Factorization::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 		assert(false);
 	}
 
+	iEvent.getByLabel(metInputTag_, pfMetHandle);
+	if (! pfMetHandle.isValid()) 
+	{
+		std::cout << __FUNCTION__ << ":" << __LINE__ << ":MET handle not found!" << std::endl;
+		assert(false);
+	}
+
+//	const float met    = (*pfMetHandle)[0].pt();
+//	const float metphi = (*pfMetHandle)[0].phi();
+//	cout << kRunLumiEvent.run << ":" << kRunLumiEvent.lumi << ":" 
+//			<< kRunLumiEvent.evt << ":met/phi=" << met << "/"<< metphi << endl;  
 	//APPLY RA2 cuts
 
 	if ( pfpt50eta25JetHandle->size() <3 ) return 0;
@@ -554,24 +571,24 @@ Factorization::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 
 	//Check if RA2 dphi cuts are satisfied
 	bool bPassRA2dphiCut = true;
-	bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[0].phi(), (*mhtHandle)[0].phi())) > 0.5);
-	bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[1].phi(), (*mhtHandle)[0].phi())) > 0.5);
-	bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[2].phi(), (*mhtHandle)[0].phi())) > 0.3);
+	//bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[0].phi(), (*mhtHandle)[0].phi())) > 0.5);
+	//bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[1].phi(), (*mhtHandle)[0].phi())) > 0.5);
+	//bPassRA2dphiCut = bPassRA2dphiCut && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[2].phi(), (*mhtHandle)[0].phi())) > 0.3);
 
 
 	/**************************************************/
 	//                 for systematics
 	/**************************************************/
 	bool bSidebandSyst1 = true;
-	if (pfpt30eta50JetHandle->size() >= 1) bSidebandSyst1 = bSidebandSyst1 && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[0].phi(), (*mhtHandle)[0].phi())) > 0.5);
+	/*if (pfpt30eta50JetHandle->size() >= 1) bSidebandSyst1 = bSidebandSyst1 && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[0].phi(), (*mhtHandle)[0].phi())) > 0.5);
 	if (pfpt30eta50JetHandle->size() >= 2) bSidebandSyst1 = bSidebandSyst1 && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[1].phi(), (*mhtHandle)[0].phi())) > 0.5);
 	if (pfpt30eta50JetHandle->size() >= 3) bSidebandSyst1 = bSidebandSyst1 && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[2].phi(), (*mhtHandle)[0].phi())) > 0.1);
-
+	*/
 	bool bSidebandSyst2 = true;
-	if (pfpt30eta50JetHandle->size() >= 1) bSidebandSyst2 = bSidebandSyst2 && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[0].phi(), (*mhtHandle)[0].phi())) > 0.4);
+	/*if (pfpt30eta50JetHandle->size() >= 1) bSidebandSyst2 = bSidebandSyst2 && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[0].phi(), (*mhtHandle)[0].phi())) > 0.4);
 	if (pfpt30eta50JetHandle->size() >= 2) bSidebandSyst2 = bSidebandSyst2 && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[1].phi(), (*mhtHandle)[0].phi())) > 0.4);
 	if (pfpt30eta50JetHandle->size() >= 3) bSidebandSyst2 = bSidebandSyst2 && (std::abs(reco::deltaPhi((*pfpt30eta50JetHandle)[2].phi(), (*mhtHandle)[0].phi())) > 0.2);
-
+	*/
 	//loop over all ht bins
 	for (unsigned i =0; i < htBins_.size()-1; ++i)
 	{
@@ -581,10 +598,11 @@ Factorization::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 		if (myHt >= htBins_.at(i) && myHt < htBins_.at(i+1)) 
 		{
 			FillHistograms(
-				vertexHandle,
+				//vertexHandle,
 				pfpt30eta50JetHandle,
 				pfpt50eta25JetHandle,
 				mhtHandle,
+				pfMetHandle,
 				htHandle,
 				myHt, 
 				myMht,
@@ -760,10 +778,11 @@ float Factorization::DelPhiMin(edm::Handle<std::vector<pat::Jet> > jetHandle,
 }
 
 void Factorization::FillHistograms(
-				edm::Handle<reco::VertexCollection> vertexHandle,
+				//edm::Handle<reco::VertexCollection> vertexHandle,
 				edm::Handle<std::vector<pat::Jet> > pf30eta50JetHandle,
 				edm::Handle<std::vector<pat::Jet> > pf50eta25JetHandle,
 				edm::Handle<edm::View<reco::MET> > mhtHandle,
+				edm::Handle<std::vector<reco::PFMET> >pfMetHandle,
 				edm::Handle<double> htHandle, const float& myht, const float& mymht,
 				const float dPhiMin, 
 				const bool bRA2DphiCut, 
@@ -778,15 +797,17 @@ void Factorization::FillHistograms(
 	hist.evt.prescaleWeights->Fill(prescaleWeight);
 	hist.evt.eventWeights->Fill(Weight);
 
-	hist.evt.nvtx->Fill(vertexHandle->size(), Weight);
+	//hist.evt.nvtx->Fill(vertexHandle->size(), Weight);
 
 	const float mht = (*mhtHandle)[0].pt();
+	const float pfmet = (*pfMetHandle)[0].pt();
 	const float ht  = (*htHandle);
 
 	hist.evt.njet50->Fill(pfpt50eta25JetHandle->size(), Weight);
 	hist.evt.njet30->Fill(pfpt30eta50JetHandle->size(), Weight);
 
 	hist.evt.pfmht->Fill(mht, Weight);
+	hist.evt.pfmet->Fill(pfmet, Weight);
 	hist.evt.pfht->Fill(ht, Weight);
 	hist.evt.meff->Fill(mht+ht, Weight);
 	hist.evt.mht->Fill(mymht, Weight);
