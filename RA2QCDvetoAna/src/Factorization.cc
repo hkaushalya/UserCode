@@ -88,7 +88,9 @@ class Factorization : public edm::EDFilter {
 			TH1F* nvtx;
 			TH1F* mht;
 			TH1F* pfmht;
+			TH1F* pfmhtphi;
 			TH1F* pfmet;
+			TH1F* pfmetphi;
 			TH1F* ht;	//calculated by hand
 			TH1F* pfht; //ht in PAT
 			TH1F* njet30;
@@ -302,11 +304,13 @@ void Factorization::BookCommonHistograms(TFileDirectory& dir, const float htMin,
 
 	//ht/mht/jet et,eta,phi,dphi-jet-mht, jet mass
 
-	const double evt_mht_max = 500, evt_mht_bins = 100;
-	const double evt_ht_max = 4000, evt_ht_bins = 800;
+	const double evt_mht_max = 1000, evt_mht_bins = 100;
+	const double evt_ht_max = 13000, evt_ht_bins = 1300;
 	hist.evt.nvtx   = dir.make<TH1F> ("nvtx"  ,"RA2 Good Vertices; N Vtx;Events;", 40, 0, 40);
 	hist.evt.pfmht  = dir.make<TH1F> ("pfmht","MHT from mhtMetHandle;MHT [GeV];Events;", evt_mht_bins, 0, evt_mht_max);
-	hist.evt.pfmet  = dir.make<TH1F> ("pfmet","MET from pfMet Hnadle;MET [GeV];Events;", evt_mht_bins, 0, evt_mht_max);
+	hist.evt.pfmhtphi  = dir.make<TH1F> ("pfmhtphi","#Phi of pfMHT from pfmhtHandle;#Phi;Events;", 100, -5., 5.);
+	hist.evt.pfmet  = dir.make<TH1F> ("pfmet","MET from pfMet Handle;MET [GeV];Events;", evt_mht_bins, 0, evt_mht_max);
+	hist.evt.pfmetphi  = dir.make<TH1F> ("pfehtphi","#Phi of pfMET from pfmetMetHandle;#Phi;Events;", 100, -5., 5.);
 	hist.evt.mht    = dir.make<TH1F> ("mht"  ,"Calculated MHT;MHT [GeV];Events;", evt_mht_bins, 0, evt_mht_max);
 	hist.evt.ht     = dir.make<TH1F> ("ht"   ,"HT from pfHT Handle ;pfHT [GeV];Events;", evt_ht_bins, 0, evt_ht_max);
 	hist.evt.pfht   = dir.make<TH1F> ("pfht" ,"HT from Jets ET>50 GeV && |#eta |<2.4;HT [GeV];Events;", evt_ht_bins, 0, evt_ht_max);
@@ -318,7 +322,9 @@ void Factorization::BookCommonHistograms(TFileDirectory& dir, const float htMin,
 	hist.evt.dphiMin = dir.make<TH1F> ("dphiMin"  ,"RA2: #Delta#Phi_{min}" , 150, 0, 3);
 
 	hist.evt.pfmht->Sumw2();
+	hist.evt.pfmhtphi->Sumw2();
 	hist.evt.pfmet->Sumw2();
+	hist.evt.pfmetphi->Sumw2();
 	hist.evt.mht->Sumw2();
 	hist.evt.ht->Sumw2();
 	hist.evt.pfht->Sumw2();
@@ -328,7 +334,7 @@ void Factorization::BookCommonHistograms(TFileDirectory& dir, const float htMin,
 	hist.evt.prescaleWeights->Sumw2();
 	hist.evt.eventWeights->Sumw2();
 
-	const double pt_bins = 100, pt_max = 500;
+	const double pt_bins = 100, pt_max = 1000;
 	for (int i =0; i < 10; ++i)
 	{
 		const int jetnum = i+1;
@@ -799,15 +805,19 @@ void Factorization::FillHistograms(
 
 	//hist.evt.nvtx->Fill(vertexHandle->size(), Weight);
 
-	const float mht = (*mhtHandle)[0].pt();
-	const float pfmet = (*pfMetHandle)[0].pt();
+	const float mht      = (*mhtHandle)[0].pt();
+	const float mhtphi   = (*mhtHandle)[0].phi();
+	const float pfmet    = (*pfMetHandle)[0].pt();
+	const float pfmetphi = (*pfMetHandle)[0].phi();
 	const float ht  = (*htHandle);
 
 	hist.evt.njet50->Fill(pfpt50eta25JetHandle->size(), Weight);
 	hist.evt.njet30->Fill(pfpt30eta50JetHandle->size(), Weight);
 
 	hist.evt.pfmht->Fill(mht, Weight);
+	hist.evt.pfmhtphi->Fill(mhtphi, Weight);
 	hist.evt.pfmet->Fill(pfmet, Weight);
+	hist.evt.pfmetphi->Fill(pfmetphi, Weight);
 	hist.evt.pfht->Fill(ht, Weight);
 	hist.evt.meff->Fill(mht+ht, Weight);
 	hist.evt.mht->Fill(mymht, Weight);
